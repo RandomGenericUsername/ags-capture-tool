@@ -1,0 +1,62 @@
+{
+  "//": [
+    "Desktop-stack typecheck config for the ags-capture-tool package. HAND-WRITTEN",
+    "AND COMMITTED. `ags bundle` transpiles without type-checking, so this is the",
+    "gate that catches a type error before it becomes a runtime failure.",
+    "",
+    "`ags types -d . -u` writes its OWN tsconfig.json at the repo root and",
+    "OVERWRITES it on every run, so this file deliberately uses a non-colliding",
+    "name. Do not rename it to tsconfig.json.",
+    "",
+    "make types runs `ags types -d . -u` and generates the machine-specific",
+    "@girs/ + env.d.ts for THIS host; both are gitignored. The `ags`/`ags/*`",
+    "paths map makes the AGS runtime resolve for every file in the program,",
+    "including ags-platform adapters that import `ags/gtk4/app`.",
+    "resolveJsonModule is required by the platform's icon-registry adapter;",
+    "skipLibCheck skips identifier clashes in the generated GIR declarations.",
+    "",
+    "`types: []` PINS THE AMBIENT-TYPE SURFACE TO EMPTY, ON PURPOSE. This app runs",
+    "under GJS, not Node. Without the pin, TypeScript auto-includes every",
+    "reachable @types/* package, which makes the app's ambient surface depend on",
+    "where a directory happens to live. tests/tsconfig.tests.json asks for node",
+    "types by name, as a separate project.",
+    "",
+    "lib/ is NOT a generated or third-party layer here: it holds the pure",
+    "appearance/refresh cores. domain/, ports/ and lib/ import no `gi://*` and",
+    "no `ags/*`; the desktop-free part is exercised by tests/ts/typecheck-config."
+  ],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "ags/gtk4",
+
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "target": "ES2020",
+    "strict": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "ags": ["/usr/share/ags/js/lib/index.ts"],
+      "ags/*": ["/usr/share/ags/js/lib/*"]
+    },
+
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"],
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "types": []
+  },
+  "include": [
+    "*.ts",
+    "*.tsx",
+    "ui/**/*.ts",
+    "ui/**/*.tsx",
+    "lib/**/*.ts",
+    "domain/**/*.ts",
+    "ports/**/*.ts",
+    "adapters/**/*.ts",
+    "@girs/index.d.ts",
+    "env.d.ts"
+  ],
+  "exclude": ["node_modules", "bin", "tests", "templates", "build", ".dev", ".worktrees"]
+}

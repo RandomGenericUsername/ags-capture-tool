@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "app": "capture",
+  "instance": "capture",
+  "configDir": "ags-capture",
+  "mode": "live",
+  "holdsUnsavedState": false
+}

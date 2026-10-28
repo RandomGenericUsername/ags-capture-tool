@@ -1,0 +1,10 @@
+{
+  "name": "ags-capture-tool",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone AGS screenshot/recording app (instance capture, config dir ags-capture).",
+  "exports": {
+    ".": "./app.tsx"
+  }
+}

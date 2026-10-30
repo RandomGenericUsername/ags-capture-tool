@@ -28,7 +28,7 @@ protocol.
       `--rec-accent` ≈ the palette's red accent, wired through the palette
       refresh, not a hardcoded literal).
       — Source/CSS verified; live visual not measured (Evidence A1–A3).
-- [ ] S4 chrome visibility follows `bar.recording_hud` (design.md D9/§6,
+- [x] S4 chrome visibility follows `bar.recording_hud` (design.md D9/§6,
       default `hidden`): `hidden` = no capture-bar HUD in the frames and
       ags-bar is the sole live timer; launcher/keybind mid-recording presents
       the S4 HUD without altering the capture; `always` = Sheet 3 S4 HUD
@@ -37,15 +37,19 @@ protocol.
       mode; pure visibility rule covered by tests.
       — Supersedes the earlier "S4 HUD always visible" acceptance; the widget
       tree, timer and locking already verified (Evidence H1–H3) carry over.
-- [ ] Live state comes from the event bus (design.md §11.7), not backend
+      Pure rule, settings tolerance, commit wiring and the launcher/hover paths
+      are verified (Evidence H7–H9). The literal "absent from a recorded
+      artifact" observation still needs a real clip (Verification limits).
+- [x] Live state comes from the event bus (design.md §11.7), not backend
       stdout: `capture.state {state, elapsed_seconds, job_id}` via
       `ags-platform/adapters/event-bus`; Pause/Stop via
       `hub.control(job_id, action)`; ags-bar's existing recording indicator
       coordinated (single indicator or explicit duplication, documented).
-      — Bus subscription + `hub.control` are verified (Evidence E1–E3). NOT
-      TICKED: the coordination decision is a **user decision** (see “User
-      decision required”); the HUD is a layer surface expected to be captured
-      and the indicator is explicitly duplicated with ags-bar.
+      — Bus subscription + `hub.control` verified (Evidence E1–E3). D9 resolves
+      the coordination: the default `hidden` makes ags-bar the **sole automatic
+      live indicator**; the capture-bar HUD is opt-in (`always`/`hover`) or
+      on-demand (launcher mid-recording), and both timers read the same
+      `elapsed_seconds` topic (Evidence H7, “Resolved: D9”).
 - [x] Red accent uses a palette token (design.md §11.6; start with `@error`
       mapped to `--rec-accent`), no hardcoded hex; if the active theme's
       `@error` is not red-adjacent, stop and report instead of inventing a
@@ -74,7 +78,7 @@ protocol.
       (Evidence H6).
 - [x] Gates: `make test`, `make conformance`, `make backend` (recording HUD
       does not change backend contract apart from REQ-003's commit path);
-      `make typecheck`.
+      `make typecheck`, `make bundle`.
       — All five gates exit 0 at final code HEAD (Evidence G1).
 
 ## Evidence
@@ -100,9 +104,9 @@ resolves to the palette token, not to an invalid token stream.
 `style.css:246-266` maps `.bar-cta.record`, the active chip
 (`.capture-shell.recording .railicon.active`) and every selected pill
 (`.capture-shell.recording .bar-pill.selected`) to `var(--rec-accent)`.
-`ui/classic/ClassicWindow.tsx:337-340` sets the shell class from the one
-`BarState`, and `:359-363` flips the CTA label `Capture → Record`.
-`tests/ts/recording-lifecycle.test.ts:66-91` pins both.
+`ui/classic/ClassicWindow.tsx:381-382` sets the shell class from the one
+`BarState`, and `:402-407` flips the CTA label `Capture → Record`.
+`tests/ts/recording-lifecycle.test.ts:69-94` pins both.
 
 ### A3 — pending overlay is red in recording, blue in screenshot
 
@@ -110,38 +114,39 @@ resolves to the palette token, not to an invalid token stream.
 from the single `OverlayView.mode`; `style.css:102-126` tints rect, handles,
 ring, the selected monitor outline and the badge. The dim rule
 (`style.css:49-52`) is deliberately untouched and stays neutral.
-`tests/ts/recording-lifecycle.test.ts:93-97`.
+`tests/ts/recording-lifecycle.test.ts:96-100`.
 
 ### H1 — pure S4 state machine, timer and ordering
 
-`domain/recording-hud.ts:24-176`: `formatElapsed`, `elapsedAt` (paused/idle
+`domain/recording-hud.ts:113-224`: `formatElapsed`, `elapsedAt` (paused/idle
 freeze), `reduceCaptureState` (duplicate/out-of-order/ended-job guards) and
-`stoppedHud`. Executed by `tests/ts/recording-hud.test.ts:36-174`:
+`stoppedHud`. Executed by `tests/ts/recording-hud.test.ts:36-182`:
 running → paused → resumed, pause span excluded, duplicate idempotence,
 out-of-order ignore, idle/unknown terminal, job replay blocked.
 
 ### H2 — the HUD is fed by `capture.state`, not stdout
 
-`ui/classic/ClassicWindow.tsx:585-602` subscribes once per window, hydrates
+`ui/classic/ClassicWindow.tsx:636-642` subscribes once per window, hydrates
 through the platform client and ticks only the *rendered* value between
-pushes; the source of truth is the pushed `elapsed_seconds`. Pause/Stop route
-through `captureState.control` (`ClassicWindow.tsx:313-328`); Stop closes S0
-via `leaveLiveHud` (`:273-279`). A Stop pressed before the first snapshot
-stores the intent and controls the job when its id arrives (`:287-311`).
-`tests/ts/recording-lifecycle.test.ts:118-150`.
+pushes (`:645-650`); the source of truth is the pushed `elapsed_seconds`.
+Pause/Stop route through `captureState.control`
+(`ClassicWindow.tsx:360-373`); Stop closes S0 via `leaveLiveHud`
+(`:313-323`). A Stop pressed before the first snapshot stores the intent and
+controls the job when its id arrives (`:332-357`).
+`tests/ts/recording-lifecycle.test.ts:121-157`.
 
 ### H3 — S4 is HUD only; options locked; compact placement
 
-`ui/classic/ClassicWindow.tsx:826-939` is the S4 row: `hud-dot`, `hud-timer`,
+`ui/classic/ClassicWindow.tsx:911-1022` is the S4 row: `hud-dot`, `hud-timer`,
 Pause and Stop, plus a popup that only opens in compact mode
-(`:840-845`). It contains no back chevron, no option page and no settings
-entry. `onKey` consumes Esc/Enter while live (`:485-488`).
+(`:926-928`). It contains no back chevron, no option page and no settings
+entry. `onKey` consumes Esc/Enter while live (`:533-536`).
 `applyHudPlacement` is the single implementation of
-`bar_compact_controls` (`:229-234`):
+`bar_compact_controls` (`:235-240`):
 `hudControlPlacement(config.bar_compact_controls)` →
 `hudActions.visible = placement.barControls`.
 `tests/ts/recording-hud.test.ts:155-158` covers both placements;
-`tests/ts/recording-lifecycle.test.ts:99-116,159-165` pins the widget/source
+`tests/ts/recording-lifecycle.test.ts:102-124,162-167` pins the widget/source
 split.
 
 ### H4 — commit order and HUD reappearance
@@ -150,18 +155,65 @@ split.
 step between the hides and the launch:
 `hideOverlay → hideBar → showHud → launch`. Recording passes
 `showHud: committingRecording ? enterLiveHud : undefined`
-(`ui/classic/ClassicWindow.tsx:462-482`); screenshot still leaves the bar
-hidden. Executed by `tests/ts/commit-order.test.ts:69-82`; source-pinned by
-`tests/ts/recording-lifecycle.test.ts:166-181`.
+(`ui/classic/ClassicWindow.tsx:514-531`); `enterLiveHud` itself is mode-gated,
+so screenshot still leaves the bar hidden and `hidden` never maps it.
+Executed by `tests/ts/commit-order.test.ts:71-83`; source-pinned by
+`tests/ts/recording-lifecycle.test.ts:169-184`.
 
 ### H6 — palette refresh keeps the HUD in place
 
 The registered `AppearanceSurface` still only calls `syncWindowSize`
-(`ui/classic/ClassicWindow.tsx:576-580`); it does not touch visibility,
+(`ui/classic/ClassicWindow.tsx:624-628`); it does not touch visibility,
 `barState`, `hud` or the timer label. The CSS reload restyles the pulse; the
-existing 1s renderer (`:597-602`) repaints the same frozen/running value.
-`tests/ts/recording-lifecycle.test.ts:183-187` rejects any reset in the
+existing 1s renderer (`:645-650`) repaints the same frozen/running value.
+`tests/ts/recording-lifecycle.test.ts:186-190` rejects any reset in the
 refresh body.
+
+### H7 — `bar.recording_hud` setting and the pure visibility rule
+
+`domain/settings.ts:29` declares `ConfigRecordingHud = "hidden" | "always" |
+"hover"`, `:48` carries it on `bar`, `:69` defaults it to `"hidden"`, `:84-88`
+lists the accepted values and `:146-150` merges it with the existing
+`configOneOf` tolerance (missing/corrupt/unknown → `hidden`, no throw).
+`ui/classic/SettingsPage.tsx:208-221` adds the General-group `Recording HUD`
+pill row (Hidden / Always / On hover) and persists through the same
+`RowContext` store as Bar position and Top offset.
+`domain/recording-hud.ts:57-110` is the pure rule: `hidden` never maps or
+shows chrome unless `presentedByLauncher`; `always` maps + shows; `hover` maps
+with `showChrome === pointerInside`; not-live is `{false,false}`.
+Tests: `tests/ts/domain-settings.test.ts:159-181` (default, round-trip,
+corrupt, sibling preservation), `tests/ts/recording-hud.test.ts:185-294`
+(hidden/always/hover, the full matrix, stop reachability, corrupt mode).
+
+### H8 — S4 visibility wiring and the launcher presentation path
+
+`ui/classic/ClassicWindow.tsx:242-272` is the only place the rule meets GTK:
+opacity hides the row without collapsing the hit area, and mapping is changed
+only while live. `enterLiveHud` (`:298-309`) delegates to it, so `hidden` does
+not auto-map after commit, `always` maps/presents and `hover` maps with
+`pointerInside = false` until entry. The motion controller (`:681-698`) flips
+only `pointerInside`; it never calls `captureState.control`, the launcher or
+argv. A launcher/keybind map while live in `hidden` sets
+`hudPresentedByLauncher` (`:705-714`), and unmapping it clears the flag again
+(`:700-704`) so the next bus push cannot re-present it. It reveals Stop/Pause
+without touching the job. `leaveLiveHud` (`:313-323`) hides a
+launcher-presented `hidden` HUD again on stop.
+Tests: `tests/ts/recording-lifecycle.test.ts:196-306` (tolerance, settings
+row, pure-rule use, hidden no-auto-show, launcher presentation, hover
+controller, hide-on-stop, Stop present in the S4 row).
+`tests/ts/commit-order.test.ts` is unchanged and still executes the
+`hideOverlay → hideBar → showHud? → launch` order.
+
+### H9 — default hidden coordinates with ags-bar, no double automatic timer
+
+`domain/settings.ts:69` makes `hidden` the default, so a fresh install maps no
+capture-bar HUD automatically while recording; ags-bar's existing
+`capture.state` widget (`ags-bar/bar/widgets/recording.tsx:51-101`) is the sole
+automatic live timer/stop affordance. `always`/`hover` are explicit opt-in
+surfaces; both consume the same `elapsed_seconds` topic, so they cannot
+disagree about the timer. No ags-bar file was changed.
+Executed by `tests/ts/recording-hud.test.ts:185-294` (hidden) and
+`tests/ts/domain-settings.test.ts:159-165` (default).
 
 ### E1 — the platform event bus is the only reader
 
@@ -186,18 +238,21 @@ adds only the current recording segment; `pause` accumulates and clears the
 segment, so paused time is never counted. This is the semantic the HUD's
 freeze/resume test models (`tests/ts/recording-hud.test.ts:63-84`).
 
-### G1 — gates (final code HEAD `91cd10c`)
+### G1 — gates (final code HEAD `d3cd929`)
 
 | Gate | Exit | Key output |
 |---|---|---|
-| `make test` | 0 | `tests 282 / pass 282`, tests `tsc` clean |
+| `make test` | 0 | `tests 297 / pass 297`, tests `tsc` clean |
 | `make conformance` | 0 | `tests 16 / pass 16` |
 | `make backend` | 0 | `114 passed` |
 | `make typecheck` | 0 | `OK: 0 errors in the ags-capture-tool tree` |
-| `make bundle` | 0 | `build/capture.js (1430744 bytes)` |
+| `make bundle` | 0 | `build/capture.js (1450880 bytes)` |
 
 Per-commit gates were also run on `30b12a8` (commit 1) and `3c9c09d`
-(commit 2) with the same five commands, all exit 0.
+(commit 2) with the same five commands, all exit 0. The D9 code/test commit
+`d3cd929` was gated with all five commands immediately before the ticket-only
+commit that follows it; the same five gates were re-run after that ticket-only
+commit with identical results.
 
 ## Verification limits
 
@@ -209,35 +264,46 @@ Per-commit gates were also run on `30b12a8` (commit 1) and `3c9c09d`
   were **not exercised end-to-end**; the binding is tested against a mocked
   hub and the contract is cited.
 - No recording was produced, so the "is the HUD in the file?" observation is
-  reasoning from compositor/layer semantics, not an artifact (see below).
+  reasoning from compositor/layer semantics, not an artifact. The **default
+  `hidden`** now means the capture-bar surface is unmapped while live, so the
+  expected artifact has no capture-bar chrome; that still needs a real clip
+  (see the unchecked follow-up below).
 
-## User decision required — HUD capture and the ags-bar indicator
+## Resolved: D9 (2026-10-30) — HUD modes and the ags-bar indicator
 
-**1. Is the capture-bar HUD captured?** The HUD lives in `capture-window`, a
-layer-shell surface (`ui/classic/ClassicWindow.tsx:556-568`:
-`layer=OVERLAY`, `exclusivity=IGNORE`, never EXCLUSIVE). The recorder backends
-are `gpu-screen-recorder` / `wf-recorder` (`bin/capture-tool:165-200`), which
-capture the composited output. A composited layer surface is therefore
-**expected to be baked into every recorded frame** that intersects it — for a
-full-screen recording, every frame. This was not measured with a real clip.
+**Decision.** S4 visibility is settings-driven through `bar.recording_hud`
+(design.md D9/§6): `hidden` (default) / `always` / `hover`. The earlier
+"always visible / user decision required" position is superseded.
 
-**2. How it is coordinated with ags-bar.** The design allows “single indicator
-or explicit duplication”. This ticket implements **explicit duplication**:
-ags-bar's existing widget (`ags-bar/bar/widgets/recording.tsx:51-101`) and the
-new capture-bar HUD both subscribe to the same `capture.state` topic and use
-the same `elapsed_seconds` semantics, so they cannot disagree about the timer
-(both interpolate locally between pushes). Two indicators are still visible at
-once while recording. A single indicator would require changing ags-bar or the
-runtime (outside this repo / AD-1), or hiding the S4 HUD (contradicts design
-§3/§5).
+- **`hidden` (default):** the bar is not presented automatically while live;
+  ags-bar is the sole automatic live timer and stop affordance, so recordings
+  carry no capture-bar chrome. A launcher/keybind invocation mid-recording
+  presents the S4 HUD (Stop/Pause reachable) without altering the capture, and
+  Stop hides it again. Evidence H7–H9.
+- **`always`:** the Sheet 3 S4 HUD is mapped/presented automatically after
+  commit and is therefore part of recorded frames (the previous behaviour,
+  now opt-in). Evidence H7/H8.
+- **`hover`:** the bar window stays mapped as a hit area with chrome at
+  opacity 0; pointer entry reveals Pause/Stop, pointer leave hides the chrome.
+  Evidence H7/H8.
 
-Because the HUD would be part of the recording, the “live state / coordination”
-acceptance item stays unticked pending a user decision:
-- accept the HUD in every frame, or
-- exclude/hide it (requires a design change and probably a recorder-side
-  exclusion mechanism), and
-- confirm explicit duplication with ags-bar is acceptable, or schedule the
-  single-indicator follow-up.
+`Stop` remains reachable in all three modes (always visible, hover on pointer
+entry, hidden through the launcher), and the matrix is executed in
+`tests/ts/recording-hud.test.ts:251-284`.
+
+**Coordination with ags-bar.** No ags-bar change was made. Because the default
+is `hidden`, there is exactly one automatic live indicator (ags-bar); the
+capture-bar HUD is opt-in or on-demand. When it is shown, both surfaces consume
+the same `capture.state` `elapsed_seconds` topic, so they cannot disagree about
+the timer. This is the "single indicator or explicit duplication, documented"
+resolution the bus acceptance asked for (Evidence E1–E3, H9).
+
+### Follow-up (unverified — needs hardware)
+
+- [ ] Recorded-clip proof: with the default `hidden`, a full-screen recording
+      contains no capture-bar HUD; with `always` it does. Requires a real
+      compositor session and a produced clip, neither available in this
+      harness.
 
 ## Design notes / deviations
 

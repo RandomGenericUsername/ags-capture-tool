@@ -15,7 +15,9 @@
 //
 // The launcher adapter keeps its own 150ms compositor delay
 // (`adapters/exec-capture-launcher.ts`); that delay runs AFTER this sequence,
-// so it cannot reorder the hide against the spawn.
+// so it cannot reorder the hide against the spawn. Recording can optionally
+// re-map the bar as the S4 HUD (`showHud`) after the hide and before launch:
+// the pending UI is gone, and the bar the user keeps is the live HUD.
 //
 // PURE: callbacks in, no GTK, no process, no I/O.
 // ---------------------------------------------------------------------------
@@ -23,8 +25,14 @@
 export interface CommitSequence {
   /** Hide/destroy the overlay chrome synchronously. */
   hideOverlay: () => void
-  /** Hide the bar synchronously (the legacy pre-capture hide). */
+  /** Hide the bar synchronously (the pre-capture hide). */
   hideBar: () => void
+  /**
+   * Optional: bring the bar back as the S4 live HUD. Recording passes this so
+   * the hide still happens first (nothing of the pending UI can reach a frame)
+   * but the bar is on screen as the HUD before the backend spawns.
+   */
+  showHud?: () => void
   /** Hand the finished argv to the launcher (which may defer the spawn). */
   launch: () => void
 }
@@ -37,5 +45,6 @@ export interface CommitSequence {
 export function runCommit(sequence: CommitSequence): void {
   sequence.hideOverlay()
   sequence.hideBar()
+  sequence.showHud?.()
   sequence.launch()
 }

@@ -15,11 +15,14 @@
 // ---------------------------------------------------------------------------
 
 import { Astal, Gdk, Gtk } from "ags/gtk4"
+import GLib from "gi://GLib?version=2.0"
 import { barMarginTop } from "../../domain/bar-placement"
 import {
   back,
   enterAction,
+  enterLive,
   homeBar,
+  isLive,
   isModeOpen,
   isSettingsOpen,
   openMode,
@@ -29,8 +32,20 @@ import {
 } from "../../domain/bar-state"
 import { recordingArgs, screenshotArgs } from "../../domain/cli-args"
 import type { RecordingRequest, ScreenshotRequest } from "../../domain/capture-request"
+import {
+  hudControlPlacement,
+  hudTimer,
+  idleHud,
+  isHudLive,
+  pauseAction,
+  pauseLabel,
+  reduceCaptureState,
+  stoppedHud,
+  type RecordingHudState,
+} from "../../domain/recording-hud"
 import type { CaptureSettings } from "../../domain/settings"
 import { runCommit } from "../../lib/commit-order"
+import type { CaptureStatePayload } from "../../ports/capture-state-feed"
 import type { SelectionController } from "../overlay/controller"
 import { configDefaults, durationSelection, type UiState } from "../../domain/ui-state"
 import type { CapturePorts } from "../../ports/capture-ports"
@@ -61,7 +76,7 @@ export function ClassicWindow(
   state: UiState,
   selection: SelectionController,
 ): Astal.Window {
-  const { settingsStore, uiStateStore, launcher, monitorReservedTop } = ports
+  const { settingsStore, uiStateStore, launcher, captureState, monitorReservedTop } = ports
 
   const initialSettings = settingsStore.load()
   const initialTop = initialSettings.bar.position === "top"
@@ -73,10 +88,19 @@ export function ClassicWindow(
       )
     : 0
 
-  // The S0/S1 surface machine. S2/S3/S4 are REQ-003/REQ-004; keeping this state
-  // pure (`domain/bar-state.ts`) is the seam they extend.
+  // The S0/S1 surface machine. S2/S3 are the selection controller's; S4 is the
+  // live HUD whose *display* state lives in `domain/recording-hud.ts`.
   let barState: BarState = homeBar()
   let config: CaptureSettings = initialSettings
+
+  // S4 feed. `hud` is the pure snapshot; the widgets below are a projection of
+  // it. `hudCompact` mirrors `bar_compact_controls` at the moment the lane went
+  // live (options are locked while live, so it cannot change under the user).
+  let hud: RecordingHudState = idleHud()
+  let hudCompact = false
+  let hudTicker: number | null = null
+  let unsubscribeFeed: (() => void) | null = null
+  let unsubscribeRestart: (() => void) | null = null
 
   // THIS window, captured from its own `<window>` `$` handler rather than
   // looked up by name (fix-capture-window-identity).
@@ -138,6 +162,15 @@ export function ClassicWindow(
   let recordingTab: Gtk.Button | null = null
   let cta: Gtk.Button | null = null
   let ctaLabel: Gtk.Label | null = null
+  let hudRow: Gtk.Box | null = null
+  let hudDot: Gtk.Box | null = null
+  let hudTimerLabel: Gtk.Label | null = null
+  let hudActions: Gtk.Box | null = null
+  let hudToggle: Gtk.Button | null = null
+  let hudToggleLabel: Gtk.Label | null = null
+  let hudPopup: Gtk.Popover | null = null
+  let hudPopupToggle: Gtk.Button | null = null
+  let hudPopupToggleLabel: Gtk.Label | null = null
   let monitorChip: Gtk.Button | null = null
   let monitorChipLabel: Gtk.Label | null = null
   let screenshotPage: ScreenshotPageHandle | null = null
@@ -185,18 +218,114 @@ export function ClassicWindow(
     }
   }
 
+  /**
+   * `bar_compact_controls` decides who carries Pause/Stop (design.md §6):
+   * true = dot+timer only in the bar, the popup carries the controls; false =
+   * the bar carries them. Both are the SAME state; only the widgets move.
+   */
+  function applyHudPlacement() {
+    const placement = hudControlPlacement(config.bar_compact_controls)
+    hudCompact = placement.popup
+    if (hudActions) hudActions.visible = placement.barControls
+    if (!placement.popup) hudPopup?.popdown()
+  }
+
+  /** Project the pure HUD snapshot onto the built widgets (no state change). */
+  function updateHudUi() {
+    if (hudTimerLabel) hudTimerLabel.set_label(hudTimer(hud, Date.now()))
+    if (hudDot) {
+      if (hud.phase === "paused") hudDot.add_css_class("paused")
+      else hudDot.remove_css_class("paused")
+    }
+    const label = pauseLabel(hud)
+    if (hudToggleLabel) hudToggleLabel.set_label(label)
+    if (hudPopupToggleLabel) hudPopupToggleLabel.set_label(label)
+    // Pause needs a job id to route `Control`; before the first snapshot there
+    // is nothing to control. Stop remains available as the one exit.
+    if (hudToggle) hudToggle.sensitive = hud.jobId !== null
+    if (hudPopupToggle) hudPopupToggle.sensitive = hud.jobId !== null
+    if (isLive(barState)) applyHudPlacement()
+  }
+
+  /**
+   * S4 entry. Recording commits hide the pending UI first (FR-10), then this
+   * brings the bar back as the HUD BEFORE the launcher spawns; the first
+   * `capture.state` snapshot fills in the job id and timer. Screenshot never
+   * calls it, so its commit still hides the bar.
+   */
+  function enterLiveHud() {
+    hud = idleHud()
+    // Re-read who owns Pause/Stop at the moment the lane goes live; options
+    // are locked from here, so one read is the whole S4 lifetime.
+    config = settingsStore.load()
+    barState = enterLive(barState)
+    applyBarState()
+    if (captureWindow) {
+      captureWindow.visible = true
+      captureWindow.present()
+    }
+  }
+
+  /** Back to S0 without destroying anything: Stop's documented exit. */
+  function leaveLiveHud() {
+    hudPopup?.popdown()
+    barState = homeBar()
+    applyBarState()
+    if (captureWindow?.visible) captureWindow.present()
+  }
+
+  /**
+   * One `capture.state` snapshot. The pure reducer owns ordering/idempotency;
+   * this only decides whether the HUD maps and when it closes. A terminal
+   * snapshot (idle, cancel, failure, unknown) returns the bar to S0 instead of
+   * leaving a stuck indicator.
+   */
+  function onCaptureState(payload: CaptureStatePayload) {
+    const next = reduceCaptureState(hud, payload, Date.now())
+    if (next === hud) return
+    hud = next
+    if (isHudLive(next)) {
+      if (!isLive(barState)) {
+        barState = enterLive(barState)
+        applyBarState()
+      }
+      updateHudUi()
+      if (captureWindow?.visible) captureWindow.present()
+      return
+    }
+    if (isLive(barState)) leaveLiveHud()
+  }
+
+  function togglePause() {
+    if (hud.jobId === null) return
+    captureState.control(hud.jobId, pauseAction(hud))
+  }
+
+  /**
+   * Stop is the ONLY exit from S4. The hub control is the single control path;
+   * the local phase closes immediately so the HUD cannot stick if the hub
+   * never answers, and `endedJobId` makes a late replay of this job a no-op.
+   */
+  function stopRecording() {
+    if (hud.jobId !== null) captureState.control(hud.jobId, "stop")
+    hud = stoppedHud(hud, Date.now())
+    leaveLiveHud()
+  }
+
   /** Translate the pure bar state into the built widget tree. */
   function applyBarState() {
     const modeOpen = isModeOpen(barState)
+    const live = isLive(barState)
     // The recording lane owns the red accent (design.md D4/§11.6). One class
     // on the shell scopes the chip, selected pills and CTA together, so the
     // screenshot lane cannot pick up a recording colour by accident.
     if (shell) {
-      if (barState.view === "recording") shell.add_css_class("recording")
+      if (barState.view === "recording" || live) shell.add_css_class("recording")
       else shell.remove_css_class("recording")
     }
     if (rail) rail.visible = barState.view === "home"
     if (openRow) openRow.visible = modeOpen
+    if (hudRow) hudRow.visible = live
     if (screenshotPage) screenshotPage.setVisible(barState.view === "screenshot")
     if (recordingPage) recordingPage.setVisible(barState.view === "recording")
     if (settingsPage) {
@@ -219,6 +348,7 @@ export function ClassicWindow(
       else cta.remove_css_class("record")
     }
     syncSelectionUi()
+    updateHudUi()
     syncWindowSize()
   }
 
@@ -274,7 +404,12 @@ export function ClassicWindow(
    * Commit is a ONE-WAY DOOR (D6): the pending selection is snapshotted, the
    * session locks inactive, the overlay + bar hide SYNCHRONOUSLY, and only then
    * does the launcher receive argv (FR-10). There is no post-commit editing
-   * state; the bar returns to S0 so the next open starts from a fresh session.
+   * state.
+   *
+   * Recording then returns the bar as the S4 HUD (design.md §3): the pending
+   * row is gone before the backend can see a frame, but the bar the user keeps
+   * is the live indicator. Screenshot keeps REQ-003's hide-and-stay-hidden
+   * behaviour.
    *
    * The legacy interactive backend path (no geometry/reference flags) is still
    * available to CLI users, but this UI never calls it: every request carries
@@ -284,30 +419,30 @@ export function ClassicWindow(
     const finished = selection.selection()
     if (finished === null) return
     if (finished.kind !== currentTarget()) return
+    const committingRecording = barState.view === "recording"
     uiStateStore.save(screenshot, recording)
     const current = settingsStore.load()
-    const argv =
-      barState.view === "recording"
-        ? recordingArgs({
-            target: recording.target,
-            fps: recording.fps,
-            gifFps: recording.gifFps,
-            format: recording.format,
-            audio: recording.audio,
-            quality: recording.quality,
-            duration: recording.duration,
-            size: recording.size,
-            cursor: current.recording.cursor,
-            selection: finished,
-          } satisfies RecordingRequest)
-        : screenshotArgs({
-            target: screenshot.target,
-            delay: screenshot.delay,
-            format: screenshot.format,
-            save: screenshot.save,
-            cursor: current.screenshot.cursor,
-            selection: finished,
-          } satisfies ScreenshotRequest)
+    const argv = committingRecording
+      ? recordingArgs({
+          target: recording.target,
+          fps: recording.fps,
+          gifFps: recording.gifFps,
+          format: recording.format,
+          audio: recording.audio,
+          quality: recording.quality,
+          duration: recording.duration,
+          size: recording.size,
+          cursor: current.recording.cursor,
+          selection: finished,
+        } satisfies RecordingRequest)
+      : screenshotArgs({
+          target: screenshot.target,
+          delay: screenshot.delay,
+          format: screenshot.format,
+          save: screenshot.save,
+          cursor: current.screenshot.cursor,
+          selection: finished,
+        } satisfies ScreenshotRequest)
 
     runCommit({
       // The controller clears the rect/pin and hides every overlay window
@@ -324,11 +459,18 @@ export function ClassicWindow(
         applyBarState()
         hideCaptureWindow()
       },
+      // Only recording re-maps the bar: the S4 HUD must be on screen before
+      // the backend's first frame, and this runs after the hides so no
+      // pending option can leak into that frame.
+      showHud: committingRecording ? enterLiveHud : undefined,
       launch: () => launcher.launch(argv),
     })
   }
 
   function onKey(keyval: number): boolean {
+    // S4 has no keyboard exit: INV-2 suppresses the back chevron, Enter must
+    // not start a second recording, and Stop is the only exit (mockup Sheet 3).
+    if (isLive(barState)) return true
     if (keyval === Gdk.KEY_Escape) {
       // An open inline path editor owns Escape (cancel the edit).
       if (isSettingsOpen(barState) && settingsPage !== null && settingsPage.cancelPathEditor()) {
@@ -425,10 +567,39 @@ export function ClassicWindow(
         // the bar's chip/CTA mirror the controller rather than only its own
         // click handlers.
         unsubscribeSelection = selection.subscribe(() => syncSelectionUi())
+        // S4 is a consumer of the hub's domain event, never backend stdout
+        // (design.md §11.7). Subscribe-before-read is inside the platform
+        // client, so a bar that starts mid-recording renders immediately.
+        unsubscribeFeed = captureState.subscribe(onCaptureState)
+        // A hub restart invalidates the old job: never leave a stale HUD up.
+        unsubscribeRestart = captureState.onRestart(() => {
+          hud = idleHud()
+          if (isLive(barState)) leaveLiveHud()
+        })
+        // Continuous rendering between pushes: the backend's pushed timer is
+        // the source of truth, and paused/idle values are frozen.
+        hudTicker = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+          if (isLive(barState) && hud.phase === "recording" && hudTimerLabel !== null) {
+            hudTimerLabel.set_label(hudTimer(hud, Date.now()))
+          }
+          return true
+        })
         self.connect("destroy", () => {
           if (unsubscribeSelection !== null) {
             unsubscribeSelection()
             unsubscribeSelection = null
+          }
+          if (unsubscribeFeed !== null) {
+            unsubscribeFeed()
+            unsubscribeFeed = null
+          }
+          if (unsubscribeRestart !== null) {
+            unsubscribeRestart()
+            unsubscribeRestart = null
+          }
+          if (hudTicker !== null) {
+            GLib.source_remove(hudTicker)
+            hudTicker = null
           }
           if (unregisterAppearance !== null) {
             unregisterAppearance()
@@ -634,6 +805,121 @@ export function ClassicWindow(
                 <label class="bar-kbd" label="Enter" />
               </box>
             </button>
+          </box>
+
+          {/* --------------------------------------------------- S4 HUD
+              Recording-live is HUD only (INV-2/INV-5): pulse dot, elapsed
+              timer, Pause/Stop. No back chevron, no target/fps/quality/audio
+              pills, no settings entry. `bar_compact_controls` decides whether
+              the controls live in this row or in the popup. */}
+          <box
+            visible={false}
+            class="capture-bar hud"
+            orientation={Gtk.Orientation.HORIZONTAL}
+            spacing={8}
+            $={(self) => {
+              hudRow = self
+            }}
+          >
+            <button
+              class="hud-status"
+              tooltipText="Recording controls"
+              onClicked={() => {
+                if (hudCompact) hudPopup?.popup()
+              }}
+            >
+              <box
+                orientation={Gtk.Orientation.HORIZONTAL}
+                spacing={6}
+                halign={Gtk.Align.CENTER}
+                valign={Gtk.Align.CENTER}
+              >
+                <box
+                  class="hud-dot"
+                  valign={Gtk.Align.CENTER}
+                  $={(self) => {
+                    hudDot = self
+                  }}
+                />
+                <label
+                  class="hud-timer"
+                  label="00:00"
+                  $={(self) => {
+                    hudTimerLabel = self
+                  }}
+                />
+              </box>
+            </button>
+            <box
+              class="hud-actions"
+              orientation={Gtk.Orientation.HORIZONTAL}
+              spacing={6}
+              $={(self) => {
+                hudActions = self
+              }}
+            >
+              <button
+                class="bar-pill hud-toggle"
+                tooltipText="Pause or resume the recording"
+                onClicked={togglePause}
+                $={(self) => {
+                  hudToggle = self
+                }}
+              >
+                <label
+                  label="Pause"
+                  $={(self) => {
+                    hudToggleLabel = self
+                  }}
+                />
+              </button>
+              <button
+                class="bar-pill hud-stop"
+                tooltipText="Stop recording"
+                onClicked={stopRecording}
+              >
+                <label label="⏹ Stop" />
+              </button>
+            </box>
+            <popover
+              $={(self) => {
+                hudPopup = self
+              }}
+            >
+              <box
+                class="hud-popup"
+                orientation={Gtk.Orientation.VERTICAL}
+                spacing={8}
+              >
+                <box
+                  class="hud-popup-row"
+                  orientation={Gtk.Orientation.HORIZONTAL}
+                  spacing={8}
+                >
+                  <box class="hud-dot" valign={Gtk.Align.CENTER} />
+                  <label label="Recording" />
+                </box>
+                <box homogeneous spacing={8}>
+                  <button
+                    class="bar-pill hud-toggle"
+                    onClicked={togglePause}
+                    $={(self) => {
+                      hudPopupToggle = self
+                    }}
+                  >
+                    <label
+                      label="Pause"
+                      $={(self) => {
+                        hudPopupToggleLabel = self
+                      }}
+                    />
+                  </button>
+                  <button class="bar-pill hud-stop" onClicked={stopRecording}>
+                    <label label="⏹ Stop" />
+                  </button>
+                </box>
+              </box>
+            </popover>
           </box>
 
           <SettingsPage

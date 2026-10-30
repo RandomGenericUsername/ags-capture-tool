@@ -7,16 +7,18 @@
  *
  * GTK4 CSS has no color-mix(): tints below are precomputed with alpha()/mix().
  *
- * NO literal colors here. TWO accents, two intents (gui-unification spec §3.4):
+ * NO literal colours here. TWO accents, two intents (gui-unification spec §3.4):
  *   @color_10 = SELECTION ("where you are"): solid fill on mode/segments,
  *               ring + 12% tint on the icon-bearing target tiles.
  *   @color_06 = ACTION ("what you can do"): the primary CTAs and the toggle-on
  *               state. Text on @color_06 follows @color_foreground, because the
  *               action slot is not guaranteed bright (live palette: dark steel).
+ *   @error    = RECORDING (design.md §11.6): exposed as `--rec-accent`; the
+ *               active recording chip, selected pills, CTA, overlay chrome and
+ *               the live HUD dot all read this one mapped token.
  * The palette's caution slot (@color_03) stays reserved for severity (settings
  * errors). Every surface follows the wallpaper like rofi's generated
- * colors.rasi. The only remaining literal is the pulsing record dot in the bar
- * stylesheet.
+ * colors.rasi.
  * ========================================================================== */
 
 /* RECORDING ACCENT (design.md §11.6, D4). The generated palette has no
@@ -270,6 +272,81 @@ window#capture-overlay {
   color: alpha(@color_foreground, 0.82);
   font-size: 10px;
   font-weight: 700;
+}
+
+/* ------------------------------------------------------------ S4 live HUD
+ * Recording-live is dot + timer + Pause/Stop, never options (design.md §5,
+ * Sheet 3). The dot is the ONE pulsing element; the recording accent comes
+ * from --rec-accent, so a palette refresh restyles the pulse too. */
+.capture-bar.hud {
+  padding: 6px 8px;
+}
+
+.hud-status {
+  padding: 0 6px;
+  border: none;
+  border-radius: 8px;
+  background-color: transparent;
+  color: @color_foreground;
+}
+
+.hud-status:hover {
+  background-color: alpha(@color_foreground, 0.08);
+}
+
+.hud-dot {
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 999px;
+  background-color: var(--rec-accent);
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
+
+.hud-dot.paused {
+  animation: none;
+  opacity: 0.45;
+}
+
+@keyframes rec-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.hud-timer {
+  font-size: 12px;
+  font-weight: 700;
+  color: @color_foreground;
+}
+
+.hud-actions {
+  /* Pause/Stop in the bar (bar_compact_controls = false). */
+}
+
+.hud-toggle {
+  min-width: 68px;
+}
+
+.hud-stop {
+  color: var(--rec-accent);
+}
+
+.hud-popup {
+  padding: 10px;
+  border-radius: 12px;
+  background-color: alpha(@color_00, 0.96);
+}
+
+.hud-popup-row {
+  color: @color_foreground;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .bar-custom-duration spinbutton,

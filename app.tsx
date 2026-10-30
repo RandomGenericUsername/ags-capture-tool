@@ -7,6 +7,7 @@ import style from "./style.css"
 import { theme } from "ags-platform/adapters/theme"
 import { execBackendProbe } from "./adapters/exec-backend-probe"
 import { execCaptureLauncher } from "./adapters/exec-capture-launcher"
+import { platformCaptureStateFeed } from "./adapters/platform-capture-state-feed"
 import { glibSettingsStore } from "./adapters/glib-settings-store"
 import { glibUiStateStore } from "./adapters/glib-ui-state-store"
 import { gdkMonitorTopology } from "./adapters/gdk-monitor-topology"
@@ -64,6 +65,7 @@ function buildPorts(): CapturePorts {
     settingsStore: glibSettingsStore(),
     uiStateStore: glibUiStateStore(),
     launcher: execCaptureLauncher(),
+    captureState: platformCaptureStateFeed(),
     backendProbe: execBackendProbe(),
     monitorReservedTop: hyprlandMonitorReservedTop(),
   }

@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 export type BarMode = "screenshot" | "recording"
-export type BarView = "home" | "settings" | BarMode
+export type BarView = "home" | "settings" | BarMode | "live"
 
 export interface BarState {
   view: BarView
@@ -44,6 +44,18 @@ export function back(state: BarState): BarState {
   return state.view === "home" ? state : { ...state, view: "home" }
 }
 
+/**
+ * S4 (design.md §3): recording is live and the bar is the HUD. It has no back
+ * chevron and no options; `Stop` is the only exit (INV-2 excludes S4).
+ */
+export function enterLive(_state: BarState): BarState {
+  return { view: "live", mode: "recording" }
+}
+
+export function isLive(state: BarState): boolean {
+  return state.view === "live"
+}
+
 export function isModeOpen(state: BarState): boolean {
   return state.view === "screenshot" || state.view === "recording"
 }
@@ -54,7 +66,8 @@ export function isSettingsOpen(state: BarState): boolean {
 
 /**
  * What Enter means in this state. `null` means Enter has no capture action
- * (S0), so the key controller must not accidentally commit from the rail.
+ * (S0 or the live HUD), so the key controller must not accidentally commit
+ * from the rail or start a second recording from S4.
  */
 export function enterAction(state: BarState): BarMode | "settings" | null {
   if (state.view === "settings") return "settings"

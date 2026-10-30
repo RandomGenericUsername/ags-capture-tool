@@ -14,6 +14,7 @@
 
 import type { BackendProbe } from "./backend-probe"
 import type { CaptureLauncher } from "./capture-launcher"
+import type { CaptureStateFeed } from "./capture-state-feed"
 import type { MonitorReservedTop } from "./monitor-reserved"
 import type { SettingsStore } from "./settings-store"
 import type { UiStateStore } from "./ui-state-store"
@@ -25,6 +26,8 @@ export interface CapturePorts {
   uiStateStore: UiStateStore
   /** Spawns the capture backend after the window is hidden. */
   launcher: CaptureLauncher
+  /** Live `capture.state` snapshots + Pause/Stop through the hub. */
+  captureState: CaptureStateFeed
   /** Reports the auto-selected recorder backend. */
   backendProbe: BackendProbe
   /** Reads the compositor's top reserved zone for top-placed bar margins. */

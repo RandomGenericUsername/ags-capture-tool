@@ -36,4 +36,12 @@ export interface MonitorFocus {
    * deterministic registration order on it.
    */
   focusedConnector(): string | null
+
+  /**
+   * Invoke `onChange` when the focused monitor may have changed.
+   *
+   * The window set uses this to re-map visibility only; it never rebuilds a
+   * window on focus. Implementations MAY deliver the same focus more than once.
+   */
+  subscribe(onChange: () => void): void
 }

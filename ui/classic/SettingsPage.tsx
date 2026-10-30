@@ -21,6 +21,7 @@
 import { Gtk } from "ags/gtk4"
 import { clearChildren } from "../shared/groups"
 import {
+  numberRow,
   pathRow,
   pillRow,
   settingsGroup,
@@ -33,6 +34,7 @@ import type { BackendProbe } from "../../ports/backend-probe"
 import type { SettingsStore } from "../../ports/settings-store"
 import type {
   CaptureSettings,
+  ConfigBarPosition,
   ConfigRecordingAudio,
   ConfigRecordingFps,
   ConfigRecordingQuality,
@@ -67,11 +69,13 @@ export interface SettingsPageProps {
   selectMode: (mode: "screenshot" | "recording") => void
   /** The mode to return to. */
   mode: "screenshot" | "recording"
+  /** Re-apply bar placement after a successful settings write. */
+  onSettingsChanged: () => void
   setHandle: (handle: SettingsPageHandle) => void
 }
 
 export function SettingsPage(props: SettingsPageProps) {
-  const { settingsStore, backendProbe, selectMode, mode, setHandle } = props
+  const { settingsStore, backendProbe, selectMode, mode, onSettingsChanged, setHandle } = props
 
   let settingsView: Gtk.Box | null = null
   let settingsBody: Gtk.Box | null = null
@@ -103,6 +107,7 @@ export function SettingsPage(props: SettingsPageProps) {
       settingsError.set_label(error ?? "")
       settingsError.visible = error !== null
     }
+    if (error === null) onSettingsChanged()
   }
 
   function refreshBackendReadout() {
@@ -175,6 +180,27 @@ export function SettingsPage(props: SettingsPageProps) {
         () => settingsConfig.bar_compact_controls,
         (value) => {
           settingsConfig.bar_compact_controls = value
+        },
+        rowContext,
+      ),
+      pillRow<ConfigBarPosition>(
+        "Bar position",
+        [
+          { label: "Bottom", value: "bottom" },
+          { label: "Top", value: "top" },
+        ],
+        () => settingsConfig.bar.position,
+        (value) => {
+          settingsConfig.bar.position = value
+        },
+        rowContext,
+      ),
+      numberRow(
+        "Top offset",
+        "Pixels below the reserved top zone (0 clears the ags-bar zone)",
+        () => settingsConfig.bar.offsetPx,
+        (value) => {
+          settingsConfig.bar.offsetPx = value
         },
         rowContext,
       ),
@@ -293,6 +319,7 @@ export function SettingsPage(props: SettingsPageProps) {
       return false
     }
     // Save applies forward: mode selections stay exactly as they were.
+    onSettingsChanged()
     selectMode(mode)
     return true
   }

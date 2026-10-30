@@ -23,6 +23,7 @@ import assert from "node:assert/strict"
 import {
   DEFAULT_SETTINGS,
   configBool,
+  configNumber,
   configOneOf,
   configString,
   defaultSettings,
@@ -75,6 +76,7 @@ test("mergeSettings: unknown extra keys are dropped, not merged through", () => 
     recording: { fps: 30, nope: 1 },
   })
   assert.deepEqual(Object.keys(merged).sort(), [
+    "bar",
     "bar_compact_controls",
     "filename_pattern",
     "notifications",
@@ -83,6 +85,7 @@ test("mergeSettings: unknown extra keys are dropped, not merged through", () => 
     "screenshot",
     "screenshot_dir",
   ])
+  assert.deepEqual(Object.keys(merged.bar).sort(), ["offsetPx", "position"])
   assert.deepEqual(Object.keys(merged.screenshot).sort(), ["cursor", "format", "output"])
   assert.deepEqual(Object.keys(merged.recording).sort(), ["audio", "cursor", "fps", "quality"])
 })
@@ -134,6 +137,48 @@ test("mergeSettings: unknown enum values fall back per field", () => {
   assert.equal(merged.recording.fps, DEFAULT_SETTINGS.recording.fps) // 60
   assert.equal(merged.recording.quality, DEFAULT_SETTINGS.recording.quality) // high
   assert.equal(merged.recording.audio, DEFAULT_SETTINGS.recording.audio) // system
+})
+
+// ---------------------------------------------------------------------------
+// bar placement (REQ-002, design.md §6): missing/corrupt degrades to defaults
+// ---------------------------------------------------------------------------
+
+test("mergeSettings: bar placement defaults to bottom/0 when the section is absent", () => {
+  const merged = mergeSettings({})
+  assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0 })
+})
+
+test("mergeSettings: valid bar position and offset round-trip", () => {
+  assert.equal(mergeSettings({ bar: { position: "top" } }).bar.position, "top")
+  assert.equal(mergeSettings({ bar: { position: "bottom" } }).bar.position, "bottom")
+  assert.equal(mergeSettings({ bar: { offsetPx: 48 } }).bar.offsetPx, 48)
+  // Pixels are whole: 12.7 is rounded rather than silently kept fractional.
+  assert.equal(mergeSettings({ bar: { offsetPx: 12.7 } }).bar.offsetPx, 13)
+})
+
+test("mergeSettings: corrupt bar values degrade instead of throwing", () => {
+  for (const bad of [null, "top", 7, []]) {
+    const merged = mergeSettings({ bar: bad })
+    assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0 })
+  }
+  const merged = mergeSettings({
+    bar: { position: "middle", offsetPx: "48" },
+  })
+  assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0 })
+  for (const bad of [NaN, Infinity, -Infinity, "12", null, undefined, {}, []]) {
+    assert.equal(
+      mergeSettings({ bar: { offsetPx: bad } }).bar.offsetPx,
+      0,
+      `expected offset fallback for ${String(bad)}`,
+    )
+  }
+  // A negative offset is clamped to the bottom of the reserved zone, not thrown.
+  assert.equal(mergeSettings({ bar: { offsetPx: -30 } }).bar.offsetPx, 0)
+})
+
+test("mergeSettings: a valid bar half keeps its sibling despite one corrupt key", () => {
+  const merged = mergeSettings({ bar: { position: "top", offsetPx: "nope" } })
+  assert.deepEqual(merged.bar, { position: "top", offsetPx: 0 })
 })
 
 test("mergeSettings: a valid value in a partially corrupt half is still honoured", () => {
@@ -223,9 +268,11 @@ test("mergeSettings: does not mutate DEFAULT_SETTINGS or alias its nested object
     filename_pattern: "{kind}_%Y-%m-%d_%H-%M-%S",
     notifications: true,
     bar_compact_controls: false,
+    bar: { position: "bottom", offsetPx: 0 },
     screenshot: { format: "png", output: "clipboard", cursor: false },
     recording: { fps: 60, quality: "high", audio: "system", cursor: true },
   })
+  assert.notEqual(merged.bar, DEFAULT_SETTINGS.bar)
   assert.notEqual(merged.screenshot, DEFAULT_SETTINGS.screenshot)
   assert.notEqual(merged.recording, DEFAULT_SETTINGS.recording)
 })
@@ -236,10 +283,13 @@ test("mergeSettings: defaultSettings() hands out an independent deep copy each c
   const a = defaultSettings()
   const b = defaultSettings()
   assert.notEqual(a, b)
+  assert.notEqual(a.bar, b.bar)
   assert.notEqual(a.screenshot, b.screenshot)
   assert.notEqual(a.recording, b.recording)
+  a.bar.position = "top"
   a.screenshot.format = "jpeg"
   a.recording.audio = "none"
+  assert.equal(b.bar.position, "bottom")
   assert.equal(b.screenshot.format, "png")
   assert.equal(b.recording.audio, "system")
 })
@@ -273,6 +323,15 @@ test("configString: a non-empty string is kept verbatim, whitespace-only is not"
   assert.equal(configString("  /tmp/x  ", "fallback"), "  /tmp/x  ")
   for (const notAString of ["", "   ", "\t", 42, null, undefined, {}, []]) {
     assert.equal(configString(notAString, "fallback"), "fallback")
+  }
+})
+
+test("configNumber: only finite numbers are accepted", () => {
+  assert.equal(configNumber(0, 9), 0)
+  assert.equal(configNumber(-3, 9), -3)
+  assert.equal(configNumber(12.7, 9), 12.7)
+  for (const notANumber of ["12", null, undefined, {}, [], true, NaN, Infinity, -Infinity]) {
+    assert.equal(configNumber(notANumber, 9), 9)
   }
 })
 

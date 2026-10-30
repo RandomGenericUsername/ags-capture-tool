@@ -160,3 +160,31 @@ export function pillRow<T>(
   }
   return settingsItem(name, null, segments)
 }
+
+/** Whole-number row for `bar.offsetPx`; persists on every committed change. */
+export function numberRow(
+  name: string,
+  desc: string | null,
+  getValue: () => number,
+  setValue: (value: number) => void,
+  ctx: RowContext,
+  minimum = 0,
+  maximum = 2000,
+): Gtk.Box {
+  const adjustment = new Gtk.Adjustment({
+    lower: minimum,
+    upper: maximum,
+    step_increment: 1,
+    page_increment: 10,
+    value: getValue(),
+  })
+  const control = new Gtk.SpinButton({ adjustment, digits: 0 })
+  control.add_css_class("bar-offset-spin")
+  control.set_halign(Gtk.Align.END)
+  control.set_valign(Gtk.Align.CENTER)
+  control.connect("value-changed", () => {
+    setValue(control.get_value_as_int())
+    ctx.persistSettings()
+  })
+  return settingsItem(name, desc, control)
+}

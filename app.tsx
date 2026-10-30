@@ -11,6 +11,7 @@ import { glibSettingsStore } from "./adapters/glib-settings-store"
 import { glibUiStateStore } from "./adapters/glib-ui-state-store"
 import { gdkMonitorTopology } from "./adapters/gdk-monitor-topology"
 import { hyprlandMonitorFocus } from "./adapters/hyprland-monitor-focus"
+import { hyprlandMonitorReservedTop } from "./adapters/hyprland-monitor-reserved"
 import {
   createMonitorWindowSet,
   installFocusedWindowLookup,
@@ -60,6 +61,7 @@ function buildPorts(): CapturePorts {
     uiStateStore: glibUiStateStore(),
     launcher: execCaptureLauncher(),
     backendProbe: execBackendProbe(),
+    monitorReservedTop: hyprlandMonitorReservedTop(),
   }
 }
 

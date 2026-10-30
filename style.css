@@ -31,6 +31,140 @@ window#capture-window {
   color: @color_foreground;
 }
 
+/* -------------------------------------------------------------- Capture bar
+ * S0 is the icon-only rail (measured 142px: three 38px icons, 4px gaps and
+ * 6px padding); S1 is one row of pill groups plus the back chevron and CTA.
+ * Both are painted on the child, never the window, so a first frame cannot
+ * flash a rectangle. */
+
+.capture-shell {
+  /* natural size; the window re-measures it on every state switch */
+}
+
+.capture-bar {
+  background-color: alpha(@color_00, 0.92);
+  border: 1px solid alpha(@color_foreground, 0.12);
+  border-radius: 14px;
+  padding: 6px;
+}
+
+/* Resting rail: icons only, no labels. Three 38px icons + gaps + padding
+ * measured 142px on the live compositor, comfortably under the 210px
+ * acceptance ceiling. GTK4 CSS has no max-width property, so the ceiling is the
+ * content itself. */
+.capture-bar.rail {
+  min-width: 0;
+}
+
+.railicon {
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background-color: transparent;
+  color: alpha(@color_foreground, 0.72);
+}
+
+.railicon:hover {
+  background-color: alpha(@color_foreground, 0.1);
+  color: @color_foreground;
+}
+
+.railicon.active {
+  background-color: @color_10;
+  color: @color_background;
+}
+
+.bar-back {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid alpha(@color_foreground, 0.12);
+  border-radius: 999px;
+  background-color: transparent;
+  color: alpha(@color_foreground, 0.72);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bar-back:hover {
+  border-color: alpha(@color_foreground, 0.22);
+  color: @color_foreground;
+}
+
+.bar-group {
+  padding: 2px;
+  border: 1px solid alpha(@color_foreground, 0.1);
+  border-radius: 9px;
+  background-color: alpha(@color_background, 0.45);
+}
+
+.bar-pill {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background-color: transparent;
+  color: alpha(@color_foreground, 0.62);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bar-pill:hover {
+  color: @color_foreground;
+  background-color: alpha(@color_foreground, 0.1);
+}
+
+.bar-pill.selected {
+  background-color: @color_10;
+  color: @color_background;
+}
+
+.bar-divider {
+  min-width: 1px;
+  background-color: alpha(@color_foreground, 0.12);
+  margin: 3px 2px;
+}
+
+.bar-cta {
+  min-height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 9px;
+  background-color: @color_06;
+  color: @color_foreground;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* REQ-004 maps `.record` to the palette's red accent. The class is attached
+ * here so the lane switch already carries the right hook; no literal colour is
+ * introduced in this ticket. */
+.bar-cta.record {
+  background-color: @color_06;
+}
+
+.bar-kbd {
+  padding: 1px 4px;
+  border: 1px solid alpha(@color_foreground, 0.35);
+  border-radius: 4px;
+  color: alpha(@color_foreground, 0.82);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.bar-custom-duration spinbutton,
+.bar-offset-spin {
+  min-height: 30px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border: 1px solid alpha(@color_foreground, 0.12);
+  border-radius: 7px;
+  background-color: alpha(@color_background, 0.45);
+  color: @color_foreground;
+}
+
 /* ------------------------------------------------------------------ Panel */
 
 .capture-panel {

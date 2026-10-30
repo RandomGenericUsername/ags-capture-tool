@@ -18,6 +18,7 @@ export type ConfigScreenshotOutput = "clipboard" | "save"
 export type ConfigRecordingFps = 24 | 30 | 60
 export type ConfigRecordingQuality = "low" | "medium" | "high"
 export type ConfigRecordingAudio = "none" | "system" | "mic"
+export type ConfigBarPosition = "bottom" | "top"
 
 export interface CaptureSettings {
   screenshot_dir: string
@@ -27,6 +28,15 @@ export interface CaptureSettings {
   /** Bar feedback mode: true = bar shows the dot + timer only and the popup
    *  carries pause/resume/stop; false = the bar carries the buttons itself. */
   bar_compact_controls: boolean
+  /**
+   * Capture-bar placement (design.md §6). `bottom` is the default-recommended
+   * position; `top` is auto-slotted below the compositor's reserved zone, with
+   * `offsetPx` as the manual escape hatch for non-exclusive top overlays.
+   */
+  bar: {
+    position: ConfigBarPosition
+    offsetPx: number
+  }
   screenshot: {
     format: ConfigScreenshotFormat
     output: ConfigScreenshotOutput
@@ -46,6 +56,7 @@ export const DEFAULT_SETTINGS: CaptureSettings = {
   filename_pattern: "{kind}_%Y-%m-%d_%H-%M-%S",
   notifications: true,
   bar_compact_controls: false,
+  bar: { position: "bottom", offsetPx: 0 },
   screenshot: { format: "png", output: "clipboard", cursor: false },
   recording: { fps: 60, quality: "high", audio: "system", cursor: true },
 }
@@ -59,6 +70,7 @@ export const CONFIG_RECORDING_QUALITIES: readonly ConfigRecordingQuality[] = [
   "high",
 ]
 export const CONFIG_RECORDING_AUDIO: readonly ConfigRecordingAudio[] = ["none", "system", "mic"]
+export const CONFIG_BAR_POSITIONS: readonly ConfigBarPosition[] = ["bottom", "top"]
 
 export function configOneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback
@@ -72,10 +84,16 @@ export function configString(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim() !== "" ? value : fallback
 }
 
+/** Only a finite number is accepted; NaN/Infinity/strings degrade to fallback. */
+export function configNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback
+}
+
 /** A fresh deep copy of the defaults (GJS has no structuredClone). */
 export function defaultSettings(): CaptureSettings {
   return {
     ...DEFAULT_SETTINGS,
+    bar: { ...DEFAULT_SETTINGS.bar },
     screenshot: { ...DEFAULT_SETTINGS.screenshot },
     recording: { ...DEFAULT_SETTINGS.recording },
   }
@@ -83,6 +101,10 @@ export function defaultSettings(): CaptureSettings {
 
 export function mergeSettings(raw: unknown): CaptureSettings {
   const record = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {}
+  const bar =
+    record.bar !== null && typeof record.bar === "object"
+      ? (record.bar as Record<string, unknown>)
+      : {}
   const shot =
     record.screenshot !== null && typeof record.screenshot === "object"
       ? (record.screenshot as Record<string, unknown>)
@@ -100,6 +122,13 @@ export function mergeSettings(raw: unknown): CaptureSettings {
       record.bar_compact_controls,
       DEFAULT_SETTINGS.bar_compact_controls,
     ),
+    bar: {
+      position: configOneOf(bar.position, CONFIG_BAR_POSITIONS, DEFAULT_SETTINGS.bar.position),
+      offsetPx: Math.max(
+        0,
+        Math.round(configNumber(bar.offsetPx, DEFAULT_SETTINGS.bar.offsetPx)),
+      ),
+    },
     screenshot: {
       format: configOneOf(shot.format, CONFIG_SCREENSHOT_FORMATS, DEFAULT_SETTINGS.screenshot.format),
       output: configOneOf(shot.output, CONFIG_SCREENSHOT_OUTPUTS, DEFAULT_SETTINGS.screenshot.output),

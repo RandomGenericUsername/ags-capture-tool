@@ -215,3 +215,43 @@ export function focusKey(
   }
   return null
 }
+
+/**
+ * The one window key that may be visible while the bar is open (D2).
+ *
+ * Focus is preferred. Unknown or foreign focus falls back to the FIRST binding
+ * in registration order, which is deterministic and keeps exactly one window on
+ * screen; it never returns a key the caller does not own.
+ */
+export function visibleKeyForFocus<T>(
+  bindings: readonly WindowBinding<T>[],
+  focusedKey: string | null,
+): string | null {
+  if (focusedKey !== null && bindings.some((b) => b.key === focusedKey)) return focusedKey
+  return bindings.length > 0 ? bindings[0].key : null
+}
+
+/** A per-window visibility decision: same binding objects, only the flag moves. */
+export interface VisibilityDecision<T> {
+  binding: WindowBinding<T>
+  visible: boolean
+}
+
+/**
+ * Map focus to visibility without touching window identity.
+ *
+ * Focus changes (and open/close) are re-maps, never a rebuild: the returned
+ * bindings are the caller's own objects, so an adapter can assign `.visible`
+ * and leave every other piece of window/shared state intact.
+ */
+export function planFocusVisibility<T>(
+  bindings: readonly WindowBinding<T>[],
+  focusedKey: string | null,
+  open: boolean,
+): VisibilityDecision<T>[] {
+  const key = visibleKeyForFocus(bindings, focusedKey)
+  return bindings.map((binding) => ({
+    binding,
+    visible: open && binding.key === key,
+  }))
+}

@@ -16,10 +16,15 @@
 // BELOW THIS POINT beyond 'construct the dependencies, then render'".
 // ---------------------------------------------------------------------------
 
-import type app from "ags/gtk4/app"
 import type { Gdk, Gtk } from "ags/gtk4"
-import type { MonitorDescriptor, WindowBinding } from "../domain/monitor-registry"
-import { monitorKey, orderedForFocus, planSync } from "../domain/monitor-registry"
+import type { WindowBinding } from "../domain/monitor-registry"
+import {
+  focusKey,
+  monitorKey,
+  orderedForFocus,
+  planFocusVisibility,
+  planSync,
+} from "../domain/monitor-registry"
 import type { MonitorFocus } from "../ports/monitor-focus"
 import type { MonitorTopology } from "../ports/monitor-topology"
 
@@ -44,7 +49,7 @@ export interface MonitorWindowSetOptions {
   topology: MonitorTopology
   focus: MonitorFocus
   /** Builds the window for one monitor. Injected so this file never names a layout. */
-  createWindow: (monitor: import("ags/gtk4").Gdk.Monitor) => Gtk.Window
+  createWindow: (monitor: Gdk.Monitor) => Gtk.Window
   /** Called when a monitor's window is built or destroyed. Diagnostics only. */
   report?: (message: string) => void
 }
@@ -62,12 +67,43 @@ export interface MonitorWindowSet {
 /** A window this set owns. Spelled out so the cast site says why. */
 type MonitorWindow = Gtk.Window & { destroy(): void }
 
-export function createMonitorWindowSet(options: MonitorWindowSetOptions): MonitorWindowSet {
+export function createMonitorWindowSet(
+  options: MonitorWindowSetOptions,
+): MonitorWindowSet {
   const { app, topology, focus, createWindow, report } = options
   // Registration order, deliberately an ARRAY and not a Map: this is the
   // fallback order when focus is unknown, and an array makes "the order things
   // were added" the definition rather than an accident of iteration.
   const bindings: WindowBinding<MonitorWindow>[] = []
+
+  // D2: the bar is a focused-monitor surface. `open` is app-wide because both
+  // per-monitor windows share one logical bar; `remapping` suppresses the
+  // `notify::visible` feedback while this adapter itself is hiding/showing.
+  let open = false
+  let remapping = false
+
+  /**
+   * Re-map visibility only. The windows stay the same objects: no destroy, no
+   * rebuild, no state reset (AGENTS.md §5). Exactly one owned window is shown
+   * while `open`, and focus is read fresh on every call so a late AstalHyprland
+   * load corrects the initial registration-order fallback.
+   */
+  function applyFocusVisibility(): void {
+    if (!open || remapping) return
+    const focused = focusKey(
+      topology.list().map((entry) => entry.descriptor),
+      focus.focusedConnector(),
+    )
+    const decisions = planFocusVisibility(bindings, focused, open)
+    remapping = true
+    try {
+      for (const { binding, visible } of decisions) {
+        if (binding.window.visible !== visible) binding.window.visible = visible
+      }
+    } finally {
+      remapping = false
+    }
+  }
 
   /**
    * Reconcile the window set against the monitors that exist now.
@@ -90,8 +126,21 @@ export function createMonitorWindowSet(options: MonitorWindowSetOptions): Monito
       if (!monitor) continue
       const window = createWindow(monitor)
       bindings.push({ key: monitorKey(descriptor), window })
+      // Opening ANY owned window means "the bar is open"; then only the
+      // focused monitor's window stays visible. Hiding the last visible window
+      // closes the bar. This is the ONLY place focus changes touch `visible`.
+      window.connect("notify::visible", () => {
+        if (remapping) return
+        if (window.visible) {
+          open = true
+          applyFocusVisibility()
+        } else if (!bindings.some((binding) => binding.window.visible)) {
+          open = false
+        }
+      })
       app.add_window(window)
       report?.(`capture: opened a window for monitor ${descriptor.connector ?? "(unnamed)"}`)
+      applyFocusVisibility()
     }
 
     for (const stale of plan.destroy) {
@@ -113,14 +162,19 @@ export function createMonitorWindowSet(options: MonitorWindowSetOptions): Monito
       // `app.windows.length` from 2 to 1, after which `get_window` resolved to
       // the surviving window rather than the dead one.
       app.remove_window(stale.window)
-      stale.window.destroy()
       const at = bindings.indexOf(stale)
       if (at > -1) bindings.splice(at, 1)
+      stale.window.destroy()
+      // The removed monitor may have owned the only visible window. Show the
+      // focused survivor instead of leaving the bar closed on a monitor that
+      // still exists.
+      applyFocusVisibility()
       report?.(`capture: destroyed the window for a monitor that went away`)
     }
   }
 
   topology.subscribe(reconcile)
+  focus.subscribe(() => applyFocusVisibility())
   reconcile()
 
   return {

@@ -14,6 +14,7 @@
 
 import type { BackendProbe } from "./backend-probe"
 import type { CaptureLauncher } from "./capture-launcher"
+import type { MonitorReservedTop } from "./monitor-reserved"
 import type { SettingsStore } from "./settings-store"
 import type { UiStateStore } from "./ui-state-store"
 
@@ -26,4 +27,6 @@ export interface CapturePorts {
   launcher: CaptureLauncher
   /** Reports the auto-selected recorder backend. */
   backendProbe: BackendProbe
+  /** Reads the compositor's top reserved zone for top-placed bar margins. */
+  monitorReservedTop: MonitorReservedTop
 }

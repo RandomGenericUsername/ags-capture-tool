@@ -39,6 +39,7 @@ import type { MonitorFocus } from "../ports/monitor-focus"
 /** The slice of AstalHyprland this adapter reads. Narrow on purpose. */
 interface HyprlandFocusSource {
   get_focused_monitor(): { name: string } | null
+  connect?(signal: string, callback: () => void): number
 }
 
 /**
@@ -49,10 +50,24 @@ interface HyprlandFocusSource {
  */
 export function hyprlandMonitorFocus(): MonitorFocus {
   let source: HyprlandFocusSource | null = null
+  const listeners: Array<() => void> = []
+  const notify = () => {
+    for (const listener of listeners) listener()
+  }
 
   void import("gi://AstalHyprland?version=0.1")
     .then(({ default: Hyprland }) => {
       source = Hyprland.get_default() as unknown as HyprlandFocusSource
+      // Focus changes are pushed by the service; re-map window visibility
+      // rather than polling. A missing signal degrades to "no push" without
+      // taking the app down.
+      try {
+        source.connect?.("notify::focused-monitor", notify)
+        source.connect?.("notify::monitors", notify)
+      } catch {
+        // No push source: the initial focus read still works.
+      }
+      notify()
     })
     .catch(() => {
       // No compositor focus service on this host. Not an error to report: the
@@ -64,6 +79,9 @@ export function hyprlandMonitorFocus(): MonitorFocus {
   return {
     focusedConnector(): string | null {
       return source?.get_focused_monitor()?.name ?? null
+    },
+    subscribe(onChange: () => void): void {
+      listeners.push(onChange)
     },
   }
 }

@@ -1,43 +1,35 @@
 // ---------------------------------------------------------------------------
-// CLASSIC LAYOUT — the window shell (design.md §2, task 8.1).
+// CAPTURE BAR — the per-monitor window shell (design.md §3/§5, REQ-002).
 //
-// Split out of the pre-split `ui/CaptureWindow.tsx` with NO behavioural
-// change. What stayed here is what the three pages cannot own: the window
-// itself, the `centerbox` + `capture-panel` wrapper, the mode switch, the
-// capture-phase key controller, the `map` handler, `syncWindowSize()`, the
-// capture actions and the view switch.
+// This file used to be the centred three-page panel. It is now the small state
+// machine the design specifies: S0 is an icon-only rail; S1 is one mode open
+// with its option pills and a CTA. REQ-003/REQ-004 add the pending overlay and
+// S4 live HUD on top of these states; this shell deliberately stops at S1 and
+// leaves the legacy backend commit path in place for this ticket.
 //
-// The JSX that stayed is a byte-for-byte move of that file's lines 712-804 and
-// 1573-1584; the three page subtrees are rendered by `./ScreenshotPage.tsx`,
-// `./RecordingPage.tsx` and `./SettingsPage.tsx`, which were moved out of it
-// unchanged. Do not re-indent what is left.
-//
-// ---------------------------------------------------------------------------
-// Settings config (add-capture-settings): the app-owned
-// `$XDG_CONFIG_HOME/capture-tool/config.json` contract (design.md §1/§3).
-//
-// The GUI owns writes; the backend reads on every invocation. Reads are always
-// safe: missing is first-run (silent defaults), corrupt degrades to defaults
-// with a loud log.
-//
-// Split three ways as of A5. The vocabulary, defaults, merge and validation
-// are pure and live in `domain/settings.ts` (A3). The `GLib.file_*` /
-// `mkdir_with_parents` persistence and the `expandDir` Environment live in
-// `adapters/glib-settings-store.ts` (A5). What remains HERE is the port type
-// in `ports/settings-store.ts` and, below, the calls into the injected store.
-// The view no longer knows the config lives in a file at all. (The settings
-// DRAFT moved to `./SettingsPage.tsx` with the three groups in A8; this file
-// still reads the config, for the settings→defaults precedence rule.)
+// The window remains ONE live window per monitor, named `capture-window`, with
+// the same appearance-registry contract. Focus changes are handled by
+// `adapters/monitor-window-set.ts`: only the focused monitor's window is
+// visible, and a focus change re-maps visibility without destroying a window or
+// resetting the shared `UiState`.
 // ---------------------------------------------------------------------------
 
 import { Astal, Gdk, Gtk } from "ags/gtk4"
+import { barMarginTop } from "../../domain/bar-placement"
+import {
+  back,
+  enterAction,
+  homeBar,
+  isModeOpen,
+  isSettingsOpen,
+  openMode,
+  openSettings,
+  type BarState,
+} from "../../domain/bar-state"
 import { recordingArgs, screenshotArgs } from "../../domain/cli-args"
 import type { RecordingRequest, ScreenshotRequest } from "../../domain/capture-request"
-import {
-  configDefaults,
-  durationSelection,
-  type UiState,
-} from "../../domain/ui-state"
+import type { CaptureSettings } from "../../domain/settings"
+import { configDefaults, durationSelection, type UiState } from "../../domain/ui-state"
 import type { CapturePorts } from "../../ports/capture-ports"
 import type {
   AudioSource,
@@ -50,129 +42,50 @@ import type {
 import { applyGroup } from "../shared/groups"
 import { createIconSlots, withIcon } from "../shared/icons"
 import { appearanceRegistry } from "../appearance"
-import {
-  RecordingPage,
-  type RecordingPageHandle,
-} from "./RecordingPage"
-import {
-  ScreenshotPage,
-  type ScreenshotPageHandle,
-} from "./ScreenshotPage"
-import {
-  SettingsPage,
-  type SettingsPageHandle,
-} from "./SettingsPage"
-
-type Mode = "screenshot" | "recording"
-type View = Mode | "settings"
-
-// ---------------------------------------------------------------------------
-// Persisted UI state (GUI-local JSON; no provisioning surface).
-//
-// The state shape, first-run constants, option vocabularies, the
-// settings→defaults precedence rule and the merge all live in
-// `domain/ui-state.ts` (A3). The read, the write and the
-// missing-is-silent / corrupt-is-loud degradation live in
-// `adapters/glib-ui-state-store.ts` (A5), behind `ports/ui-state-store.ts`.
-// The calls are the only trace of persistence left in this file.
-// ---------------------------------------------------------------------------
+import { RecordingPage, type RecordingPageHandle } from "./RecordingPage"
+import { ScreenshotPage, type ScreenshotPageHandle } from "./ScreenshotPage"
+import { SettingsPage, type SettingsPageHandle } from "./SettingsPage"
 
 // The name is the window's PUBLIC identity, and it is deliberately NOT unique:
-// `style.css` selects the surface with `window#capture-window` (a GTK id
-// selector, which matches the widget NAME, not the class) and the provisioned
-// launcher `capture-ui.j2` runs `ags toggle capture-window -i capture`. Both
-// hard-code this string, so a per-monitor rename is not a local edit: it needs a
-// stylesheet change AND a provisioning run. See
-// openspec/changes/fix-capture-window-identity/design.md for the full blast
-// radius and for why nothing in this file is allowed to depend on it.
-//
-// What this file used to do instead: resolve "my own window" through
-// `app.get_window(WINDOW_NAME)`. `app.tsx` builds one window per monitor and
-// every one of them carries this name, and AGS resolves the name with
-// `windows.find(...)` over GTK's own window list — so the answer was whichever
-// duplicate GTK happened to list first, a value that CHANGES as windows are
-// mapped and unmapped (measured live: `B,A` before any map, `A,B` after window
-// A had mapped and unmapped). Hiding "the window called capture-window" is
-// therefore not the same thing as hiding THIS window, and with two windows it is
-// demonstrably the wrong one.
+// `style.css` selects the surface with `window#capture-window` and the
+// provisioned `capture-ui` launcher toggles it by that name. See
+// `tests/ts/window-identity.test.ts` for the full consumer list.
 const WINDOW_NAME = "capture-window"
 
-// The return type is annotated because the JSX runtime's inferred element type
-// widens to `Object`, which `app.add_window` rejects. `<window>` maps to
-// Astal.Window (see ags/gtk4/jsx-runtime), so the annotation names the real
-// type; see the cast on the return below for why TS cannot infer it.
-//
-// `ports` (design.md §2, task 5.9) is the injected hexagon: settings
-// persistence, UI-state persistence, capture launching and the backend probe.
-// `state` is the ONE live UI state, also injected by the composition root and
-// SHARED by every window it builds — the state belongs to the app, not to a
-// window, and a window that allocated its own would be a second writer to the
-// same `capture-ui.json`. Both are required parameters on purpose: a window
-// cannot be constructed without being told which state it mutates.
-// The composition root builds the adapters and passes them in, so this file
-// contains no filesystem access and no process spawning — only calls into
-// interfaces it was handed.
 export function ClassicWindow(
   gdkmonitor: Gdk.Monitor,
   ports: CapturePorts,
   state: UiState,
 ): Astal.Window {
-  const { settingsStore, uiStateStore, launcher } = ports
+  const { settingsStore, uiStateStore, launcher, monitorReservedTop } = ports
 
-  let mode: Mode = "screenshot"
+  const initialSettings = settingsStore.load()
+  const initialTop = initialSettings.bar.position === "top"
+  const initialMargin = initialTop
+    ? barMarginTop(
+        initialSettings.bar.position,
+        monitorReservedTop.reservedTop(gdkmonitor.get_connector()),
+        initialSettings.bar.offsetPx,
+      )
+    : 0
+
+  // The S0/S1 surface machine. S2/S3/S4 are REQ-003/REQ-004; keeping this state
+  // pure (`domain/bar-state.ts`) is the seam they extend.
+  let barState: BarState = homeBar()
+  let config: CaptureSettings = initialSettings
 
   // THIS window, captured from its own `<window>` `$` handler rather than
-  // looked up by name. It is per-CALL, not per-module: `app.tsx` builds one
-  // window per monitor and they must not share it, or the second construction
-  // would overwrite the first window's self-reference and the defect this
-  // replaces would come straight back (measured: that exact mistake — a
-  // module-level `let` — was made and caught, see
-  // openspec/changes/fix-capture-window-identity/design.md §"The bug I wrote
-  // first").
-  //
-  // Null until gnim runs that handler, and gnim runs it AFTER the children are
-  // appended (jsx.ts evaluates the child array before constructing the parent,
-  // then calls `$` last). So `syncWindowSize()` invoked from a child's own `$`
-  // handler still no-ops — exactly as it did when the name lookup returned
-  // `undefined` because the window had not been added to the app yet. Same
-  // early-return, same reason, no behaviour change on the one-window path.
+  // looked up by name (fix-capture-window-identity).
   let captureWindow: Astal.Window | null = null
-
-  // Live-palette refresh state for THIS window. The icon slots are the only
-  // palette-dependent widgets built once at construction; registering them
-  // with the app-wide appearance registry lets a runtime refresh clear and
-  // rebuild them without touching the active view, the shared `state`, or the
-  // window itself.
   const iconSlots = createIconSlots()
   let unregisterAppearance: (() => void) | null = null
 
   function hideCaptureWindow() {
-    // The window whose button was pressed is the only window that may be
-    // hidden; every other window is left exactly as it was found.
     if (captureWindow) captureWindow.visible = false
   }
 
-  /**
-   * Re-assert the layer surface size after a view switch.
-   *
-   * GTK does not shrink a layer-shell surface when its content gets shorter:
-   * measured live, the surface stayed 718px tall after returning to the 590px
-   * screenshot view, so the panel ended up glued to the top of a too-tall
-   * transparent window.
-   *
-   * Deliberately SYNCHRONOUS (no idle callback): deferring the size change made
-   * GTK paint an intermediate frame with the new, shorter content still inside
-   * the OLD surface, and the panel's clipped shadow in that leftover area read
-   * as a rectangle trailing the window. Measuring and resizing in the same turn
-   * lets GTK resize and repaint atomically. GTK's measure() recomputes on
-   * demand, so the visibility changes made just before this are already
-   * reflected.
-   */
+  /** Re-assert the layer-surface size after a state switch. */
   function syncWindowSize() {
-    // Scoped to THIS window for the same reason as `hideCaptureWindow()`: a
-    // name lookup resized whichever duplicate GTK listed first, so a view
-    // switch on one monitor left that window at the old height and silently grew
-    // another one.
     const window = captureWindow
     const panel = window?.get_child()
     if (!window || !panel) return
@@ -181,104 +94,146 @@ export function ClassicWindow(
     window.set_default_size(width, height)
   }
 
+  /**
+   * Apply `bar.position` / `bar.offsetPx`.
+   *
+   * Top margin is `reserved_top + offsetPx`; bottom keeps the edge margin at 0.
+   * The window is never EXCLUSIVE, so this value cannot feed back into the
+   * compositor's own reserved zone (design.md §11.4).
+   */
+  function applyPlacement() {
+    const window = captureWindow
+    if (!window) return
+    config = settingsStore.load()
+    const top = config.bar.position === "top"
+    const reserved = top ? monitorReservedTop.reservedTop(gdkmonitor.get_connector()) : 0
+    const margin = barMarginTop(config.bar.position, reserved, config.bar.offsetPx)
+    window.anchor = top ? Astal.WindowAnchor.TOP : Astal.WindowAnchor.BOTTOM
+    window.valign = top ? Gtk.Align.START : Gtk.Align.END
+    window.margin_top = margin
+    window.margin_bottom = 0
+    syncWindowSize()
+  }
+
+  // Widget handles. The three S0 rail buttons, the S1 row and the settings page
+  // are built once; state changes only toggle visibility and classes.
+  let rail: Gtk.Box | null = null
+  let openRow: Gtk.Box | null = null
   let screenshotTab: Gtk.Button | null = null
   let recordingTab: Gtk.Button | null = null
-
-  // The mode switch, and the three top-level views. A third top-level view
-  // (settings) replaces the mode switch + mode views while open; the pages
-  // hold their own containers and publish them through these handles, because
-  // the `$` handlers that assign them moved with the JSX.
-  let modeSwitch: Gtk.Box | null = null
+  let cta: Gtk.Button | null = null
+  let ctaLabel: Gtk.Label | null = null
   let screenshotPage: ScreenshotPageHandle | null = null
   let recordingPage: RecordingPageHandle | null = null
   let settingsPage: SettingsPageHandle | null = null
-  let view: View = "screenshot"
 
-  // Live UI state, INJECTED (fix-capture-per-monitor-state). The composition
-  // root builds one state and passes the SAME object to every window it
-  // creates, because the state is per-application: one `capture-ui.json`, one
-  // precedence chain, one set of last-used selections. A window that allocated
-  // its own copy would be a second owner of that value, and the two copies
-  // would diverge the moment either was mutated — with the last `save()` to
-  // run silently discarding the other's selection.
-  //
-  // Still MUTATED IN PLACE, never rebound — the three pages were handed these
-  // exact objects when they were constructed, so a rebind would leave every
-  // page mutating an object the window had already replaced. The store's merge
-  // always returns every field, so `Object.assign` below lands the same key
-  // set, and the same values, a rebind would have.
   const { screenshot, recording } = state
 
-  // Button groups carry their value so persisted state can re-select them.
   const screenshotTargetGroup: Array<{ value: CaptureTarget; button: Gtk.Button }> = []
   const screenshotDelayGroup: Array<{ value: number; button: Gtk.Button }> = []
   const screenshotFormatGroup: Array<{ value: ScreenshotFormat; button: Gtk.Button }> = []
   const screenshotOutputGroup: Array<{ value: boolean; button: Gtk.Button }> = []
+  const screenshotCursorGroup: Array<{ value: boolean; button: Gtk.Button }> = []
   const recordingTargetGroup: Array<{ value: CaptureTarget; button: Gtk.Button }> = []
   const recordingFpsGroup: Array<{ value: number; button: Gtk.Button }> = []
   const recordingGifFpsGroup: Array<{ value: number; button: Gtk.Button }> = []
   const recordingFormatGroup: Array<{ value: RecordingFormat; button: Gtk.Button }> = []
   const recordingAudioGroup: Array<{ value: AudioSource; button: Gtk.Button }> = []
   const recordingQualityGroup: Array<{ value: RecordingQuality; button: Gtk.Button }> = []
-  // Duration: 0/10/30/60 seconds, -1 = custom (editor value in `recording`).
   const recordingDurationGroup: Array<{ value: number; button: Gtk.Button }> = []
   const recordingSizeGroup: Array<{ value: GifScale; button: Gtk.Button }> = []
+  const recordingCursorGroup: Array<{ value: boolean; button: Gtk.Button }> = []
 
-  function selectMode(next: Mode) {
-    mode = next
-    view = next
-    // Leaving settings must restore the mode switch: openSettings() hides it,
-    // and without this the whole tab row (Screenshot + Recording) stayed
-    // hidden for the rest of the session after one visit to settings.
-    if (modeSwitch) modeSwitch.visible = true
-    if (settingsPage) settingsPage.setVisible(false)
-    const screenshotSelected = next === "screenshot"
-    if (screenshotPage) screenshotPage.setVisible(screenshotSelected)
-    if (recordingPage) recordingPage.setVisible(!screenshotSelected)
+  /** Translate the pure bar state into the built widget tree. */
+  function applyBarState() {
+    const modeOpen = isModeOpen(barState)
+    if (rail) rail.visible = barState.view === "home"
+    if (openRow) openRow.visible = modeOpen
+    if (screenshotPage) screenshotPage.setVisible(barState.view === "screenshot")
+    if (recordingPage) recordingPage.setVisible(barState.view === "recording")
+    if (settingsPage) {
+      const settingsOpen = isSettingsOpen(barState)
+      settingsPage.setVisible(settingsOpen)
+      if (settingsOpen) settingsPage.render()
+    }
     if (screenshotTab) {
-      screenshotTab.remove_css_class("active")
-      if (screenshotSelected) screenshotTab.add_css_class("active")
+      if (barState.view === "screenshot") screenshotTab.add_css_class("active")
+      else screenshotTab.remove_css_class("active")
     }
     if (recordingTab) {
-      recordingTab.remove_css_class("active")
-      recordingTab.remove_css_class("record")
-      if (!screenshotSelected) {
-        recordingTab.add_css_class("active")
-        recordingTab.add_css_class("record")
-      }
+      if (barState.view === "recording") recordingTab.add_css_class("active")
+      else recordingTab.remove_css_class("active")
     }
-    // Views differ in height; the surface must shrink as well as grow.
+    if (cta && ctaLabel) {
+      const recordingMode = barState.view === "recording"
+      ctaLabel.set_label(recordingMode ? "Record" : "Capture")
+      if (recordingMode) cta.add_css_class("record")
+      else cta.remove_css_class("record")
+    }
     syncWindowSize()
   }
 
+  function selectMode(next: "screenshot" | "recording") {
+    barState = openMode(barState, next)
+    applyBarState()
+  }
+
+  function openSettingsView() {
+    barState = openSettings(barState)
+    applyBarState()
+  }
+
+  function returnHome() {
+    barState = back(barState)
+    applyBarState()
+  }
+
+  function closeSettings() {
+    if (settingsPage !== null && !settingsPage.close()) return
+    returnHome()
+  }
+
+  function setScreenshotCursor(value: boolean) {
+    config = { ...config, screenshot: { ...config.screenshot, cursor: value } }
+    const error = settingsStore.save(config)
+    if (error !== null) console.error(`capture-tool: cannot save cursor setting: ${error}`)
+    applyGroup(screenshotCursorGroup, value)
+  }
+
+  function setRecordingCursor(value: boolean) {
+    config = { ...config, recording: { ...config.recording, cursor: value } }
+    const error = settingsStore.save(config)
+    if (error !== null) console.error(`capture-tool: cannot save cursor setting: ${error}`)
+    applyGroup(recordingCursorGroup, value)
+  }
+
+  /**
+   * Commit path for this ticket — LEGACY backend flow.
+   *
+   * REQ-003 replaces this with a pending-selection commit (`--geometry`,
+   * `--window`, `--monitor`); until then the CTA launches the same backend argv
+   * as the old panel, after hiding this window. Commit returns the bar to S0 so
+   * the next open starts at rest.
+   */
   function takeScreenshot() {
     uiStateStore.save(screenshot, recording)
-    const config = settingsStore.load()
-    // Build the request, then TRANSLATE it. The argv vocabulary -- including
-    // the `--size 75` (not `75%`) and `--audio mic` (not `microphone`) traps --
-    // belongs to `domain/cli-args.ts` (A6), the one module that owns it, so the
-    // next layout shares it instead of re-deriving it here.
+    const current = settingsStore.load()
     const request: ScreenshotRequest = {
       target: screenshot.target,
       delay: screenshot.delay,
       format: screenshot.format,
-      // The backend owns the default save path (config dir + pattern); the
-      // clipboard default is preserved unless Save was chosen.
       save: screenshot.save,
-      cursor: config.screenshot.cursor,
+      cursor: current.screenshot.cursor,
     }
     hideCaptureWindow()
-    // The 150ms hide-then-spawn delay lives in the launcher (A5), not here:
-    // it is a compositor fact, so a second layout inherits it for free.
+    barState = homeBar()
+    applyBarState()
     launcher.launch(screenshotArgs(request))
   }
 
   function startRecording() {
     uiStateStore.save(screenshot, recording)
-    const config = settingsStore.load()
-    // Same seam as takeScreenshot: the GIF fps branch, the `--size` scale
-    // mapping and the `microphone`→`mic` conversion are the translator's, not
-    // the view's.
+    const current = settingsStore.load()
     const request: RecordingRequest = {
       target: recording.target,
       fps: recording.fps,
@@ -288,31 +243,38 @@ export function ClassicWindow(
       quality: recording.quality,
       duration: recording.duration,
       size: recording.size,
-      cursor: config.recording.cursor,
+      cursor: current.recording.cursor,
     }
     hideCaptureWindow()
+    barState = homeBar()
+    applyBarState()
     launcher.launch(recordingArgs(request))
+  }
+
+  function commitCurrentMode() {
+    if (barState.view === "recording") startRecording()
+    else takeScreenshot()
   }
 
   function onKey(keyval: number): boolean {
     if (keyval === Gdk.KEY_Escape) {
       // An open inline path editor owns Escape (cancel the edit).
-      if (view === "settings" && settingsPage !== null && settingsPage.cancelPathEditor()) {
+      if (isSettingsOpen(barState) && settingsPage !== null && settingsPage.cancelPathEditor()) {
         return true
       }
-      // Hierarchy: settings → mode view → hide window.
-      if (view === "settings") closeSettings()
+      // One level per press: settings/mode -> S0, then S0 -> hide.
+      if (barState.view !== "home") returnHome()
       else hideCaptureWindow()
       return true
     }
     if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter) {
       // An open inline path editor owns Enter (commit the edit).
-      if (view === "settings" && settingsPage !== null && settingsPage.commitPathEditor()) {
+      if (isSettingsOpen(barState) && settingsPage !== null && settingsPage.commitPathEditor()) {
         return true
       }
-      if (view === "settings") closeSettings()
-      else if (mode === "screenshot") takeScreenshot()
-      else startRecording()
+      const action = enterAction(barState)
+      if (action === "settings") closeSettings()
+      else if (action === "screenshot" || action === "recording") commitCurrentMode()
       return true
     }
     return false
@@ -320,13 +282,15 @@ export function ClassicWindow(
 
   function applyStateToUi() {
     // Last-used UI state > settings defaults > hardcoded constants.
-    const state = uiStateStore.load(configDefaults(settingsStore.load()))
-    Object.assign(screenshot, state.screenshot)
-    Object.assign(recording, state.recording)
+    const loaded = uiStateStore.load(configDefaults(settingsStore.load()))
+    Object.assign(screenshot, loaded.screenshot)
+    Object.assign(recording, loaded.recording)
+    config = settingsStore.load()
     applyGroup(screenshotTargetGroup, screenshot.target)
     applyGroup(screenshotDelayGroup, screenshot.delay)
     applyGroup(screenshotFormatGroup, screenshot.format)
     applyGroup(screenshotOutputGroup, screenshot.save)
+    applyGroup(screenshotCursorGroup, config.screenshot.cursor)
     applyGroup(recordingTargetGroup, recording.target)
     applyGroup(recordingFpsGroup, recording.fps)
     applyGroup(recordingGifFpsGroup, recording.gifFps)
@@ -335,32 +299,17 @@ export function ClassicWindow(
     applyGroup(recordingQualityGroup, recording.quality)
     applyGroup(recordingDurationGroup, durationSelection(recording))
     applyGroup(recordingSizeGroup, recording.size)
-    // The custom-duration spin write and the GIF/duration conditional rows
-    // belong to the recording page (task 8.3), and it applies them here so the
-    // order — groups, then spin, then conditional rows — is unchanged.
+    applyGroup(recordingCursorGroup, config.recording.cursor)
+    // Groups, then the spin, then the conditional rows — the recording page's
+    // own order, unchanged from the old panel.
     if (recordingPage) recordingPage.applyState()
   }
 
-  function openSettings() {
-    view = "settings"
-    if (modeSwitch) modeSwitch.visible = false
-    if (screenshotPage) screenshotPage.setVisible(false)
-    if (recordingPage) recordingPage.setVisible(false)
-    if (settingsPage) {
-      settingsPage.setVisible(true)
-      settingsPage.render()
-    }
-    // Settings is the tallest view; the surface must grow to fit it.
-    syncWindowSize()
-  }
-
-  function closeSettings() {
-    // The draft, the error label and the save live in the settings page (task
-    // 8.4); it reports whether the draft made it to disk. On success it has
-    // already returned to the mode view.
-    if (settingsPage !== null && !settingsPage.close()) return
-    // Save applies forward: mode selections stay exactly as they were.
-    selectMode(mode)
+  function settingsChanged() {
+    applyPlacement()
+    config = settingsStore.load()
+    applyGroup(screenshotCursorGroup, config.screenshot.cursor)
+    applyGroup(recordingCursorGroup, config.recording.cursor)
   }
 
   return (
@@ -370,38 +319,25 @@ export function ClassicWindow(
       class="capture-window"
       namespace="capture"
       gdkmonitor={gdkmonitor}
-      // NONE, not 0. `Astal.WindowAnchor` is a bitfield with no zero member
-      // (NONE=1, TOP=2, RIGHT=4, LEFT=8, BOTTOM=16), so the bare literal was
-      // never a valid value. It anchored to no edge, and so does NONE:
-      // astal_window_set_anchor() reads only bits 1/2/3/4 and never tests bit 0,
-      // so 0 and NONE both hand gtk_layer_shell four anchored=false edges.
-      // Behaviour is identical; only the type is now honest.
-      anchor={Astal.WindowAnchor.NONE}
+      anchor={initialTop ? Astal.WindowAnchor.TOP : Astal.WindowAnchor.BOTTOM}
       layer={Astal.Layer.OVERLAY}
       keymode={Astal.Keymode.ON_DEMAND}
+      // NEVER EXCLUSIVE: the bar reads reserved_top for its own margin, so
+      // claiming an exclusive zone would feed back into that measurement.
+      exclusivity={Astal.Exclusivity.IGNORE}
       halign={Gtk.Align.CENTER}
-      valign={Gtk.Align.CENTER}
+      valign={initialTop ? Gtk.Align.START : Gtk.Align.END}
+      margin_top={initialMargin}
       $={(self) => {
-        // gnim calls this with the constructed Astal.Window, AFTER the children
-        // are appended — which is exactly when a name lookup would have started
-        // working too (the window is added to the app by the caller). Capturing
-        // it here is what makes `hideCaptureWindow()` / `syncWindowSize()` mean
-        // "this window" instead of "a window with my name".
         captureWindow = self
-        // Register the non-destructive refresh surface BEFORE the shared
-        // registry can be asked to refresh. `clearCaches` drops the built icon
-        // images, `rebuildIcons` resolves them from the regenerated palette,
-        // and `refreshWindow` only re-measures the surface. None of the three
-        // touches `visible`, the current view/mode, the settings draft or the
-        // shared `state` object.
+        // Non-destructive palette refresh surface, unchanged contract: clear the
+        // built icon images, rebuild them, re-measure the surface. Nothing here
+        // touches visibility, the bar state, the settings draft or `state`.
         unregisterAppearance = appearanceRegistry.register({
           clearCaches: () => iconSlots.clear(),
           rebuildIcons: () => iconSlots.refresh(),
           refreshWindow: syncWindowSize,
         })
-        // The window set destroys a window when its monitor goes away; unhook
-        // it from the registry at the same moment so no later refresh can
-        // touch a destroyed widget.
         self.connect("destroy", () => {
           if (unregisterAppearance !== null) {
             unregisterAppearance()
@@ -413,153 +349,177 @@ export function ClassicWindow(
         keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", (_controller, keyval, _keycode, _state) => onKey(keyval))
         self.add_controller(keys)
-        // Re-read persisted choices on every show so the window reflects
-        // captures that happened while it was hidden.
-        //
-        // AD-24 (surface before content, CONDITIONAL) is NOT triggered here, so
-        // the overlay-lifecycle primitive is deliberately not adopted. The
-        // window TREE is built ONCE, at startup, by
-        // `adapters/monitor-window-set.ts#reconcile`; a show does NOT rebuild
-        // it. Measured on the live compositor (Hyprland), an instrumented copy
-        // under a distinct instance name (`capmeasure`, the live instance
-        // untouched), GLib.get_monotonic_time around the synchronous calls:
-        //
-        //   ClassicWindow construct (1st, cold):  6.96-7.29 ms
-        //   ClassicWindow construct (warm):       3.97-4.57 ms
-        //   add_window:                           0.028-0.035 ms
-        //   open path (windowSet reconcile):      ~8.0 ms (dominated by the cold construct)
-        //   show -> first idle after present:     5.6-6.2 ms (first)
-        //                                         0.18-0.20 ms (recurring)
-        //   set_visible (the `ags toggle` path):  1.49-1.85 ms (recurring)
-        //   set_visible (FIRST ever show):        85.6-95.4 ms (one-time
-        //                                         process/layer-shell warm-up)
-        //
-        // The recurring open path is single-digit ms and the ~90 ms first show
-        // is a one-time per-process surface/compositor warm-up, not a per-open
-        // content build -- so there is no heavy build to defer behind the
-        // surface. Adding the primitive would be indirection for an
-        // imperceptible win; the direct path stays (same conclusion as the bar's
-        // revert and the notifications slice). Harness: /tmp/opencode/cap-measure.
         self.connect("map", () => {
           applyStateToUi()
-          // ON_DEMAND (like hypr-pano) never steals the keyboard from other
-          // AGS windows; present() asks the compositor to focus on show.
+          applyPlacement()
+          applyBarState()
+          // ON_DEMAND never steals the keyboard from other AGS windows.
           self.present()
         })
       }}
     >
-      {/* CenterBox, not a Box. The window allocates its whole area to its
-          direct child, and a GtkBox ignores a child's main-axis alignment
-          (verified live: panel allocated 950 while its own content was 590), so
-          the panel still stretched to the stale surface size and painted its
-          background as a rectangle below the content during a view switch.
-          CenterBox centres its centre widget by construction, so the panel
-          keeps its natural size and the leftover area stays transparent. */}
       <centerbox class="capture-root">
         <box
           $type="center"
-          class="capture-panel"
+          class="capture-shell"
           orientation={Gtk.Orientation.VERTICAL}
           spacing={0}
         >
-        <box
-          class="mode-switch"
-          homogeneous
-          spacing={0}
-          $={(self) => {
-            modeSwitch = self
-          }}
-        >
-          <button
-            class="active"
+          {/* --------------------------------------------------------- S0 */}
+          <box
+            class="capture-bar rail"
+            orientation={Gtk.Orientation.HORIZONTAL}
+            spacing={4}
             $={(self) => {
-              screenshotTab = self
-              selectMode("screenshot")
+              rail = self
             }}
-            onClicked={() => selectMode("screenshot")}
           >
-            <box
-              orientation={Gtk.Orientation.HORIZONTAL}
-              spacing={9}
-              halign={Gtk.Align.CENTER}
-              valign={Gtk.Align.CENTER}
-              $={withIcon("camera", 18, iconSlots)}
+            <button
+              class="railicon"
+              tooltipText="Screenshot"
+              onClicked={() => selectMode("screenshot")}
             >
-              <label label="Screenshot" />
-            </box>
-          </button>
-          <button
+              <box
+                orientation={Gtk.Orientation.HORIZONTAL}
+                halign={Gtk.Align.CENTER}
+                valign={Gtk.Align.CENTER}
+                $={withIcon("camera", 18, iconSlots)}
+              />
+            </button>
+            <button
+              class="railicon"
+              tooltipText="Recording"
+              onClicked={() => selectMode("recording")}
+            >
+              <box
+                orientation={Gtk.Orientation.HORIZONTAL}
+                halign={Gtk.Align.CENTER}
+                valign={Gtk.Align.CENTER}
+                $={withIcon("video", 18, iconSlots)}
+              />
+            </button>
+            <button
+              class="railicon"
+              tooltipText="Capture settings"
+              onClicked={openSettingsView}
+            >
+              <label label="⚙" />
+            </button>
+          </box>
+
+          {/* ------------------------------------------- S1 (one mode open) */}
+          <box
+            visible={false}
+            class="capture-bar open"
+            orientation={Gtk.Orientation.HORIZONTAL}
+            spacing={6}
             $={(self) => {
-              recordingTab = self
+              openRow = self
             }}
-            onClicked={() => selectMode("recording")}
           >
-            <box
-              orientation={Gtk.Orientation.HORIZONTAL}
-              spacing={9}
-              halign={Gtk.Align.CENTER}
-              valign={Gtk.Align.CENTER}
-              $={withIcon("video", 18, iconSlots)}
+            <button class="bar-back" tooltipText="Back" onClicked={returnHome}>
+              <label label="←" />
+            </button>
+            <button
+              class="railicon"
+              tooltipText="Screenshot"
+              onClicked={() => selectMode("screenshot")}
+              $={(self) => {
+                screenshotTab = self
+              }}
             >
-              <label label="Recording" />
-            </box>
-          </button>
-        </box>
+              <box
+                orientation={Gtk.Orientation.HORIZONTAL}
+                halign={Gtk.Align.CENTER}
+                valign={Gtk.Align.CENTER}
+                $={withIcon("camera", 18, iconSlots)}
+              />
+            </button>
+            <button
+              class="railicon"
+              tooltipText="Recording"
+              onClicked={() => selectMode("recording")}
+              $={(self) => {
+                recordingTab = self
+              }}
+            >
+              <box
+                orientation={Gtk.Orientation.HORIZONTAL}
+                halign={Gtk.Align.CENTER}
+                valign={Gtk.Align.CENTER}
+                $={withIcon("video", 18, iconSlots)}
+              />
+            </button>
 
-        {/* ------------------------------------------------ Screenshot view */}
-        <ScreenshotPage
-          screenshot={screenshot}
-          screenshotTargetGroup={screenshotTargetGroup}
-          screenshotDelayGroup={screenshotDelayGroup}
-          screenshotFormatGroup={screenshotFormatGroup}
-          screenshotOutputGroup={screenshotOutputGroup}
-          icons={iconSlots}
-          takeScreenshot={takeScreenshot}
-          openSettings={openSettings}
-          setHandle={(handle) => {
-            screenshotPage = handle
-          }}
-        />
+            <ScreenshotPage
+              screenshot={screenshot}
+              screenshotTargetGroup={screenshotTargetGroup}
+              screenshotDelayGroup={screenshotDelayGroup}
+              screenshotFormatGroup={screenshotFormatGroup}
+              screenshotOutputGroup={screenshotOutputGroup}
+              screenshotCursorGroup={screenshotCursorGroup}
+              setScreenshotCursor={setScreenshotCursor}
+              icons={iconSlots}
+              setHandle={(handle) => {
+                screenshotPage = handle
+              }}
+            />
 
-        {/* ------------------------------------------------ Recording view */}
-        <RecordingPage
-          recording={recording}
-          recordingTargetGroup={recordingTargetGroup}
-          recordingFpsGroup={recordingFpsGroup}
-          recordingGifFpsGroup={recordingGifFpsGroup}
-          recordingFormatGroup={recordingFormatGroup}
-          recordingAudioGroup={recordingAudioGroup}
-          recordingQualityGroup={recordingQualityGroup}
-          recordingDurationGroup={recordingDurationGroup}
-          recordingSizeGroup={recordingSizeGroup}
-          icons={iconSlots}
-          startRecording={startRecording}
-          openSettings={openSettings}
-          syncWindowSize={syncWindowSize}
-          setHandle={(handle) => {
-            recordingPage = handle
-          }}
-        />
+            <RecordingPage
+              recording={recording}
+              recordingTargetGroup={recordingTargetGroup}
+              recordingFpsGroup={recordingFpsGroup}
+              recordingGifFpsGroup={recordingGifFpsGroup}
+              recordingFormatGroup={recordingFormatGroup}
+              recordingAudioGroup={recordingAudioGroup}
+              recordingQualityGroup={recordingQualityGroup}
+              recordingDurationGroup={recordingDurationGroup}
+              recordingSizeGroup={recordingSizeGroup}
+              recordingCursorGroup={recordingCursorGroup}
+              setRecordingCursor={setRecordingCursor}
+              icons={iconSlots}
+              syncWindowSize={syncWindowSize}
+              setHandle={(handle) => {
+                recordingPage = handle
+              }}
+            />
 
-        {/* ------------------------------------------------ Settings view */}
-        <SettingsPage
-          settingsStore={settingsStore}
-          backendProbe={ports.backendProbe}
-          selectMode={selectMode}
-          mode={mode}
-          setHandle={(handle) => {
-            settingsPage = handle
-          }}
-        />
+            <button
+              class="bar-cta"
+              onClicked={commitCurrentMode}
+              $={(self) => {
+                cta = self
+              }}
+            >
+              <box
+                orientation={Gtk.Orientation.HORIZONTAL}
+                spacing={8}
+                halign={Gtk.Align.CENTER}
+                valign={Gtk.Align.CENTER}
+              >
+                <label
+                  label="Capture"
+                  $={(self) => {
+                    ctaLabel = self
+                  }}
+                />
+                <label class="bar-kbd" label="Enter" />
+              </box>
+            </button>
+          </box>
+
+          <SettingsPage
+            settingsStore={settingsStore}
+            backendProbe={ports.backendProbe}
+            selectMode={() => returnHome()}
+            mode={barState.mode}
+            onSettingsChanged={settingsChanged}
+            setHandle={(handle) => {
+              settingsPage = handle
+            }}
+          />
         </box>
       </centerbox>
     </window>
-    // Type-level only. gnim types every intrinsic element as `CC | FC`, i.e.
-    // a constructor yielding `GObject.Object`, so the JSX expression widens to
-    // `GObject.Object` no matter which tag is used — gnim's own source says
-    // "intrinsicElements always resolve as FC / so we can't narrow it down".
-    // `<window>` really is an Astal.Window (ags/gtk4/jsx-runtime maps it), so
-    // this cast records a fact rather than hiding a bug. Nothing at runtime
-    // changes: `jsx()` already called `new Astal.Window(props)`.
   ) as unknown as Astal.Window
 }

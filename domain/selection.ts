@@ -269,6 +269,32 @@ export function badgeAnchor(
   return { x, y }
 }
 
+/**
+ * Widget-local point -> global logical display point.
+ *
+ * The overlay is full-monitor and its widget origin is the monitor's GDK
+ * logical origin, so this is a translation, not a scale. GDK monitor geometry,
+ * `hyprctl` and `slurp` all speak logical coordinates; the backend receives the
+ * translated global point regardless of the output's fractional scale. Negative
+ * monitor origins (a monitor left of the primary) are ordinary values here.
+ */
+export function localToGlobal(
+  localX: number,
+  localY: number,
+  monitor: Rect,
+): { x: number; y: number } {
+  return { x: monitor.x + localX, y: monitor.y + localY }
+}
+
+/** Global logical point -> widget-local point for one overlay. */
+export function globalToLocal(
+  globalX: number,
+  globalY: number,
+  monitor: Rect,
+): { x: number; y: number } {
+  return { x: globalX - monitor.x, y: globalY - monitor.y }
+}
+
 /** `W×H`, the badge/ARIA spelling (multiplication sign, not an x). */
 export function formatSize(rect: Rect): string {
   const r = normalizeRect(rect)

@@ -20,6 +20,8 @@ import {
   hitClient,
   hitHandle,
   intersectRect,
+  localToGlobal,
+  globalToLocal,
   moveRect,
   normalizeRect,
   rectFromPoints,
@@ -197,4 +199,23 @@ test("badge text names the size and the pending state", () => {
   assert.match(windowBadge(client, false), /firefox — dotfiles — 1280×800 · click once to pin/)
   assert.match(windowBadge(client, true), /pinned/)
   assert.equal(windowBadge(null, false), "hover a window · click to pin")
+})
+
+test("overlay local<->global translation keeps negative monitor origins exact", () => {
+  // A monitor left of the primary has a negative logical origin. The overlay's
+  // widget-local (0,0) is that origin, and a point drawn there is committed as
+  // the negative global coordinate the backend/grim expect.
+  assert.deepEqual(localToGlobal(0, 0, LEFT), { x: -1920, y: 0 })
+  assert.deepEqual(localToGlobal(100, 50, LEFT), { x: -1820, y: 50 })
+  assert.deepEqual(globalToLocal(-1820, 50, LEFT), { x: 100, y: 50 })
+
+  // A scale≠1 output still reports LOGICAL geometry (GDK/hyprctl/slurp agree on
+  // that space); the translation is not a scale. Actual equality of grim/slurp
+  // coordinates on a scale≠1 output is recorded as UNMEASURED in the ticket:
+  // this host has one scale=1 output.
+  const logicalAtScaleTwo: Rect = { x: 0, y: 0, width: 1280, height: 720 }
+  assert.deepEqual(
+    clampRect({ x: localToGlobal(1280, 0, logicalAtScaleTwo).x, y: 0, width: 10, height: 10 }, logicalAtScaleTwo),
+    { x: 1270, y: 0, width: 10, height: 10 },
+  )
 })

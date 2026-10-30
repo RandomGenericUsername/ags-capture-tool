@@ -68,6 +68,8 @@ export interface SelectionControllerOptions {
 export interface SelectionController {
   register(host: OverlayHost): void
   unregister(host: OverlayHost): void
+  /** Observe selection changes (bar chip/CTA); returns an unsubscribe. */
+  subscribe(listener: () => void): () => void
   /** Open a mode's pending selection. */
   begin(mode: BarMode, target: CaptureTarget): void
   /** Leave the mode (back/Esc/commit); overlay disappears synchronously. */
@@ -103,6 +105,7 @@ export function createSelectionController(
 ): SelectionController {
   const { topology, focus, clients } = options
   const hosts: OverlayHost[] = []
+  const listeners: Array<() => void> = []
   let monitors: MonitorDescriptor[] = topology.list().map((entry) => entry.descriptor)
   let session: SelectionSession = emptySelection()
   let mode: BarMode = "screenshot"
@@ -153,6 +156,7 @@ export function createSelectionController(
       )
       host.render(current)
     }
+    for (const listener of [...listeners]) listener()
   }
 
   topology.subscribe(() => {
@@ -174,6 +178,13 @@ export function createSelectionController(
     unregister(host): void {
       const at = hosts.indexOf(host)
       if (at > -1) hosts.splice(at, 1)
+    },
+    subscribe(listener): () => void {
+      listeners.push(listener)
+      return () => {
+        const at = listeners.indexOf(listener)
+        if (at > -1) listeners.splice(at, 1)
+      }
     },
     begin(nextMode, target): void {
       mode = nextMode

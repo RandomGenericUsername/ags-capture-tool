@@ -67,7 +67,7 @@ test("overlay chrome is CSS-styled widgets, not Cairo", () => {
   assert.match(OVERLAY, /box\("overlay-dim"\)/)
   assert.match(CSS, /window#capture-overlay/)
   assert.match(CSS, /\.selrect\s*\{/)
-  assert.match(CSS, /\.selhandle\s*\{[^}]*min-width:\s*9px/)
+  assert.match(CSS, /(?:\.selhandle|\.hx)[^{]*\{[^}]*min-width:\s*9px/)
   assert.match(CSS, /\.overlay-dim\s*\{/)
   assert.match(CSS, /\.selbadge\s*\{/)
 })
@@ -104,6 +104,23 @@ test("window hover data comes from compositor client rects, not a GDK pointer", 
   assert.match(CONTROLLER, /hitClient\(clients\(\), x, y\)/)
   assert.match(OVERLAY, /controller\.hoverAt\(/)
   assert.match(OVERLAY, /controller\.pinAt\(/)
+})
+
+test("screen shows a monitor outline and the bar carries a Monitor n chip", () => {
+  assert.match(OVERLAY, /view\.target === "screen"/)
+  assert.match(OVERLAY, /outline\.add_css_class\("selected"\)/)
+  assert.match(OVERLAY, /monitorBadge\(/)
+  assert.match(CSS, /\.mon-outline\.selected\s*\{/)
+  assert.match(BAR, /class="bar-pill monitor-chip"/)
+  assert.match(BAR, /selection\.cycleMonitor\(\)/)
+  assert.match(BAR, /count > 1/, "single-monitor stays a confirmation frame; no dead chip")
+})
+
+test("releasing a drag never reaches the launcher", () => {
+  // The old flow captured on a completed selection. The overlay must only
+  // update pending state; commit lives in the bar and runs through runCommit.
+  assert.doesNotMatch(OVERLAY, /launcher|runCommit|screenshotArgs|recordingArgs/)
+  assert.match(OVERLAY, /controller\.setRect\(/)
 })
 
 test("the overlay is absent outside an open mode", () => {

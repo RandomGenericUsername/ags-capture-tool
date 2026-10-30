@@ -83,9 +83,19 @@ export function ClassicWindow(
   let captureWindow: Astal.Window | null = null
   const iconSlots = createIconSlots()
   let unregisterAppearance: (() => void) | null = null
+  let unsubscribeSelection: (() => void) | null = null
 
   function hideCaptureWindow() {
     if (captureWindow) captureWindow.visible = false
+  }
+
+  /**
+   * A newly mapped TOP overlay can take the pointer/focus surface; re-present
+   * the bar after the state change so its ON_DEMAND keyboard controller stays
+   * reachable (design.md §11.8 risk). Only while the bar is already visible.
+   */
+  function presentBar() {
+    if (captureWindow?.visible) captureWindow.present()
   }
 
   /** Re-assert the layer-surface size after a state switch. */
@@ -127,6 +137,8 @@ export function ClassicWindow(
   let recordingTab: Gtk.Button | null = null
   let cta: Gtk.Button | null = null
   let ctaLabel: Gtk.Label | null = null
+  let monitorChip: Gtk.Button | null = null
+  let monitorChipLabel: Gtk.Label | null = null
   let screenshotPage: ScreenshotPageHandle | null = null
   let recordingPage: RecordingPageHandle | null = null
   let settingsPage: SettingsPageHandle | null = null
@@ -160,6 +172,16 @@ export function ClassicWindow(
   function syncSelectionUi() {
     const modeOpen = isModeOpen(barState)
     if (cta) cta.sensitive = modeOpen && selection.canCommit()
+    if (monitorChip && monitorChipLabel) {
+      const screen = modeOpen && currentTarget() === "screen"
+      const count = selection.monitors().length
+      monitorChip.visible = screen && count > 1
+      if (screen && count > 1) {
+        const pending = selection.pending()
+        const picked = pending.target === "screen" ? (pending.monitor ?? selection.focused()) : selection.focused()
+        monitorChipLabel.set_label(`Monitor ${selection.monitorIndex(picked) || 1}`)
+      }
+    }
   }
 
   /** Translate the pure bar state into the built widget tree. */
@@ -199,6 +221,7 @@ export function ClassicWindow(
     // Re-tapping the active lane keeps the current pending object.
     if (!wasOpen) selection.begin(next, currentTarget())
     applyBarState()
+    presentBar()
   }
 
   function openSettingsView() {
@@ -217,6 +240,7 @@ export function ClassicWindow(
     if (!isModeOpen(barState)) return
     selection.retarget(currentTarget())
     applyBarState()
+    presentBar()
   }
 
   function closeSettings() {
@@ -251,6 +275,7 @@ export function ClassicWindow(
   function commitCurrentMode() {
     const finished = selection.selection()
     if (finished === null) return
+    if (finished.kind !== currentTarget()) return
     uiStateStore.save(screenshot, recording)
     const current = settingsStore.load()
     const argv =
@@ -281,7 +306,10 @@ export function ClassicWindow(
       // synchronously. `commit()` is idempotent from this call site: it
       // returns the same finished selection that argv was built from.
       hideOverlay: () => {
+        // Lock the session and hide synchronously; `hideNow()` is idempotent
+        // and covers a selector that vanished between the check and launch.
         selection.commit()
+        selection.hideNow()
       },
       hideBar: () => {
         barState = homeBar()
@@ -385,7 +413,15 @@ export function ClassicWindow(
           rebuildIcons: () => iconSlots.refresh(),
           refreshWindow: syncWindowSize,
         })
+        // The screen pick can also change from another monitor's overlay, so
+        // the bar's chip/CTA mirror the controller rather than only its own
+        // click handlers.
+        unsubscribeSelection = selection.subscribe(() => syncSelectionUi())
         self.connect("destroy", () => {
+          if (unsubscribeSelection !== null) {
+            unsubscribeSelection()
+            unsubscribeSelection = null
+          }
           if (unregisterAppearance !== null) {
             unregisterAppearance()
             unregisterAppearance = null
@@ -399,6 +435,18 @@ export function ClassicWindow(
         self.connect("map", () => {
           applyStateToUi()
           applyPlacement()
+          // Focus changes re-map which monitor's bar is visible (D2). The
+          // selection controller is app-wide, so keep THIS window's surface
+          // state and the shared pending session from disagreeing: an S0 bar
+          // must never appear over an active overlay, and an open lane must
+          // re-engage if its session was closed by another window's S0.
+          if (isModeOpen(barState)) {
+            if (!selection.session().active) {
+              selection.begin(barState.view === "recording" ? "recording" : "screenshot", currentTarget())
+            }
+          } else if (selection.session().active) {
+            selection.end()
+          }
           applyBarState()
           // ON_DEMAND never steals the keyboard from other AGS windows.
           self.present()
@@ -532,6 +580,26 @@ export function ClassicWindow(
                 recordingPage = handle
               }}
             />
+
+            <button
+              visible={false}
+              class="bar-pill monitor-chip"
+              tooltipText="Switch the pending screen pick"
+              onClicked={() => {
+                selection.cycleMonitor()
+                applyBarState()
+              }}
+              $={(self) => {
+                monitorChip = self
+              }}
+            >
+              <label
+                label="Monitor 1"
+                $={(self) => {
+                  monitorChipLabel = self
+                }}
+              />
+            </button>
 
             <button
               class="bar-cta"

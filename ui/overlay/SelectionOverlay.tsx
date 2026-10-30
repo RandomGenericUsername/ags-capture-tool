@@ -26,9 +26,12 @@ import {
   clampRect,
   clientByAddress,
   containsPoint,
+  globalToLocal,
   handlePositions,
   hitHandle,
   intersectRect,
+  localToGlobal,
+  monitorBadge,
   moveRect,
   rectFromPoints,
   regionBadge,
@@ -86,11 +89,11 @@ export function SelectionOverlay(
     | null = null
 
   function toGlobal(localX: number, localY: number): { x: number; y: number } {
-    return { x: geometry.x + localX, y: geometry.y + localY }
+    return localToGlobal(localX, localY, geometry)
   }
 
   function toLocal(globalX: number, globalY: number): { x: number; y: number } {
-    return { x: globalX - geometry.x, y: globalY - geometry.y }
+    return globalToLocal(globalX, globalY, geometry)
   }
 
   function show(widget: Gtk.Widget | null, visible: boolean): void {
@@ -174,8 +177,39 @@ export function SelectionOverlay(
       return
     }
 
-    // Screen chrome is the final REQ-003 slice; a screen pick still shows the
-    // dim until then, never a stale window ring.
+    if (view.target === "screen") {
+      const selected =
+        view.pending.target === "screen"
+          ? (view.pending.monitor ?? view.focused)
+          : view.focused
+      if (outline) {
+        outline.set_size_request(
+          Math.max(1, geometry.width - CHROME_INSET * 2),
+          Math.max(1, geometry.height - CHROME_INSET * 2),
+        )
+        fixed.move(outline, CHROME_INSET, CHROME_INSET)
+        outline.visible = true
+        if (connector === selected) outline.add_css_class("selected")
+        else outline.remove_css_class("selected")
+      }
+      if (connector === selected) {
+        placeBadge(
+          monitorBadge(
+            Math.max(1, view.monitorIndex),
+            geometry.width,
+            geometry.height,
+          ),
+          {
+            x: geometry.x + CHROME_INSET,
+            y: geometry.y + CHROME_INSET,
+            width: geometry.width - CHROME_INSET * 2,
+            height: geometry.height - CHROME_INSET * 2,
+          },
+        )
+      }
+      return
+    }
+
     if (view.target !== "window") return
 
     // Window: the ring follows the hovered client, or stays on the pin. A
@@ -316,6 +350,9 @@ export function SelectionOverlay(
 
     for (const handle of HANDLE_ORDER) {
       const square = box("selhandle")
+      // The mockup's handle selector is `.hx`; keep it as a compatibility
+      // class on the same 9px circle.
+      square.add_css_class("hx")
       canvas.put(square, 0, 0)
       handles.set(handle, square)
     }

@@ -60,7 +60,8 @@ window#capture-overlay {
 }
 
 /* Eight handle squares, 9px with a dark ring so they read on the tint. */
-.selhandle {
+.selhandle,
+.hx {
   min-width: 9px;
   min-height: 9px;
   border: 2px solid @color_00;

@@ -221,3 +221,18 @@ test("the monitor list follows topology changes without losing the session", () 
   assert.equal(h.controller.monitors().length, 2)
   assert.deepEqual(h.last().pending, { target: "screen", monitor: "HDMI-2" })
 })
+
+test("subscribers see selection changes and can unsubscribe", () => {
+  const h = harness()
+  let calls = 0
+  const off = h.controller.subscribe(() => {
+    calls += 1
+  })
+  h.controller.begin("screenshot", "region")
+  h.controller.setRect({ x: 1, y: 2, width: 3, height: 4 })
+  assert.ok(calls >= 2)
+  off()
+  const before = calls
+  h.controller.end()
+  assert.equal(calls, before, "destroyed bar no longer receives selection updates")
+})

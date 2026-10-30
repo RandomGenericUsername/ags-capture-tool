@@ -2,7 +2,7 @@
 id: REQ-002
 title: "Capture bar shell — five-state S0–S4, placement, on-demand pills"
 kind: requirement
-status: in-progress
+status: done
 lane: 4
 links:
   openspec: none

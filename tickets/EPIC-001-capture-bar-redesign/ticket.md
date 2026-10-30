@@ -33,6 +33,6 @@ rejected alternatives live in [design.md](./design.md).
 
 ## Children
 
-- [ ] `REQ-002` — Capture bar shell: five-state S0–S4, placement + on-demand pills (`proposed`)
+- [x] `REQ-002` — Capture bar shell: five-state S0–S4, placement + on-demand pills (`done`)
 - [ ] `REQ-003` — Selection-first capture flow: pending protocol + irreversible commit (`proposed`)
 - [ ] `REQ-004` — Recording lifecycle: red accent + live HUD (`proposed`)

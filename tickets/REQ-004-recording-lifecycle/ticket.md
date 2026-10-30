@@ -28,11 +28,15 @@ protocol.
       `--rec-accent` ≈ the palette's red accent, wired through the palette
       refresh, not a hardcoded literal).
       — Source/CSS verified; live visual not measured (Evidence A1–A3).
-- [x] S4 HUD while recording is live: pulsing red dot, elapsed `MM:SS` timer,
-      Pause/Stop buttons; **no target/fps/quality/audio pills**, no `←`
-      (INV-2 excludes S4; frame Sheet 3 `S4`).
-      — Widget tree + pure state executed/source-pinned; live compositor
-      rendering not measured (Evidence H1–H3).
+- [ ] S4 chrome visibility follows `bar.recording_hud` (design.md D9/§6,
+      default `hidden`): `hidden` = no capture-bar HUD in the frames and
+      ags-bar is the sole live timer; launcher/keybind mid-recording presents
+      the S4 HUD without altering the capture; `always` = Sheet 3 S4 HUD
+      rendered (and therefore recorded); `hover` = bar mapped with chrome
+      hidden until pointer entry reveals Pause/Stop. Stop reachable in every
+      mode; pure visibility rule covered by tests.
+      — Supersedes the earlier "S4 HUD always visible" acceptance; the widget
+      tree, timer and locking already verified (Evidence H1–H3) carry over.
 - [ ] Live state comes from the event bus (design.md §11.7), not backend
       stdout: `capture.state {state, elapsed_seconds, job_id}` via
       `ags-platform/adapters/event-bus`; Pause/Stop via

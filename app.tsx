@@ -12,6 +12,7 @@ import { glibUiStateStore } from "./adapters/glib-ui-state-store"
 import { gdkMonitorTopology } from "./adapters/gdk-monitor-topology"
 import { hyprlandMonitorFocus } from "./adapters/hyprland-monitor-focus"
 import { hyprlandMonitorReservedTop } from "./adapters/hyprland-monitor-reserved"
+import { hyprlandWindowClients } from "./adapters/hyprland-window-clients"
 import {
   createMonitorWindowSet,
   installFocusedWindowLookup,
@@ -97,12 +98,14 @@ app.start({
     // selection-driven window set that mirrors the monitors (design.md §11.2).
     const topology = gdkMonitorTopology(Gdk.Display.get_default() as Gdk.Display)
     const focus = hyprlandMonitorFocus()
+    const windowClients = hyprlandWindowClients()
     const selection = createSelectionController({
       topology,
       focus,
-      // Commit 2 replaces this with the AstalHyprland client-rect adapter.
-      clients: () => [],
+      clients: () => windowClients.list(),
     })
+    // A client list change is a repaint, never a session change (INV-4).
+    windowClients.subscribe(() => selection.refresh())
     createOverlayWindowSet({
       app,
       topology,

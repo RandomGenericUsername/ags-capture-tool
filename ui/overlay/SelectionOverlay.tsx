@@ -24,13 +24,16 @@ import {
   HANDLE_SIZE,
   badgeAnchor,
   clampRect,
+  clientByAddress,
   containsPoint,
   handlePositions,
   hitHandle,
+  intersectRect,
   moveRect,
   rectFromPoints,
   regionBadge,
   resizeRect,
+  windowBadge,
   type Rect,
   type ResizeHandle,
 } from "../../domain/selection"
@@ -171,9 +174,23 @@ export function SelectionOverlay(
       return
     }
 
-    // Window/screen chrome is added by the next slices of REQ-003; until then
-    // a non-region target still shows the dim, never a stale region rect.
-    return
+    // Screen chrome is the final REQ-003 slice; a screen pick still shows the
+    // dim until then, never a stale window ring.
+    if (view.target !== "window") return
+
+    // Window: the ring follows the hovered client, or stays on the pin. A
+    // client is drawn only by the overlay of the monitor it intersects.
+    const hovered = clientByAddress(view.clients, view.hoverAddress)
+    const client = view.pinned ?? hovered
+    if (client !== null) {
+      const clipped = intersectRect(client.rect, geometry)
+      if (clipped !== null) {
+        place(ring, clipped)
+        placeBadge(windowBadge(client, view.pinned !== null), clipped)
+        return
+      }
+    }
+    placeBadge(windowBadge(null, false), null)
   }
 
   function beginRegionDrag(globalX: number, globalY: number): void {

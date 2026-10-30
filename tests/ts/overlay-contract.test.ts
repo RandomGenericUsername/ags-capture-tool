@@ -31,6 +31,7 @@ const CONTROLLER = code(read("ui", "overlay", "controller.ts"))
 const APP = code(read("app.tsx"))
 const CSS = read("style.css")
 const BAR = code(read("ui", "classic", "ClassicWindow.tsx"))
+const CLIENTS = code(read("adapters", "hyprland-window-clients.ts"))
 
 test("the overlay is a separate window named capture-overlay", () => {
   assert.match(OVERLAY, /const OVERLAY_NAME = "capture-overlay"/)
@@ -92,6 +93,17 @@ test("the composition root builds a second, selection-driven overlay set", () =>
   assert.match(APP, /createOverlayWindowSet\(\{/)
   assert.match(APP, /createWindow: \(monitor\) => SelectionOverlay\(monitor, selection\)/)
   assert.match(APP, /createSelectionController\(\{/)
+})
+
+test("window hover data comes from compositor client rects, not a GDK pointer", () => {
+  assert.match(CLIENTS, /import\("gi:\/\/AstalHyprland\?version=0\.1"\)/)
+  for (const field of ["address", "title", "class", "x", "y", "width", "height", "monitor"]) {
+    assert.match(CLIENTS, new RegExp(`client\\.${field}`), `missing client field ${field}`)
+  }
+  assert.doesNotMatch(CLIENTS, /get_pointer|get_position|Gdk/)
+  assert.match(CONTROLLER, /hitClient\(clients\(\), x, y\)/)
+  assert.match(OVERLAY, /controller\.hoverAt\(/)
+  assert.match(OVERLAY, /controller\.pinAt\(/)
 })
 
 test("the overlay is absent outside an open mode", () => {

@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>capture-bar — presets, screenshot AND recording states</title>
+<style>
+  :root{
+    --bg:#0d0f14; --wall1:#232a36; --wall2:#141822;
+    --surface-card:#161b25; --surface-raised:#1b212e;
+    --hairline:rgba(255,255,255,.09); --hairline-strong:rgba(255,255,255,.20);
+    --text:#e8eaf0; --text-dim:#a7adba; --text-faint:#6b7280;
+    --sel-accent:#7aa2f7;
+    --selection-fill:#7aa2f7; --selection-text:#0d0f14;
+    --selection-tint:rgba(122,162,247,.16); --selection-ring:rgba(122,162,247,.75);
+    --action-primary:#c8d3f5;
+    --rec-accent:#d96b6b; --rec-tint:rgba(217,107,107,.16);
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.45 "Inter","Cantarell",system-ui,sans-serif;padding:34px 24px 60px}
+  h1{font-size:19px;font-weight:700;margin:0 0 4px}
+  .sub{color:var(--text-faint);font-size:12.5px;margin:0 0 10px}
+  .sechead{display:flex;align-items:baseline;gap:12px;margin:44px 0 10px}
+  h2{font-size:14px;font-weight:700;color:var(--text-dim);letter-spacing:.4px;margin:0}
+  .state{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--text-faint)}
+
+  .screen{position:relative;width:min(920px,100%);height:270px;border-radius:16px;
+    border:1px solid var(--hairline);overflow:hidden;
+    background:linear-gradient(160deg,var(--wall1),var(--wall2) 70%);
+    margin-bottom:10px}
+  .screen.short{height:200px}
+
+  .agsbar{position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:min(640px,86%);height:34px;border-radius:0 0 12px 12px;background:rgba(10,12,18,.86);
+    border:1px solid var(--hairline);border-top:0;display:flex;align-items:center;gap:10px;
+    padding:0 12px;color:var(--text-dim);font-size:11px}
+  .agsbar .pill{border:1px solid var(--hairline);border-radius:6px;padding:2px 8px;background:var(--surface-card)}
+
+  .bar{position:absolute;background:var(--surface-raised);border:1px solid var(--hairline);
+    border-radius:14px;display:flex;align-items:center;gap:8px;
+    box-shadow:0 12px 32px rgba(0,0,0,.45);padding:7px 9px}
+  .bar.bottom{bottom:12px;left:50%;transform:translateX(-50%)}
+  .bar.top{top:44px;left:50%;transform:translateX(-50%)}
+
+  .chip{min-height:34px;padding:0 13px;border-radius:9px;border:1px solid transparent;
+    background:transparent;color:var(--text-dim);font:inherit;font-size:12.5px;font-weight:600;
+    display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  .chip:hover{color:var(--text);background:rgba(255,255,255,.06)}
+  .chip.active{background:var(--selection-fill);color:var(--selection-text)}
+  .chip.active.rec{background:var(--rec-accent)}
+  .chip svg{width:16px;height:16px}
+  .chip.short{padding:0 9px}
+
+  .pill{min-height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--hairline);
+    background:var(--surface-card);color:var(--text-dim);font-size:11.5px;font-weight:600;
+    display:inline-flex;align-items:center;cursor:pointer}
+  .pill:hover{border-color:var(--hairline-strong);color:var(--text)}
+  .pill.sel{background:var(--selection-fill);color:var(--selection-text);border-color:transparent}
+  .pill.sel.rec{background:var(--rec-accent)}
+  .pillout{display:inline-flex;gap:6px}
+  .vsep{width:1px;align-self:stretch;background:var(--hairline);margin:3px 4px}
+
+  .cta{min-height:36px;padding:0 18px;border:0;border-radius:10px;background:var(--action-primary);
+    color:#10131b;font:inherit;font-size:12.5px;font-weight:700;display:inline-flex;
+    align-items:center;gap:8px;cursor:pointer}
+  .cta.rec{background:var(--rec-accent);color:#fff}
+  .cta svg{width:15px;height:15px}
+  .gear{width:34px;height:34px;border-radius:9px;border:1px solid var(--hairline);
+    background:transparent;color:var(--text-dim);display:inline-flex;align-items:center;
+    justify-content:center;cursor:pointer}
+  .gear:hover{border-color:var(--hairline-strong);color:var(--text)}
+  .gear svg{width:15px;height:15px}
+  .gear.sm{width:30px;height:30px}
+
+  .popover{position:absolute;background:var(--surface-raised);border:1px solid var(--hairline);
+    border-radius:12px;padding:12px 14px;box-shadow:0 14px 36px rgba(0,0,0,.5);width:430px}
+  .popover .lbl{font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--text-faint);margin:0 0 7px}
+  .pop-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .pop-row .lbl{width:74px;margin:0;flex:none}
+  .pop-row:last-child{margin-bottom:0}
+
+  .railicon{width:34px;height:34px;border-radius:9px;border:1px solid transparent;
+    background:transparent;color:var(--text-dim);display:inline-flex;align-items:center;
+    justify-content:center;cursor:pointer}
+  .railicon:hover{color:var(--text);background:rgba(255,255,255,.06)}
+  .railicon.active{background:var(--selection-fill);color:var(--selection-text)}
+  .railicon.active.rec{background:var(--rec-accent)}
+  .railicon svg{width:17px;height:17px}
+
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--rec-accent);display:inline-block;margin-right:7px;
+    box-shadow:0 0 8px var(--rec-accent)}
+  .back{width:34px;height:34px;border-radius:50%;border:1px solid var(--hairline);
+    background:transparent;color:var(--text-dim);display:inline-flex;align-items:center;
+    justify-content:center;cursor:pointer}
+  .back:hover{border-color:var(--hairline-strong);color:var(--text)}
+  .back svg{width:16px;height:16px}
+
+  .kbd{border:1px solid var(--hairline-strong);border-radius:5px;background:var(--surface-card);
+    padding:2px 6px;font-size:10.5px;font-weight:700;color:var(--text-dim);display:inline-block}
+  .dim{position:absolute;inset:0;background:rgba(5,7,12,.55)}
+  .selrect{position:absolute;border:2px solid var(--selection-ring);background:rgba(122,162,247,.10);border-radius:4px}
+  .hx{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--selection-ring);border:2px solid #0d0f14}
+  .hl{position:absolute;border:2px solid var(--selection-ring);border-radius:6px;background:rgba(122,162,247,.08);box-shadow:0 0 0 1px rgba(122,162,247,.35)}
+  .hl.rec{border-color:var(--rec-accent);background:var(--rec-tint);box-shadow:0 0 0 1px rgba(217,107,107,.35)}
+  .selrect.rec{border-color:var(--rec-accent);background:var(--rec-tint)}
+  .selrect.rec .hx{background:var(--rec-accent);border-color:#0d0f14}
+  .badge{position:absolute;background:#10131b;border:1px solid var(--hairline-strong);border-radius:7px;
+    padding:3px 9px;font-size:11px;color:var(--text);white-space:nowrap;z-index:3}
+  .fakewin{position:absolute;border-radius:8px;background:var(--surface-card);border:1px solid var(--hairline);overflow:hidden}
+  .fakewin .tbar{height:26px;background:var(--surface-raised);border-bottom:1px solid var(--hairline);
+    display:flex;align-items:center;gap:6px;padding:0 9px;font-size:10.5px;color:var(--text-dim)}
+  .fakewin .tbar i{width:9px;height:9px;border-radius:50%;background:var(--hairline-strong)}
+  .fakewin .body{padding:10px;color:var(--text-faint);font-size:11px;line-height:1.7}
+
+  .caption{width:min(920px,100%);font-size:12px;color:var(--text-faint);line-height:1.55;margin:0 0 6px}
+  .caption b{color:var(--text-dim)}
+  .tag{display:inline-block;border:1px solid var(--hairline-strong);border-radius:5px;
+    padding:0 7px;font-size:10.5px;font-weight:700;color:var(--text-dim);margin-right:8px;vertical-align:1px}
+</style>
+</head>
+<body>
+<!-- icon defs: every bar reuses these; the cog is a real cog path now -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.4-2.2h5.2L16 6"/></symbol>
+    <symbol id="i-rec" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4-2.5z"/></symbol>
+    <symbol id="i-cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-region" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 12h8"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></symbol>
+  </defs>
+</svg>
+
+<h1>capture-bar · each preset in BOTH states</h1>
+<p class="sub">Same bar, two moods. Screenshot = cool blue accents published from the palette; Recording = red accent + red Record CTA (recording is consequential — it deserves a different feel). Popovers frozen open to show their content.</p>
+
+<!-- ===================== PRESET A ===================== -->
+<h2><span class="tag">A</span>Strip + popover</h2>
+
+<div class="sechead"><h2>— screenshot state</h2></div>
+<div class="screen">
+  <div class="popover" style="bottom:78px;left:50%;transform:translateX(-50%)">
+    <div class="pop-row"><span class="lbl">TARGET</span>
+      <span class="pillout"><button class="pill sel">Region</button><button class="pill">Screen</button><button class="pill">Window</button></span>
+      <span class="pillout" style="margin-left:auto"><button class="pill">Delay 3s</button></span>
+    </div>
+    <div class="pop-row"><span class="lbl">FORMAT</span>
+      <span class="pillout"><button class="pill sel">PNG</button><button class="pill">JPEG</button></span>
+      <span class="pillout" style="margin-left:auto"><button class="pill">Cursor</button></span>
+    </div>
+    <div class="pop-row"><span class="lbl">SEND TO</span>
+      <span class="pillout"><button class="pill sel">Clipboard</button><button class="pill">Save</button></span>
+    </div>
+  </div>
+  <div class="bar bottom">
+    <button class="chip active"><svg><use href="#i-cam"/></svg>Screenshot</button>
+    <button class="chip"><svg><use href="#i-rec"/></svg>Recording</button>
+    <span class="vsep"></span>
+    <button class="cta"><svg><use href="#i-region"/></svg>Capture</button>
+    <button class="gear"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+
+<div class="sechead"><h2>— recording state</h2></div>
+<div class="screen">
+  <div class="popover" style="bottom:78px;left:50%;transform:translateX(-50%)">
+    <div class="pop-row"><span class="lbl">TARGET</span>
+      <span class="pillout"><button class="pill sel rec">Screen</button><button class="pill">Window</button><button class="pill">Region</button></span>
+    </div>
+    <div class="pop-row"><span class="lbl">VIDEO</span>
+      <span class="pillout"><button class="pill">24 fps</button><button class="pill">30 fps</button><button class="pill sel rec">60 fps</button></span>
+      <span class="pillout" style="margin-left:auto"><button class="pill">Quality: High</button></span>
+    </div>
+    <div class="pop-row"><span class="lbl">AUDIO</span>
+      <span class="pillout"><button class="pill">None</button><button class="pill sel rec">System</button><button class="pill">Mic</button></span>
+    </div>
+  </div>
+  <div class="bar bottom">
+    <button class="chip"><svg><use href="#i-cam"/></svg>Screenshot</button>
+    <button class="chip active rec"><svg><use href="#i-rec"/></svg>Recording</button>
+    <span class="vsep"></span>
+    <button class="cta rec"><svg><use href="#i-rec"/></svg>Record</button>
+    <button class="gear"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+<p class="caption">The popover <b>swap</b> is the whole trick: same anchor, different rows (target/delay/format/output → target/fps/quality/audio). The active mode chip and the CTA both flip to the red accent — mode is color-coded, not just labeled.</p>
+
+<!-- ===================== PRESET B ===================== -->
+<h2><span class="tag">B</span>Full single-row — everything visible</h2>
+
+<div class="sechead"><h2>— screenshot state</h2></div>
+<div class="screen">
+  <div class="bar bottom" style="gap:6px;padding:6px 8px">
+    <button class="chip active short">Shot</button>
+    <button class="chip short">Rec</button>
+    <span class="vsep"></span>
+    <span class="pillout"><button class="pill sel">Region</button><button class="pill">Screen</button><button class="pill">Window</button></span>
+    <span class="pillout"><button class="pill">0s</button><button class="pill sel">3s</button><button class="pill">5s</button></span>
+    <span class="pillout"><button class="pill sel">PNG</button><button class="pill">JPEG</button></span>
+    <span class="vsep"></span>
+    <button class="cta" style="padding:0 14px">Capture</button>
+    <button class="gear sm"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+
+<div class="sechead"><h2>— recording state</h2></div>
+<div class="screen">
+  <div class="bar bottom" style="gap:6px;padding:6px 8px">
+    <button class="chip short">Shot</button>
+    <button class="chip active short rec">Rec</button>
+    <span class="vsep"></span>
+    <span class="pillout"><button class="pill sel rec">Screen</button><button class="pill">Window</button><button class="pill">Region</button></span>
+    <span class="pillout"><button class="pill">24</button><button class="pill">30</button><button class="pill sel rec">60</button></span>
+    <span class="pillout"><button class="pill">Low</button><button class="pill">Med</button><button class="pill sel rec">High</button></span>
+    <span class="pillout"><button class="pill">None</button><button class="pill sel rec">Sys</button><button class="pill">Mic</button></span>
+    <span class="vsep"></span>
+    <button class="cta rec" style="padding:0 14px">Record</button>
+    <button class="gear sm"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+<p class="caption">Note what recording does to B: the row <b>reshapes its pills</b> (format/delay → fps/quality/audio) and grows even wider. Nothing hidden, but this is the trade at full density — mode switching is a reflow, not a repaint.</p>
+
+<!-- ===================== PRESET C ===================== -->
+<h2><span class="tag">C</span>Icon-only until touch</h2>
+
+<div class="sechead"><h2>— collapsed at rest (both modes hidden)</h2></div>
+<div class="screen short">
+  <div class="bar bottom" style="padding:6px">
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <button class="railicon"><svg><use href="#i-rec"/></svg></button>
+    <button class="railicon"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+
+<div class="sechead"><h2>— screenshot icon tapped (back leads the row)</h2></div>
+<div class="screen short">
+  <div class="bar bottom" style="padding:6px">
+    <button class="back" title="Back to main"><svg><use href="#i-back"/></svg></button>
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <span class="vsep"></span>
+    <span class="pillout"><button class="pill sel">Region</button><button class="pill">Screen</button><button class="pill">Window</button></span>
+    <span class="pillout"><button class="pill">3s</button><button class="pill sel">PNG</button><button class="pill">→ Clipboard</button></span>
+    <span class="vsep"></span>
+    <button class="cta" style="padding:0 14px">Capture</button>
+    <button class="railicon"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+
+<div class="sechead"><h2>— recording icon tapped (back leads the row)</h2></div>
+<div class="screen short">
+  <div class="bar bottom" style="padding:6px">
+    <button class="back" title="Back to main"><svg><use href="#i-back"/></svg></button>
+    <button class="railicon active rec"><svg><use href="#i-rec"/></svg></button>
+    <span class="vsep"></span>
+    <span class="pillout"><button class="pill sel rec">Screen</button><button class="pill">Window</button><button class="pill">Region</button></span>
+    <span class="pillout"><button class="pill sel rec">60</button><button class="pill">High</button><button class="pill">Sys</button><button class="pill">Mic</button></span>
+    <span class="vsep"></span>
+    <button class="cta rec" style="padding:0 14px"><svg><use href="#i-rec"/></svg>Record</button>
+    <button class="railicon"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+<p class="caption">C in both moods, now with an explicit <b>back button</b>: `←` always returns to the main three-icon rail — no hidden "tap again" logic. Keyboard parity: <b>Esc</b> does the same. And while opened, the other mode icon stays visible and tappable, so switching lanes never forces a trip home first.</p>
+
+<!-- ===================== RECORDING ACTIVE ===================== -->
+<h2>Bonus frame — recording IN PROGRESS (live state)</h2>
+<div class="screen short">
+  <div class="bar bottom" style="padding:6px 8px">
+    <button class="chip"><svg><use href="#i-cam"/></svg>Screenshot</button>
+    <button class="chip"><svg><use href="#i-rec"/></svg>Recording</button>
+    <span class="vsep"></span>
+    <span style="font-size:12px;color:var(--text)"><span class="dot"></span><b>01:24</b></span>
+    <span class="pillout"><button class="pill">⏸ Pause</button><button class="pill">⏹ Stop</button></span>
+    <button class="gear sm"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+<p class="caption">One more state the bar must honor (your <code>bar_compact_controls</b> setting already encodes it): while a recording is live, the bar becomes the recorder HUD — pulsing red dot + timer + pause/stop. No options enter while running. Your existing <code>bar_compact_controls</code> toggle decides whether these buttons live here or in a popup.</p>
+
+<!-- ===================== SELECTION-FIRST FLOW ===================== -->
+<h1 style="margin-top:54px">Sheet 2 · selection lives while the bar is open</h1>
+<p class="sub">Mode icons open the tool; a pending selection (editable) waits for the shutter. Shutter = commit, not start.</p>
+
+<div class="sechead"><h2>Region — rect persists, handles live</h2></div>
+<div class="screen">
+  <div class="dim"></div>
+  <div class="badge" style="top:26px;left:130px">920×470 <span style="color:var(--text-faint)">· drag inside = move · squares = resize</span></div>
+  <div class="selrect" style="left:130px;top:48px;width:520px;height:150px">
+    <span class="hx" style="left:-6px;top:-6px"></span><span class="hx" style="left:50%;top:-6px;transform:translateX(-50%)"></span><span class="hx" style="right:-6px;top:-6px"></span>
+    <span class="hx" style="left:-6px;top:50%;transform:translateY(-50%)"></span><span class="hx" style="right:-6px;top:50%;transform:translateY(-50%)"></span>
+    <span class="hx" style="left:-6px;bottom:-6px"></span><span class="hx" style="left:50%;bottom:-6px;transform:translateX(-50%)"></span><span class="hx" style="right:-6px;bottom:-6px"></span>
+  </div>
+  <div class="bar bottom" style="padding:6px">
+    <button class="back"><svg><use href="#i-back"/></svg></button>
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <span class="pillout"><button class="pill sel">Region</button><button class="pill">Screen</button><button class="pill">Window</button></span>
+    <span class="pillout"><button class="pill sel">PNG</button><button class="pill">Clip</button></span>
+    <button class="cta" style="padding:0 14px"><svg><use href="#i-region"/></svg>Shutter <span class="kbd" style="background:transparent;border-color:rgba(16,19,27,.35);color:#10131b">Enter</span></button>
+  </div>
+</div>
+<p class="caption">The rect you drew survives. Widen it, nudge it, redraw a fresh one by dragging empty space — nothing captures until <b>Shutter</b>. The bar stays as the HUD carrying the commit action; <b>Enter</b> is its keyboard twin. Dimmed desktop = what will be <i>excluded</i>.</p>
+
+<div class="sechead"><h2>Window — pending pick glides across clients</h2></div>
+<div class="screen">
+  <div class="dim"></div>
+  <div class="fakewin" style="left:80px;top:40px;width:220px;height:130px">
+    <div class="tbar"><i></i><i></i><i></i><span style="margin-left:6px">files</span></div>
+    <div class="body">idle window</div>
+  </div>
+  <div class="fakewin" style="left:340px;top:26px;width:300px;height:170px;opacity:.95">
+    <div class="tbar"><i></i><i></i><i></i><span style="margin-left:6px">firefox — dotfiles</span></div>
+    <div class="body">hovered window</div>
+    <div class="hl" style="inset:-4px;pointer-events:none"></div>
+  </div>
+  <div class="badge" style="top:2px;left:336px">firefox — 1280×800 · click once to pin</div>
+  <div class="bar bottom" style="padding:6px">
+    <button class="back"><svg><use href="#i-back"/></svg></button>
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <span class="pillout"><button class="pill">Region</button><button class="pill">Screen</button><button class="pill sel">Window</button></span>
+    <button class="cta" style="padding:0 14px"><svg><use href="#i-cam"/></svg>Shutter <span class="kbd" style="background:transparent;border-color:rgba(16,19,27,.35);color:#10131b">Enter</span></button>
+  </div>
+</div>
+<p class="caption">With <b>Window</b> engaged, the highlight ring follows the pointer across clients — geometry + title in the badge. Click <b>pins</b> the pick (it stays highlighted); shutter still commits. Pin a different client at any time; Esc unpins, Esc again goes back.</p>
+
+<div class="sechead"><h2>Screen — the pending pick is the monitor itself</h2></div>
+<div class="screen">
+  <div class="dim"></div>
+  <div class="hl" style="inset:12px;border-radius:10px"></div>
+  <div class="badge" style="top:26px;left:50%;transform:translateX(-50%)">Monitor 2 — current pick · whole screen, nothing excluded</div>
+  <div class="bar bottom" style="padding:6px">
+    <button class="back"><svg><use href="#i-back"/></svg></button>
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <span class="pillout"><button class="pill">Region</button><button class="pill sel">Screen</button><button class="pill">Window</button></span>
+    <span class="pillout"><button class="pill">Monitor 2</button></span>
+    <button class="cta" style="padding:0 14px"><svg><use href="#i-cam"/></svg>Shutter <span class="kbd" style="background:transparent;border-color:rgba(16,19,27,.35);color:#10131b">Enter</span></button>
+  </div>
+</div>
+<p class="caption">Screen gets the same pending-pick protocol: an outline around the target monitor. On a single-monitor setup it's a confirmation frame; on multi-monitor the small <b>Monitor n</b> chip in the bar (or clicking another screen's outline) swaps the pick before shutter.</p>
+
+<!-- ===================== SHEET 3 · NORMATIVE STATE BOARD ===================== -->
+<h1 style="margin-top:56px">Sheet 3 · normative state board (C + back, locked)</h1>
+<p class="sub">The five states of the capture bar. One sheet to cite; every functional requirement hangs off one of these frames.</p>
+
+<div class="sechead"><h2>S0 — REST (bottom)</h2></div>
+<div class="screen short">
+  <div class="bar bottom" style="padding:6px">
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <button class="railicon"><svg><use href="#i-rec"/></svg></button>
+    <button class="railicon"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+<p class="caption">Three icons, ~120px. The whole bar's resting face.</p>
+
+<div class="sechead"><h2>S0-top — REST (top, collision-safe)</h2></div>
+<div class="screen short">
+  <div class="agsbar"><span>🏛 ags-bar</span><span class="pill">clock · tray · workspaces</span></div>
+  <div class="bar top" style="padding:6px">
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <button class="railicon"><svg><use href="#i-rec"/></svg></button>
+    <button class="railicon"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+<p class="caption">Auto-slotted below existing top layer surfaces; manual pixel offset in settings.</p>
+
+<div class="sechead"><h2>S1 — MODE OPEN + S2 SELECTION PENDING (the working state)</h2></div>
+<div class="screen short">
+  <div class="dim"></div>
+  <div class="selrect" style="left:220px;top:40px;width:340px;height:96px">
+    <span class="hx" style="left:-6px;top:-6px"></span><span class="hx" style="left:50%;top:-6px;transform:translateX(-50%)"></span><span class="hx" style="right:-6px;top:-6px"></span>
+    <span class="hx" style="left:-6px;top:50%;transform:translateY(-50%)"></span><span class="hx" style="right:-6px;top:50%;transform:translateY(-50%)"></span>
+    <span class="hx" style="left:-6px;bottom:-6px"></span><span class="hx" style="left:50%;bottom:-6px;transform:translateX(-50%)"></span><span class="hx" style="right:-6px;bottom:-6px"></span>
+  </div>
+  <div class="badge" style="top:28px;left:220px">920×470 · editable</div>
+  <div class="bar bottom" style="padding:6px">
+    <button class="back"><svg><use href="#i-back"/></svg></button>
+    <button class="railicon active"><svg><use href="#i-cam"/></svg></button>
+    <span class="pillout"><button class="pill sel">Region</button><button class="pill">Screen</button><button class="pill">Window</button></span>
+    <button class="cta" style="padding:0 14px"><svg><use href="#i-region"/></svg>Shutter <span class="kbd" style="background:transparent;border-color:rgba(16,19,27,.35);color:#10131b">Enter</span></button>
+  </div>
+</div>
+<p class="caption">Mode open and selection pending are one state pair on this board: opening a mode immediately launches its pending selection (region rect / window ring / monitor outline). Shutter or <b>Enter</b> commits; Esc backs out level by level.</p>
+
+<div class="sechead"><h2>S3 — RECORDING OPEN (red accent, same pending selection)</h2></div>
+<div class="screen short">
+  <div class="dim"></div>
+  <div class="selrect rec" style="left:200px;top:44px;width:300px;height:110px">
+    <span class="hx" style="left:-6px;top:-6px"></span><span class="hx" style="left:50%;top:-6px;transform:translateX(-50%)"></span><span class="hx" style="right:-6px;top:-6px"></span>
+    <span class="hx" style="left:-6px;top:50%;transform:translateY(-50%)"></span><span class="hx" style="right:-6px;top:50%;transform:translateY(-50%)"></span>
+    <span class="hx" style="left:-6px;bottom:-6px"></span><span class="hx" style="left:50%;bottom:-6px;transform:translateX(-50%)"></span><span class="hx" style="right:-6px;bottom:-6px"></span>
+  </div>
+  <div class="badge" style="top:32px;left:200px">region pending — Record commits</div>
+  <div class="bar bottom" style="padding:6px">
+    <button class="back"><svg><use href="#i-back"/></svg></button>
+    <button class="railicon active rec"><svg><use href="#i-rec"/></svg></button>
+    <span class="pillout"><button class="pill sel rec">Region</button><button class="pill">Screen</button><button class="pill">Window</button></span>
+    <span class="pillout"><button class="pill sel rec">60</button><button class="pill">High</button><button class="pill">Sys</button></span>
+    <button class="cta rec" style="padding:0 14px"><svg><use href="#i-rec"/></svg>Record</button>
+  </div>
+</div>
+<p class="caption">Same overlay grammar as S2, tinted red: the region/window/monitor pick is sculpted <b>before</b> Record. Commit ordering is normative: overlay + dim vanish <b>synchronously with</b> Record — the runner's first frame must never see the selection UI.</p>
+
+<div class="sechead"><h2>S4 — RECORDING LIVE (HUD; ← suppressed)</h2></div>
+<div class="screen short">
+  <div class="bar bottom" style="padding:6px 8px">
+    <span style="font-size:12px;color:var(--text)"><span class="dot"></span><b>01:24</b></span>
+    <span class="pillout"><button class="pill">⏸ Pause</button><button class="pill">⏹ Stop</button></span>
+    <button class="gear sm"><svg><use href="#i-cog"/></svg></button>
+  </div>
+</div>
+<p class="caption">Options locked while live; <span class="kbd">⏹</span> is the only exit. Pause/stop ownership follows <code>bar_compact_controls</code>.</p>
+
+<div class="caption" style="margin-top:26px"><b>State machine:</b> S0 home → S1 open (per mode) → S2 pending selection → shutter/Enter → capture · Esc unwinds one level · recording adds S3 → S4 (live) → stop → S0.<br><b>Commit is a one-way door:</b> selections are editable up to the shutter and <b>locked</b> at it — after commit, the artwork freezes with the shot/runner; no further region editing exists in any state.</div>
+</body>
+</html>

@@ -19,6 +19,16 @@
  * stylesheet.
  * ========================================================================== */
 
+/* RECORDING ACCENT (design.md §11.6, D4). The generated palette has no
+   dedicated red accent, so recording maps the palette's existing @error slot to
+   ONE app token. Nothing below spells a literal colour: a palette swap
+   restyles the recording lane with the rest of the window, and `--rec-accent`
+   is the only name a rule needs. If a theme's @error is not red-adjacent the
+   design says stop and report, never invent a second palette source. */
+:root {
+  --rec-accent: @error;
+}
+
 /* The WINDOW stays fully transparent and paints nothing: it is a layer-shell
    surface, so it can be presented for a frame before the child has laid out.
    When the window itself carried the panel chrome, that first frame showed the
@@ -51,8 +61,7 @@ window#capture-overlay {
   background-color: alpha(@color_background, 0.55);
 }
 
-/* Pending region: same accent as the bar's selection (no recording red here —
-   that is REQ-004). */
+/* Pending region: the bar's selection accent (blue) in screenshot lane. */
 .selrect {
   border: 2px solid @color_10;
   background-color: alpha(@color_10, 0.1);
@@ -86,6 +95,32 @@ window#capture-overlay {
 .mon-outline.selected {
   border-color: @color_10;
   background-color: alpha(@color_10, 0.08);
+}
+
+/* RECORDING LANE (S3, design.md D4/D7): the SAME overlay grammar tinted with
+   the recording token. The dim stays neutral — it is "what will be excluded",
+   not a mode indicator. The class lives on `.overlay-root`, set from the one
+   `OverlayView.mode` value, so ring/rect/handles/badge/monitor outline cannot
+   disagree about which lane is open. */
+.overlay-root.recording .selrect {
+  border-color: var(--rec-accent);
+  background-color: alpha(@error, 0.12);
+}
+.overlay-root.recording .selhandle,
+.overlay-root.recording .hx {
+  background-color: var(--rec-accent);
+}
+.overlay-root.recording .selring {
+  border-color: var(--rec-accent);
+  background-color: alpha(@error, 0.08);
+}
+.overlay-root.recording .mon-outline.selected {
+  border-color: var(--rec-accent);
+  background-color: alpha(@error, 0.09);
+}
+.overlay-root.recording .selbadge {
+  border-color: alpha(@error, 0.55);
+  color: @error;
 }
 
 /* Live size/title chip (Sheet 2 badge). */
@@ -206,11 +241,26 @@ window#capture-overlay {
   font-weight: 700;
 }
 
-/* REQ-004 maps `.record` to the palette's red accent. The class is attached
- * here so the lane switch already carries the right hook; no literal colour is
- * introduced in this ticket. */
+/* REQ-004 maps `.record` to the palette's red accent (design.md §11.6). The
+ * class is attached by the window whenever the recording lane is open; the
+ * CTA's label flips Capture -> Record at the same moment. */
 .bar-cta.record {
-  background-color: @color_06;
+  background-color: var(--rec-accent);
+  color: @color_foreground;
+}
+
+/* The recording lane is the same row, one accent over: the active mode chip,
+ * every selected option pill and the CTA read as recording. Scoped under
+ * `.capture-shell.recording` so the screenshot lane keeps the blue palette
+ * accent untouched (D4: screenshot stays cool, recording is consequential). */
+.capture-shell.recording .railicon.active {
+  background-color: var(--rec-accent);
+  color: @color_background;
+}
+
+.capture-shell.recording .bar-pill.selected {
+  background-color: var(--rec-accent);
+  color: @color_background;
 }
 
 .bar-kbd {
@@ -396,12 +446,12 @@ window#capture-overlay {
   box-shadow: 0 8px 22px alpha(@color_06, 0.3);
 }
 
-/* Recording CTA uses the same accent as the screenshot CTA (see above). The
-   `.record` class is kept by the view for the record-dot glyph only. */
+/* Recording CTA uses the palette's recording token through the same mapping
+   (design.md §11.6); the red is not a second literal. */
 .primary.record {
-  background-color: @color_06;
+  background-color: var(--rec-accent);
   color: @color_foreground;
-  box-shadow: 0 8px 22px alpha(@color_06, 0.3);
+  box-shadow: 0 8px 22px alpha(@error, 0.3);
 }
 
 /* Record "dot" glyph on the recording CTA (light on the accent). */

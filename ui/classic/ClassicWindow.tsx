@@ -131,6 +131,7 @@ export function ClassicWindow(
 
   // Widget handles. The three S0 rail buttons, the S1 row and the settings page
   // are built once; state changes only toggle visibility and classes.
+  let shell: Gtk.Box | null = null
   let rail: Gtk.Box | null = null
   let openRow: Gtk.Box | null = null
   let screenshotTab: Gtk.Button | null = null
@@ -187,6 +188,13 @@ export function ClassicWindow(
   /** Translate the pure bar state into the built widget tree. */
   function applyBarState() {
     const modeOpen = isModeOpen(barState)
+    // The recording lane owns the red accent (design.md D4/§11.6). One class
+    // on the shell scopes the chip, selected pills and CTA together, so the
+    // screenshot lane cannot pick up a recording colour by accident.
+    if (shell) {
+      if (barState.view === "recording") shell.add_css_class("recording")
+      else shell.remove_css_class("recording")
+    }
     if (rail) rail.visible = barState.view === "home"
     if (openRow) openRow.visible = modeOpen
     if (screenshotPage) screenshotPage.setVisible(barState.view === "screenshot")
@@ -459,6 +467,9 @@ export function ClassicWindow(
           class="capture-shell"
           orientation={Gtk.Orientation.VERTICAL}
           spacing={0}
+          $={(self) => {
+            shell = self
+          }}
         >
           {/* --------------------------------------------------------- S0 */}
           <box

@@ -154,6 +154,13 @@ export function SelectionOverlay(
 
   function render(view: OverlayView): void {
     current = view
+    // The overlay's ONLY lane signal is `OverlayView.mode`; one class scopes
+    // ring/rect/handles/badge/outline to the recording token. The dim class is
+    // deliberately not touched: it stays neutral in both lanes.
+    if (root) {
+      if (view.mode === "recording") root.add_css_class("recording")
+      else root.remove_css_class("recording")
+    }
     const visible =
       view.active && (view.target !== "region" || connector === view.focused)
     if (overlayWindow) overlayWindow.visible = visible

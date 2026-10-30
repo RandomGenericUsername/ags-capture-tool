@@ -113,6 +113,13 @@ Protocol rules:
    monitors anchored; the bar keeps `capture-window` at `layer=OVERLAY`,
    `keymode=ON_DEMAND` and owns Enter/Esc. Chrome is CSS-styled GTK (no
    Cairo) so palette refresh needs no new AppearanceSurface step (§11.5).
+7. **Esc ladder (normative):** with a mode open (S1/S3) and its pending
+   selection engaging, Esc unwinds in this exact order, one action per press:
+   (a) clear the pending pick — window unpin, monitor chip back to the
+   focused monitor, region rect cleared to an empty overlay ready for a new
+   draw — mode stays open; (b) close the mode and hide the overlay (S1→S0);
+   (c) from S0, hide the bar. Enter never participates in this ladder.
+   Committing bypasses the ladder (overlay locks and is gone).
 
 ---
 

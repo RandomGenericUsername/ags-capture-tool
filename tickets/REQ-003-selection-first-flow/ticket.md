@@ -68,7 +68,10 @@ the backend a finished commit.
       backend pytest covers the new commit path (`make backend` green).
 - [ ] **Region confined to one monitor** by construction: geometry clamped to
       the hosting overlay's monitor bounds (§4 rule 4).
-- [ ] Esc unwind = one level per press: unpin (S2) → unmode (S1) → home (S0);
+- [ ] Esc unwind = one level per press per design.md §4.7: (a) clear the
+      pending pick (window unpin / monitor chip back to focused / region rect
+      cleared to an empty overlay), mode stays open; (b) close the mode and
+      hide the overlay; (c) hide the bar from S0. Enter never participates;
       pinning survives `palette-refresh` (INV-4).
 - [ ] Gates: `make test`, `make conformance`, `make backend`,
       `make typecheck`, `make bundle`.

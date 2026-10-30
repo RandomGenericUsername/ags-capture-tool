@@ -2,7 +2,7 @@
 id: REQ-004
 title: "Recording lifecycle — red accent + live HUD (S4)"
 kind: requirement
-status: in-progress
+status: done
 lane: 3
 links:
   openspec: none

@@ -44,6 +44,7 @@ functionality 1:1, and change the capture flow to selection-first.
 | D6 | 2026-10-30 | **Commit is a one-way door**: selection locks irreversibly at shutter; no post-commit editing state exists | JD (normative correction) |
 | D7 | 2026-10-30 | Same pending protocol applies to **recording**, red-tinted (S3); commit ordering: overlay must vanish before first recorded frame | JD ("region/window hold up applies for recorder") |
 | D8 | 2026-10-30 | Region transfer passes **geometry**; window pick passes a window **reference** (backend resolves geometry at commit) | Sally, confirmed JD |
+| D9 | 2026-10-30 | S4 HUD visibility is settings-driven `recording_hud` = `hidden` \| `always` \| `hover`, **default `hidden`** (videos clean; ags-bar is the sole live timer). `always` ships the Sheet 3 HUD in recordings; `hover` shows it only while the pointer is over the bar | JD (explicit) |
 
 ---
 
@@ -136,6 +137,8 @@ Refer to Sheet 3 for the canonical drawings.
   `[Region|Screen|Window]` · pills `[24|30|60]` · `[Low|Med|High]`
   · `[None|Sys|Mic]` · `CTA ‘Record’` red.
 - **S4:** `pulse dot` · `MM:SS` · `[⏸ Pause] [⏹ Stop]` · ⚙ (allowed here).
+  Chrome visibility follows `bar.recording_hud` (D9, §6): `hidden` / `always`
+  / `hover`, default `hidden`; Stop stays reachable in all three.
 - Back button: round chevron `←`, 34px, leading position.
 
 Keyboard map (full parity): `Enter` = commit · `Esc` = back one level ·
@@ -153,8 +156,22 @@ to defaults via `configOneOf`/`configBool` tolerance helpers):
 bar: {
   position: "bottom" | "top"     // default: "bottom"
   offsetPx: number               // default: 0; pixels added beyond auto-detect
+  recording_hud: "hidden" | "always" | "hover"  // default: "hidden" (D9)
 }
 ```
+
+`recording_hud` decides S4 chrome visibility while a recording is live:
+`hidden` = the bar stays out of the way (videos contain no timer; the ags-bar
+indicator is the sole live timer and carries the stop control), `always` = the
+Sheet 3 S4 HUD is rendered and therefore appears in recorded frames, `hover` =
+the HUD renders only while the pointer is over the bar area (recordings contain
+it only during interaction).
+
+Stop MUST remain reachable in every mode: in `hidden`, the user stops through
+the ags-bar indicator, and invoking the capture launcher/keybind presents the
+bar in its S4 state (HUD visible, Stop available) even mid-recording; presenting
+it does not alter the running capture. In `hover`, the bar window stays mapped
+(hit-area present, chrome hidden) so pointer entry reveals Pause/Stop.
 
 Existing settings keep their meaning and surface — including
 `bar_compact_controls`, which decides **who carries Pause/Stop during S4**:

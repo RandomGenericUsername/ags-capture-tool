@@ -35,6 +35,7 @@ import type { RecordingRequest, ScreenshotRequest } from "../../domain/capture-r
 import {
   hudControlPlacement,
   hudTimer,
+  hudVisibility,
   idleHud,
   isHudLive,
   pauseAction,
@@ -98,6 +99,11 @@ export function ClassicWindow(
   // live (options are locked while live, so it cannot change under the user).
   let hud: RecordingHudState = idleHud()
   let hudCompact = false
+  // D9 hover/on-demand inputs. `pointerInside` is pure UI state (never a
+  // capture control); `hudPresentedByLauncher` remembers that the user asked
+  // for the HUD mid-recording in `hidden` mode.
+  let pointerInside = false
+  let hudPresentedByLauncher = false
   // Stop pressed before the hub has delivered the job id: stop the job as soon
   // as the first snapshot names it instead of leaving it running unobserved.
   let hudStopPending = false
@@ -233,6 +239,38 @@ export function ClassicWindow(
     if (!placement.popup) hudPopup?.popdown()
   }
 
+  /**
+   * Project `bar.recording_hud` (D9/§6) onto the S4 window and row.
+   *
+   * The pure rule decides; this only applies it. `opacity` hides the chrome
+   * without collapsing the row, so hover keeps a hit area and hidden/on-demand
+   * presentation does not have to recreate the widget tree. Mapping is only
+   * touched while live: S0/S1 visibility stays the focus/window-set contract.
+   */
+  function applyHudVisibility() {
+    const live = isLive(barState)
+    const visibility = hudVisibility({
+      mode: config.bar.recording_hud,
+      live,
+      pointerInside,
+      presentedByLauncher: hudPresentedByLauncher,
+    })
+    if (hudRow) hudRow.opacity = visibility.showChrome ? 1 : 0
+    // A popover is a separate surface and would otherwise outlive hidden
+    // chrome (hover pointer-leave, or `hidden` before presentation).
+    if (!visibility.showChrome) hudPopup?.popdown()
+    if (!live || captureWindow === null) return
+    if (visibility.mapWindow) {
+      if (!captureWindow.visible) {
+        captureWindow.visible = true
+        captureWindow.present()
+      }
+    } else if (captureWindow.visible) {
+      // hidden mode with no on-demand presentation: nothing may reach a frame.
+      hideCaptureWindow()
+    }
+  }
+
   /** Project the pure HUD snapshot onto the built widgets (no state change). */
   function updateHudUi() {
     if (hudTimerLabel) hudTimerLabel.set_label(hudTimer(hud, Date.now()))
@@ -252,30 +290,37 @@ export function ClassicWindow(
 
   /**
    * S4 entry. Recording commits hide the pending UI first (FR-10), then this
-   * brings the bar back as the HUD BEFORE the launcher spawns; the first
-   * `capture.state` snapshot fills in the job id and timer. Screenshot never
-   * calls it, so its commit still hides the bar.
+   * hands the decision to `bar.recording_hud` (D9): `always` maps the HUD,
+   * `hover` maps it with hidden chrome, `hidden` stays unmapped unless the user
+   * presents it. The first `capture.state` snapshot fills in the job id and
+   * timer. Screenshot never calls it, so its commit still hides the bar.
    */
   function enterLiveHud() {
     hud = idleHud()
     hudStopPending = false
-    // Re-read who owns Pause/Stop at the moment the lane goes live; options
-    // are locked from here, so one read is the whole S4 lifetime.
+    hudPresentedByLauncher = false
+    // Re-read who owns Pause/Stop and which HUD mode is active at the moment
+    // the lane goes live; options are locked from here, so one read is the
+    // whole S4 lifetime.
     config = settingsStore.load()
     barState = enterLive(barState)
+    // `applyBarState` ends in `applyHudVisibility`: always maps/presents, hover
+    // maps with hidden chrome, hidden stays unmapped (no automatic HUD).
     applyBarState()
-    if (captureWindow) {
-      captureWindow.visible = true
-      captureWindow.present()
-    }
   }
 
   /** Back to S0 without destroying anything: Stop's documented exit. */
   function leaveLiveHud() {
     hudPopup?.popdown()
+    // `hidden` had no automatic surface. A HUD the user presented through the
+    // launcher goes away again on stop, leaving no S0 bar behind.
+    const hideAfterStop =
+      config.bar.recording_hud === "hidden" && hudPresentedByLauncher
     barState = homeBar()
+    hudPresentedByLauncher = false
     applyBarState()
-    if (captureWindow?.visible) captureWindow.present()
+    if (hideAfterStop) hideCaptureWindow()
+    else if (captureWindow?.visible) captureWindow.present()
   }
 
   /**
@@ -301,9 +346,10 @@ export function ClassicWindow(
       if (!isLive(barState)) {
         barState = enterLive(barState)
         applyBarState()
+      } else {
+        updateHudUi()
+        applyHudVisibility()
       }
-      updateHudUi()
-      if (captureWindow?.visible) captureWindow.present()
       return
     }
     hudStopPending = false
@@ -365,6 +411,7 @@ export function ClassicWindow(
     syncSelectionUi()
     updateHudUi()
     syncWindowSize()
+    applyHudVisibility()
   }
 
   function selectMode(next: BarMode) {
@@ -421,10 +468,11 @@ export function ClassicWindow(
    * does the launcher receive argv (FR-10). There is no post-commit editing
    * state.
    *
-   * Recording then returns the bar as the S4 HUD (design.md §3): the pending
-   * row is gone before the backend can see a frame, but the bar the user keeps
-   * is the live indicator. Screenshot keeps REQ-003's hide-and-stay-hidden
-   * behaviour.
+   * Recording then consults `bar.recording_hud` (D9) after the hides and before
+   * the launcher spawns: `always`/`hover` may map the bar as the S4 HUD, while
+   * `hidden` leaves it unmapped so no capture-bar chrome can reach a frame.
+   * The pending row is gone either way. Screenshot keeps REQ-003's
+   * hide-and-stay-hidden behaviour.
    *
    * The legacy interactive backend path (no geometry/reference flags) is still
    * available to CLI users, but this UI never calls it: every request carries
@@ -627,9 +675,43 @@ export function ClassicWindow(
         keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", (_controller, keyval, _keycode, _state) => onKey(keyval))
         self.add_controller(keys)
+        // Hover mode (D9): the window is mapped with its chrome at opacity 0,
+        // so it remains a real hit area. Pointer entry/leave only re-applies
+        // the pure visibility rule; it never touches the running capture.
+        const motion = new Gtk.EventControllerMotion()
+        motion.connect("enter", () => {
+          pointerInside = true
+          if (isLive(barState)) applyHudVisibility()
+        })
+        motion.connect("motion", () => {
+          if (!pointerInside) {
+            pointerInside = true
+            if (isLive(barState)) applyHudVisibility()
+          }
+        })
+        motion.connect("leave", () => {
+          pointerInside = false
+          if (isLive(barState)) applyHudVisibility()
+        })
+        self.add_controller(motion)
+        // Toggling an on-demand `hidden` HUD away is a user decision too: clear
+        // the presentation flag so the next `capture.state` push cannot bring
+        // the surface back automatically.
+        self.connect("unmap", () => {
+          if (isLive(barState) && config.bar.recording_hud === "hidden") {
+            hudPresentedByLauncher = false
+          }
+        })
         self.connect("map", () => {
           applyStateToUi()
           applyPlacement()
+          // `hidden` maps nothing automatically. A launcher/keybind toggle is
+          // the ONE on-demand presentation path: mapping while live means the
+          // user asked for the HUD, so reveal it (Stop/Pause) without touching
+          // the capture. `always`/`hover` are already reachable by definition.
+          if (isLive(barState) && config.bar.recording_hud === "hidden") {
+            hudPresentedByLauncher = true
+          }
           // Focus changes re-map which monitor's bar is visible (D2). The
           // selection controller is app-wide, so keep THIS window's surface
           // state and the shared pending session from disagreeing: an S0 bar

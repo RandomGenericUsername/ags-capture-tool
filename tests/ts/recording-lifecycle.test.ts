@@ -48,6 +48,9 @@ function functionBody(source: string, marker: string): string {
 const CSS = read("style.css")
 const CSS_NO_COMMENTS = CSS.replace(/\/\*[\s\S]*?\*\//g, "")
 const WINDOW = code(read("ui", "classic", "ClassicWindow.tsx"))
+const SETTINGS_PAGE = code(read("ui", "classic", "SettingsPage.tsx"))
+const SETTINGS_DOMAIN = read("domain", "settings.ts")
+const HUD_DOMAIN = read("domain", "recording-hud.ts")
 const BAR_STATE = read("domain", "bar-state.ts")
 const COMMIT_ORDER = read("lib", "commit-order.ts")
 const ADAPTER = read("adapters", "platform-capture-state-feed.ts")
@@ -184,4 +187,120 @@ test("a palette refresh re-measures the HUD window without resetting it", () => 
   const surface = functionBody(WINDOW, "unregisterAppearance = appearanceRegistry.register")
   assert.match(surface, /refreshWindow: syncWindowSize/)
   assert.doesNotMatch(surface, /idleHud\(\)|stoppedHud\(|hud\s*=|barState\s*=|\.visible\s*=/)
+})
+
+// ---------------------------------------------------------------------------
+// D9 / design.md §6: settings-driven S4 chrome visibility.
+// ---------------------------------------------------------------------------
+
+test("bar.recording_hud is a tolerant setting with hidden as the default", () => {
+  assert.match(
+    SETTINGS_DOMAIN,
+    /export type ConfigRecordingHud = "hidden" \| "always" \| "hover"/,
+  )
+  assert.match(SETTINGS_DOMAIN, /recording_hud: "hidden"/, "the default must be hidden")
+  assert.match(SETTINGS_DOMAIN, /recording_hud: configOneOf\(/)
+  assert.match(
+    SETTINGS_DOMAIN,
+    /bar\.recording_hud,\s*CONFIG_RECORDING_HUD_MODES,\s*DEFAULT_SETTINGS\.bar\.recording_hud/,
+    "corrupt/missing values must degrade through the existing tolerance helper",
+  )
+})
+
+test("the settings page exposes all three HUD modes and persists through the store", () => {
+  assert.match(SETTINGS_PAGE, /pillRow<ConfigRecordingHud>\(\s*"Recording HUD"/)
+  for (const [label, value] of [
+    ["Hidden", "hidden"],
+    ["Always", "always"],
+    ["On hover", "hover"],
+  ] as const) {
+    assert.match(
+      SETTINGS_PAGE,
+      new RegExp(`\\{ label: "${label}", value: "${value}" \\}`),
+      `missing HUD mode ${label}`,
+    )
+  }
+  assert.match(SETTINGS_PAGE, /settingsConfig\.bar\.recording_hud = value/)
+  // The row builder persists via RowContext, the same chain as bar placement.
+  assert.match(SETTINGS_PAGE, /rowContext,/)
+})
+
+test("the pure visibility rule is the only S4 decision", () => {
+  assert.match(HUD_DOMAIN, /export function hudVisibility\(/)
+  assert.match(HUD_DOMAIN, /case "always":/)
+  assert.match(HUD_DOMAIN, /case "hover":/)
+  assert.match(HUD_DOMAIN, /case "hidden":/)
+  const apply = functionBody(WINDOW, "function applyHudVisibility()")
+  assert.match(apply, /hudVisibility\(\{/)
+  assert.match(apply, /mode: config\.bar\.recording_hud/)
+  assert.match(apply, /live,/)
+  assert.match(apply, /pointerInside,/)
+  assert.match(apply, /presentedByLauncher: hudPresentedByLauncher/)
+  // Opacity, not visibility: hover keeps a real hit area while chrome is off.
+  assert.match(apply, /hudRow\.opacity = visibility\.showChrome \? 1 : 0/)
+  // A popover is a separate surface, so it must close with hidden chrome.
+  assert.match(apply, /if \(!visibility\.showChrome\) hudPopup\?\.popdown\(\)/)
+})
+
+test("hidden does not auto-show the HUD after commit", () => {
+  const enter = functionBody(WINDOW, "function enterLiveHud()")
+  assert.match(enter, /applyBarState\(\)/)
+  assert.doesNotMatch(
+    enter,
+    /captureWindow\.visible = true|captureWindow\.present\(\)/,
+    "enterLiveHud must not map the window itself; the pure rule decides",
+  )
+  // The commit sequence is unchanged: recording still offers the HUD step.
+  const commit = functionBody(WINDOW, "function commitCurrentMode()")
+  assert.match(commit, /showHud: committingRecording \? enterLiveHud : undefined/)
+})
+
+test("a launcher presentation mid-recording reveals hidden chrome", () => {
+  assert.match(
+    WINDOW,
+    /if \(isLive\(barState\) && config\.bar\.recording_hud === "hidden"\) \{\s*hudPresentedByLauncher = true/,
+  )
+  // Toggling that on-demand HUD away must not be undone by the next bus push.
+  assert.match(
+    WINDOW,
+    /self\.connect\("unmap",[\s\S]*?hudPresentedByLauncher = false/,
+  )
+  // The presentation path is a map, so it works for always/hover too; it never
+  // touches captureState/launcher/argv.
+  assert.doesNotMatch(
+    WINDOW.slice(
+      WINDOW.indexOf('self.connect("map"'),
+      WINDOW.indexOf("applyBarState()", WINDOW.indexOf('self.connect("map"')),
+    ),
+    /captureState\.control|launcher\.launch|recordingArgs/,
+  )
+})
+
+test("hover installs a pointer controller that only re-applies visibility", () => {
+  assert.match(WINDOW, /new Gtk\.EventControllerMotion\(\)/)
+  assert.match(WINDOW, /motion\.connect\("enter",[\s\S]*?pointerInside = true/)
+  assert.match(WINDOW, /motion\.connect\("leave",[\s\S]*?pointerInside = false/)
+  assert.match(WINDOW, /self\.add_controller\(motion\)/)
+  const motion = WINDOW.slice(WINDOW.indexOf("const motion = new Gtk.EventControllerMotion()"))
+  const body = motion.slice(0, motion.indexOf('self.connect("map"'))
+  assert.doesNotMatch(body, /captureState\.control|launcher\.launch|\bhud =/)
+  assert.match(body, /if \(isLive\(barState\)\) applyHudVisibility\(\)/)
+})
+
+test("hidden launcher-presented chrome is hidden again on stop", () => {
+  const leave = functionBody(WINDOW, "function leaveLiveHud()")
+  assert.match(leave, /config\.bar\.recording_hud === "hidden" && hudPresentedByLauncher/)
+  assert.match(leave, /hideAfterStop/)
+  assert.match(leave, /hideCaptureWindow\(\)/)
+  assert.match(leave, /hudPresentedByLauncher = false/)
+})
+
+test("Stop remains in the S4 row for every visibility mode", () => {
+  const start = WINDOW.indexOf('class="capture-bar hud"')
+  const end = WINDOW.indexOf("<SettingsPage", start)
+  const hud = WINDOW.slice(start, end)
+  assert.match(hud, /label="⏹ Stop"/)
+  assert.match(hud, /onClicked=\{stopRecording\}/)
+  // The row itself must stay built even when its chrome is at opacity 0.
+  assert.match(WINDOW, /if \(hudRow\) hudRow\.visible = live/)
 })

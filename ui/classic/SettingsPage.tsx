@@ -37,6 +37,7 @@ import type {
   ConfigBarPosition,
   ConfigRecordingAudio,
   ConfigRecordingFps,
+  ConfigRecordingHud,
   ConfigRecordingQuality,
   ConfigScreenshotFormat,
   ConfigScreenshotOutput,
@@ -201,6 +202,19 @@ export function SettingsPage(props: SettingsPageProps) {
         () => settingsConfig.bar.offsetPx,
         (value) => {
           settingsConfig.bar.offsetPx = value
+        },
+        rowContext,
+      ),
+      pillRow<ConfigRecordingHud>(
+        "Recording HUD",
+        [
+          { label: "Hidden", value: "hidden" },
+          { label: "Always", value: "always" },
+          { label: "On hover", value: "hover" },
+        ],
+        () => settingsConfig.bar.recording_hud,
+        (value) => {
+          settingsConfig.bar.recording_hud = value
         },
         rowContext,
       ),

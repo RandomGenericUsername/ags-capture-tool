@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import type { CaptureStatePayload } from "../ports/capture-state-feed"
+import type { ConfigRecordingHud } from "./settings"
 
 export type HudPhase = "idle" | "recording" | "paused"
 
@@ -52,6 +53,60 @@ export function idleHud(): RecordingHudState {
 /** True while the HUD should be on screen (recording or paused). */
 export function isHudLive(state: RecordingHudState): boolean {
   return state.phase === "recording" || state.phase === "paused"
+}
+
+// ---------------------------------------------------------------------------
+// S4 chrome visibility (design.md D9/§6, REQ-004).
+//
+// `bar.recording_hud` decides what the live S4 surface looks like. This is a
+// pure decision so the three modes can be exercised without GTK:
+//
+//   hidden  -> nothing automatic. The bar window stays unmapped while live;
+//              only a launcher/keybind presentation (`presentedByLauncher`)
+//              maps it and reveals the HUD. ags-bar remains the sole automatic
+//              live timer, so recordings carry no capture-bar chrome.
+//   always  -> the bar is mapped and the Sheet 3 HUD is visible (current S4
+//              behaviour); it is therefore part of recorded frames.
+//   hover   -> the bar is mapped for its hit area, but the chrome is hidden
+//              until the pointer is inside it. Entering/leaving never touches
+//              the running capture.
+//
+// Stop stays reachable in every branch: always shows it, hover reveals it on
+// pointer entry, hidden reveals it when the launcher presents the bar.
+// ---------------------------------------------------------------------------
+
+export interface HudVisibilityInput {
+  mode: ConfigRecordingHud
+  /** The capture is live (S4); the bar state owns this, not the bus snapshot. */
+  live: boolean
+  /** Pointer is inside the bar area (hover mode). */
+  pointerInside: boolean
+  /** The launcher/keybind presented the bar during this live recording. */
+  presentedByLauncher: boolean
+}
+
+export interface HudVisibility {
+  /** Whether the bar window must be mapped. */
+  mapWindow: boolean
+  /** Whether the S4 chrome (dot/timer/Pause/Stop) is visible. */
+  showChrome: boolean
+}
+
+export function hudVisibility(input: HudVisibilityInput): HudVisibility {
+  if (!input.live) return { mapWindow: false, showChrome: false }
+  switch (input.mode) {
+    case "always":
+      return { mapWindow: true, showChrome: true }
+    case "hover":
+      return { mapWindow: true, showChrome: input.pointerInside }
+    case "hidden":
+    default:
+      // An unknown/corrupt value behaves like the default, never like `always`.
+      return {
+        mapWindow: input.presentedByLauncher,
+        showChrome: input.presentedByLauncher,
+      }
+  }
 }
 
 /** `MM:SS`, rounded down; minutes are allowed to grow past 99. */

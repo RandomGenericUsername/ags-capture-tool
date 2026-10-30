@@ -19,6 +19,14 @@ export type ConfigRecordingFps = 24 | 30 | 60
 export type ConfigRecordingQuality = "low" | "medium" | "high"
 export type ConfigRecordingAudio = "none" | "system" | "mic"
 export type ConfigBarPosition = "bottom" | "top"
+/**
+ * S4 chrome visibility while a recording is live (design.md D9/§6):
+ *   hidden = the bar stays out of the way; ags-bar is the sole live timer and
+ *            a launcher invocation presents the HUD on demand;
+ *   always = the Sheet 3 HUD is rendered (and therefore recorded);
+ *   hover  = the bar stays mapped with chrome hidden until pointer entry.
+ */
+export type ConfigRecordingHud = "hidden" | "always" | "hover"
 
 export interface CaptureSettings {
   screenshot_dir: string
@@ -36,6 +44,8 @@ export interface CaptureSettings {
   bar: {
     position: ConfigBarPosition
     offsetPx: number
+    /** S4 live-HUD visibility (D9); `hidden` keeps recordings clean. */
+    recording_hud: ConfigRecordingHud
   }
   screenshot: {
     format: ConfigScreenshotFormat
@@ -56,7 +66,7 @@ export const DEFAULT_SETTINGS: CaptureSettings = {
   filename_pattern: "{kind}_%Y-%m-%d_%H-%M-%S",
   notifications: true,
   bar_compact_controls: false,
-  bar: { position: "bottom", offsetPx: 0 },
+  bar: { position: "bottom", offsetPx: 0, recording_hud: "hidden" },
   screenshot: { format: "png", output: "clipboard", cursor: false },
   recording: { fps: 60, quality: "high", audio: "system", cursor: true },
 }
@@ -71,6 +81,11 @@ export const CONFIG_RECORDING_QUALITIES: readonly ConfigRecordingQuality[] = [
 ]
 export const CONFIG_RECORDING_AUDIO: readonly ConfigRecordingAudio[] = ["none", "system", "mic"]
 export const CONFIG_BAR_POSITIONS: readonly ConfigBarPosition[] = ["bottom", "top"]
+export const CONFIG_RECORDING_HUD_MODES: readonly ConfigRecordingHud[] = [
+  "hidden",
+  "always",
+  "hover",
+]
 
 export function configOneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback
@@ -127,6 +142,11 @@ export function mergeSettings(raw: unknown): CaptureSettings {
       offsetPx: Math.max(
         0,
         Math.round(configNumber(bar.offsetPx, DEFAULT_SETTINGS.bar.offsetPx)),
+      ),
+      recording_hud: configOneOf(
+        bar.recording_hud,
+        CONFIG_RECORDING_HUD_MODES,
+        DEFAULT_SETTINGS.bar.recording_hud,
       ),
     },
     screenshot: {

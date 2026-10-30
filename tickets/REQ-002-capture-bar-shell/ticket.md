@@ -52,10 +52,7 @@ without touching the identity tuple, window name or palette-refresh contract.
       corrupt/missing values degrade to defaults via `configOneOf`/
       `configString` tolerance, no throw (settings tolerance rule,
       settings.ts L63–73).
-- [ ] Top placement (design.md D3/FR-2): bar anchors below other top-anchored
-      layer surfaces with no overlap at offset 0 (ags-bar present case),
-      `offsetPx` shifts it further; manual verification scenario documented
-      in the ticket evidence.
+- [ ] Top placement (design.md D3/§11.4): margin = `AstalHyprland.Monitor.reserved_top` (+ `hyprctl -j monitors` `reserved` fallback) + `bar.offsetPx`; verified no overlap with ags-bar (48px reserved zone) at offset 0; the bar MUST NOT be EXCLUSIVE (no self-offset feedback). Manual verification scenario documented in ticket evidence.
 - [ ] `baseline` regression: `make test`, `make conformance` green;
       `make typecheck`, `make bundle` green locally.
 

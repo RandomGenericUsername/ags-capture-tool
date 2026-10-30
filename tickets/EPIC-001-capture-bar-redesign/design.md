@@ -107,6 +107,12 @@ Protocol rules:
    per-monitor overlay windows stay the deployment unit [README L21–23]).
 5. Region hands over **geometry**; window hands over a **reference** resolved
    by the backend at commit time (D8).
+6. **Overlay surface contract (§11.2, resolved):** the selection overlay is a
+   separate per-monitor window named `capture-overlay` (NEVER
+   `capture-window`), `layer=TOP`, `exclusivity=IGNORE`, `keymode=NONE`, full
+   monitors anchored; the bar keeps `capture-window` at `layer=OVERLAY`,
+   `keymode=ON_DEMAND` and owns Enter/Esc. Chrome is CSS-styled GTK (no
+   Cairo) so palette refresh needs no new AppearanceSurface step (§11.5).
 
 ---
 
@@ -170,7 +176,7 @@ The redesign must NOT touch:
 
 ---
 
-## 8. Architecture hand-off flags (input for the architect, blocking FR-10 design)
+## 8. Architecture hand-off flags (RESOLVED 2026-10-30 — see §11)
 
 1. **Selection geometry ownership moves to the AGS overlay (D5/D7).** Today
    the region-draw/window-pick act is delegated one-shot to the backend
@@ -214,3 +220,149 @@ The redesign must NOT touch:
 - Cross-monitor regions — rejected for now (per-monitor architecture; §4.4).
 - Selection editing after commit (crop-follow while live) — rejected D6.
 - Structural teardown/rebuild refresh — rejected (AGENTS.md §5 residual).
+
+---
+
+## 11. Resolved architecture decisions (2026-10-30 advisory — binds)
+
+All findings carry evidence in the advisory record; implementer must not
+re-derive or "improve" these without a new user decision.
+
+### 11.1 Current plumbing (baseline facts)
+
+Region/window/screen selection is one-shot in the backend today: AGS builds
+argv (`domain/cli-args.ts` single translator) → `exec-capture-launcher` hides
+the window (150 ms) and fire-and-forgets → `bin/capture-tool`
+`parse_args` → `resolve_target()` runs `slurp` (region, or `slurp -r` over
+`hyprctl -j clients` boxes for window; single-candidate window auto-selects)
+→ capture immediately. Screen today = grim all-outputs (no per-monitor).
+Recording = same `resolve_target` then `dotfiles-runtime capture`. Backend
+stdout is discarded by the launcher — the GUI has no live state feed yet.
+Evidence: `bin/capture-tool:194–264,276–344,446–517,1347–1418`;
+`ui/classic/ClassicWindow.tsx:254–295`; `adapters/exec-capture-launcher.ts:23–28`.
+
+### 11.2 Overlay — separate `capture-overlay` window
+
+gtk4-layer-shell 1.3 has **no input-region API** (verified: zero
+`set_input_region` in GIR). Therefore a full-monitor overlay window on TOP
+receives pointer everywhere; it must not sit above the bar. Contract:
+
+- `capture-overlay`: per-monitor, `name="capture-overlay"`,
+  `layer=TOP`, `exclusivity=IGNORE`, `keymode=NONE`, anchors all edges,
+  margins 0, `gdkmonitor=<monitor>`. Present S1–S3, absent S0/S4 (INV-5).
+- Bar stays `capture-window`, `layer=OVERLAY`, `keymode=ON_DEMAND`; it owns
+  Enter/Esc and stays clickable above the dim.
+- Chrome = CSS-styled GTK widgets (dim bands / bordered boxes / handles /
+  ring), NOT Cairo — palette stays in `style.css`. Cairo only with an
+  explicit `refreshPaint()` AppearanceSurface step (§11.5).
+- Overlay window-set lifecycle mirrors `monitor-window-set` discipline:
+  registry register/destroy unregister, no dead-widget refresh.
+- Window hover data comes from `AstalHyprland` client rects (GTK4 has no
+  global pointer/API); use `address,x,y,width,height,monitor,title`.
+- Coordinate caution: GDK monitor geometry is logical; hyprctl/slurp/grim
+  coords may differ under scaling or negative origins — verify on scale≠1
+  before assuming equality.
+- TOP-layer contest with ags-bar (also TOP, EXCLUSIVE 48px, anchored
+  TOP|LEFT|RIGHT): acceptable modal block, or inset overlay by
+  `reserved_top` (§11.4).
+
+### 11.3 Backend commit path — additive flags only
+
+Keep every existing flag/default; old interactive path remains for
+compatibility (UI must not use it):
+
+```
+screenshot|start --target region --geometry "X,Y WxH" [--monitor NAME]
+screenshot|start --target screen --monitor NAME
+screenshot|start --target window --window 0xADDRESS
+```
+
+- `--geometry` = finished rect; region path skips `slurp` entirely; validate
+  with the existing regex, canonical `X,Y WxH` (never `WxH+X+Y`).
+- `--monitor` = per-monitor screen capture via `grim -o NAME` (behaviour
+  change vs today's all-outputs, only on the new path); for recording use
+  the monitor name instead of `resolve_target("screen")`.
+- `--window` = resolve `hyprctl -j clients` by address at commit time (D8);
+  vanished client → typed error, NEVER silent slurp fallback.
+- TS: add a discriminated `Selection` to requests; append flags at the END
+  of `screenshotArgs`/`recordingArgs` so legacy arrays stay byte-identical.
+- Tests: python parse/accept/defaults, no-slurp-on-commit (monkeypatch),
+  window resolution + vanished address, `grim -o` per monitor; TS exact-argv
+  per selection kind + legacy unchanged + region clamp.
+Evidence: `bin/capture-tool:254–263,287–322,1353–1418`;
+`domain/capture-request.ts:40–80`; `domain/cli-args.ts:65–116`.
+
+### 11.4 Top placement — `reserved_top` + manual offset
+
+Primary: `AstalHyprland.Monitor.reserved_top` (push-based; measured
+`[0,48,0,0]` = ags-bar's exclusive zone). Fallback: `hyprctl -j monitors`
+`reserved` when unavailable. Final margin = `reserved_top + bar.offsetPx`.
+The capture bar MUST NOT be `EXCLUSIVE` (self-offset feedback loop); keep
+`IGNORE`/non-exclusive. `reserved_*` cannot see non-exclusive top overlays —
+`offsetPx` is the manual escape hatch. Evidence:
+`@girs/astalhyprland-0.1.d.ts:668–671,780–792`;
+`adapters/hyprland-monitor-focus.ts:50–68`; `ags-bar/bar/Bar.tsx:49–57`.
+
+### 11.5 Palette refresh — CSS-only chrome
+
+`theme.apply()` reloads `style.css`, so CSS-styled chrome (bar, pills, CTA,
+badge, dim bands, rect/handles, HUD) needs **no** new AppearanceSurface
+step. Icons keep their existing `IconSlots` path. If a Cairo canvas is ever
+introduced, add `refreshPaint()` to `AppearanceSurface`, called between
+`rebuildIcons` and `refreshWindow` (`lib/appearance.ts:41–49,72–76`), and
+re-read the palette only during refresh (never subscribe `wallpaper.state`).
+
+### 11.6 Red accent token (D4) — no literals
+
+The generated palette exposes `@error`, `@warning`, `@color_00..15`; no
+dedicated red accent exists. Implementation MUST use a palette token (start
+with `@error` as the recording accent; `--rec-accent` CSS var maps to it)
+and MUST NOT hardcode a hex (`style.css:10–19` no-literal rule). If the
+active theme's `@error` is not red-adjacent, stop and report — do not
+invent a second palette source.
+
+### 11.7 S4 live state feed — event bus, not stdout
+
+The launcher discards backend stdout, so S4 must subscribe to
+`capture.state {state, elapsed_seconds, job_id}` via
+`ags-platform/adapters/event-bus` (proven pattern:
+`ags-bar/bar/widgets/recording.tsx:79–97`); Pause/Stop via
+`hub.control(job_id, action)`. Coordinate with ags-bar's existing recording
+indicator (single indicator or explicit duplication) — do not let two
+disagreeing timers ship silently.
+
+### 11.8 Risk register (carry into tasks)
+
+Input regions absent · exclusivity feedback · TOP contest with ags-bar ·
+bar keyboard focus loss when overlay maps (re-`present()` after show) ·
+second per-monitor window set lifecycle · coordinate spaces (scale/negative
+origins) · argv drift (single translator, flags appended) · vanished window
+at commit · overlay-in-capture ordering (FR-10 test on call order) · screen
+semantics change scoped to new path only · refresh must never show/hide/
+resize the pending selection (INV-4) · never resurrect complete-selection=
+capture.
+
+### 11.9 "Do NOT do" (normative)
+
+- Rename `capture-window`, touch `app.manifest.json`, `capture-ui` or the
+  `window#capture-window` selector; name the overlay `capture-window`.
+- Add a second request→argv translator, a second settings/ui-state source,
+  or a second app list.
+- Keep/restore a slurp call inside the overlay commit path.
+- Destroy/recreate per-monitor windows for palette or state changes.
+- Subscribe to `wallpaper.state`; hardcode hex colours; make the bar
+  `EXCLUSIVE`; read `reserved_top` off itself.
+- Cross-monitor regions, post-commit editing, crop/annotation phase.
+- GTK/GLib imports in `domain/`, `ports/`, `lib/`.
+
+### 11.10 Implementation sequencing (smallest shippable slices)
+
+- **REQ-002:** S0 rail + S1 per mode on existing option vocabulary; placement
+  (`reserved_top` + offset); focused-monitor visibility; legacy commit path
+  still used temporarily (documented migration). No overlay yet.
+- **REQ-003:** commit 1 = backend `--geometry` + overlay skeleton (dim, rect,
+  8 handles, Enter commit, Esc unpin); commit 2 = `--window` + hover ring/pin;
+  commit 3 = `--monitor`/`grim -o` + monitor outline/chip + clamp.
+- **REQ-004:** commit 1 = red accent token + CTA flip (CSS); commit 2 =
+  `capture.state` subscription + S4 HUD + locked options; commit 3 =
+  Pause/Stop via event bus + timer continuity check.

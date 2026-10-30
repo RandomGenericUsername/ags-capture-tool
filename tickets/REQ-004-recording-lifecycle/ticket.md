@@ -30,6 +30,15 @@ protocol.
 - [ ] S4 HUD while recording is live: pulsing red dot, elapsed `MM:SS` timer,
       Pause/Stop buttons; **no target/fps/quality/audio pills**, no `←`
       (INV-2 excludes S4; frame Sheet 3 `S4`).
+- [ ] Live state comes from the event bus (design.md §11.7), not backend
+      stdout: `capture.state {state, elapsed_seconds, job_id}` via
+      `ags-platform/adapters/event-bus`; Pause/Stop via
+      `hub.control(job_id, action)`; ags-bar's existing recording indicator
+      coordinated (single indicator or explicit duplication, documented).
+- [ ] Red accent uses a palette token (design.md §11.6; start with `@error`
+      mapped to `--rec-accent`), no hardcoded hex; if the active theme's
+      `@error` is not red-adjacent, stop and report instead of inventing a
+      palette source.
 - [ ] Options locked while live: changing target/format/etc. is impossible
       until `⏹ Stop` returns the bar to S0 (INV-5: S2/S3 overlay machinery is
       fully torn down once live).

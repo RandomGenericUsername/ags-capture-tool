@@ -49,12 +49,25 @@ the backend a finished commit.
       recording starts. Verify: unit test ordering hide→launch; manual grep
       of commit path for no async gap; a recorded 2s clip contains no
       selection UI (manual evidence in ticket).
-- [ ] **Region confined to one monitor** by construction: geometry clamped to
-      the hosting overlay's monitor bounds (§4 rule 4).
+- [ ] **Overlay surface (design.md §11.2):** selection chrome lives in a
+      separate per-monitor `capture-overlay` window (layer TOP,
+      exclusivity IGNORE, keymode NONE) — never named `capture-window`; the
+      bar stays OVERLAY/ON_DEMAND and retains Enter/Esc; overlay present in
+      S1–S3 only, absent S0/S4; unregistered on destroy (no dead-widget
+      refresh).
+- [ ] **Backend commit flags only additive (design.md §11.3):** legacy argv
+      arrays stay byte-identical and the legacy slurp path still works for
+      CLI users; the UI path builds `--geometry "X,Y WxH"` / `--monitor` /
+      `--window 0x…` and never triggers `slurp` (test: monkeypatched
+      `resolve_target` must not be called; vanished window → typed error,
+      no slurp fallback). Coordinate-space caution verified: rect correctness
+      on one `scale≠1` output and negative monitor origins (§11.2).
 - [ ] **Backend contract pivot (D8/§8.1):** commit passes finished geometry
       (region/screen) or a window reference (window) to `bin/capture-tool`;
       domain/argv updated and pure; `domain/`, `ports/` stay GTK-free;
       backend pytest covers the new commit path (`make backend` green).
+- [ ] **Region confined to one monitor** by construction: geometry clamped to
+      the hosting overlay's monitor bounds (§4 rule 4).
 - [ ] Esc unwind = one level per press: unpin (S2) → unmode (S1) → home (S0);
       pinning survives `palette-refresh` (INV-4).
 - [ ] Gates: `make test`, `make conformance`, `make backend`,

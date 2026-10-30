@@ -98,6 +98,9 @@ export function ClassicWindow(
   // live (options are locked while live, so it cannot change under the user).
   let hud: RecordingHudState = idleHud()
   let hudCompact = false
+  // Stop pressed before the hub has delivered the job id: stop the job as soon
+  // as the first snapshot names it instead of leaving it running unobserved.
+  let hudStopPending = false
   let hudTicker: number | null = null
   let unsubscribeFeed: (() => void) | null = null
   let unsubscribeRestart: (() => void) | null = null
@@ -255,6 +258,7 @@ export function ClassicWindow(
    */
   function enterLiveHud() {
     hud = idleHud()
+    hudStopPending = false
     // Re-read who owns Pause/Stop at the moment the lane goes live; options
     // are locked from here, so one read is the whole S4 lifetime.
     config = settingsStore.load()
@@ -285,6 +289,15 @@ export function ClassicWindow(
     if (next === hud) return
     hud = next
     if (isHudLive(next)) {
+      // A Stop raced the first snapshot: control the job the moment it is
+      // named, then close the HUD without ever showing a live timer.
+      if (hudStopPending) {
+        if (next.jobId !== null) captureState.control(next.jobId, "stop")
+        hudStopPending = false
+        hud = stoppedHud(next, Date.now())
+        leaveLiveHud()
+        return
+      }
       if (!isLive(barState)) {
         barState = enterLive(barState)
         applyBarState()
@@ -293,6 +306,7 @@ export function ClassicWindow(
       if (captureWindow?.visible) captureWindow.present()
       return
     }
+    hudStopPending = false
     if (isLive(barState)) leaveLiveHud()
   }
 
@@ -308,6 +322,7 @@ export function ClassicWindow(
    */
   function stopRecording() {
     if (hud.jobId !== null) captureState.control(hud.jobId, "stop")
+    else hudStopPending = true
     hud = stoppedHud(hud, Date.now())
     leaveLiveHud()
   }
@@ -574,6 +589,7 @@ export function ClassicWindow(
         // A hub restart invalidates the old job: never leave a stale HUD up.
         unsubscribeRestart = captureState.onRestart(() => {
           hud = idleHud()
+          hudStopPending = false
           if (isLive(barState)) leaveLiveHud()
         })
         // Continuous rendering between pushes: the backend's pushed timer is

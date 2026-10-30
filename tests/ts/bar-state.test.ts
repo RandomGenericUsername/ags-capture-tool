@@ -12,7 +12,9 @@ import assert from "node:assert/strict"
 import {
   back,
   enterAction,
+  enterLive,
   homeBar,
+  isLive,
   isModeOpen,
   isSettingsOpen,
   openMode,
@@ -86,4 +88,20 @@ test("Enter is the CTA twin in S1 and never commits from S0", () => {
   assert.equal(enterAction(openMode(homeBar(), "screenshot")), "screenshot")
   assert.equal(enterAction(openMode(homeBar(), "recording")), "recording")
   assert.equal(enterAction(openSettings(homeBar())), "settings")
+})
+
+test("S4 live is its own view, not an open mode (INV-2/INV-5)", () => {
+  const live = enterLive(openMode(homeBar(), "recording"))
+  assert.deepEqual(live, { view: "live", mode: "recording" })
+  assert.equal(isLive(live), true)
+  assert.equal(isModeOpen(live), false, "options and back belong to S1/S3 only")
+  assert.equal(enterAction(live), null, "Enter never starts a second recording")
+  assert.equal(openSettings(live).view, "live", "settings is S0-only (INV-3)")
+})
+
+test("Stop returns from live to S0 via back()", () => {
+  const home = back(enterLive(openMode(homeBar(), "recording")))
+  assert.equal(home.view, "home")
+  assert.equal(home.mode, "recording")
+  assert.equal(isLive(home), false)
 })

@@ -67,3 +67,18 @@ test("a thrown launch does not reorder or resurrect the hides", () => {
   )
   assert.deepEqual(calls, ["hide-overlay", "hide-bar", "launch"])
 })
+
+test("recording restores the S4 HUD after the hides and before the launch", () => {
+  const calls: string[] = []
+  runCommit({
+    hideOverlay: () => calls.push("hide-overlay"),
+    hideBar: () => calls.push("hide-bar"),
+    showHud: () => calls.push("show-hud"),
+    launch: () => calls.push("launch"),
+  })
+  assert.deepEqual(
+    calls,
+    ["hide-overlay", "hide-bar", "show-hud", "launch"],
+    "the pending UI is gone before the HUD maps, and the HUD maps before the backend",
+  )
+})

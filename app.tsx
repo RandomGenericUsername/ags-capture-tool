@@ -16,11 +16,14 @@ import {
   createMonitorWindowSet,
   installFocusedWindowLookup,
 } from "./adapters/monitor-window-set"
+import { createOverlayWindowSet } from "./adapters/overlay-window-set"
 import { createUiState } from "./domain/ui-state"
 import { createCapturePaletteRefresh } from "./lib/palette-refresh"
 import type { CapturePorts } from "./ports/capture-ports"
 import { refreshAppAppearance } from "./ui/appearance"
 import { ClassicWindow } from "./ui/classic/ClassicWindow"
+import { createSelectionController } from "./ui/overlay/controller"
+import { SelectionOverlay } from "./ui/overlay/SelectionOverlay"
 
 // THE RUNTIME-OWNED LIVE REFRESH (AD-27). This is the real capture refresh,
 // not a Theme-only acknowledgement:
@@ -88,6 +91,25 @@ app.start({
     // test or a second entry point.
     const state = createUiState()
 
+    // ONE topology/focus/clients source shared by the bar windows, the overlay
+    // windows and the pending-selection controller. The controller is the
+    // single owner of "what is selected"; the overlay set is a second,
+    // selection-driven window set that mirrors the monitors (design.md §11.2).
+    const topology = gdkMonitorTopology(Gdk.Display.get_default() as Gdk.Display)
+    const focus = hyprlandMonitorFocus()
+    const selection = createSelectionController({
+      topology,
+      focus,
+      // Commit 2 replaces this with the AstalHyprland client-rect adapter.
+      clients: () => [],
+    })
+    createOverlayWindowSet({
+      app,
+      topology,
+      createWindow: (monitor) => SelectionOverlay(monitor, selection),
+      report: (message) => console.log(message),
+    })
+
     // The window set owns one window per monitor AND keeps that true when the
     // monitors change (fix-capture-monitor-lifecycle). It used to be a bare
     // `for (const monitor of app.get_monitors())` loop here, which read the
@@ -107,9 +129,9 @@ app.start({
     // the current monitor set without app.tsx tracking windows a second time.
     const windowSet = createMonitorWindowSet({
       app,
-      topology: gdkMonitorTopology(Gdk.Display.get_default() as Gdk.Display),
-      focus: hyprlandMonitorFocus(),
-      createWindow: (monitor) => ClassicWindow(monitor, ports, state),
+      topology,
+      focus,
+      createWindow: (monitor) => ClassicWindow(monitor, ports, state, selection),
       report: (message) => console.log(message),
     })
     installFocusedWindowLookup(app, windowSet)

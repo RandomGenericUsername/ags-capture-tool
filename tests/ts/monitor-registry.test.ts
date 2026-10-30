@@ -357,8 +357,13 @@ test("app.tsx subscribes to monitor changes instead of reading the list once", (
   const source = code(APP)
   assert.match(
     source,
-    /topology: gdkMonitorTopology\(/,
-    "the composition root must hand the window set a real topology",
+    /gdkMonitorTopology\(/,
+    "the composition root must build a real topology",
+  )
+  assert.match(
+    source,
+    /topology,\s*\n\s*focus,/,
+    "the window set must receive the shared topology/focus pair",
   )
   assert.match(
     source,

@@ -156,9 +156,14 @@ test("a zero AstalHyprland reserved_top falls through to hyprctl", () => {
   assert.match(RESERVED, /readHyprctl\(connector\)/)
 })
 
-test("the legacy commit path still launches the existing backend argv", () => {
-  assert.match(WINDOW, /launcher\.launch\(screenshotArgs\(request\)\)/)
-  assert.match(WINDOW, /launcher\.launch\(recordingArgs\(request\)\)/)
-  // No REQ-003 overlay/pending machinery is invented in this ticket.
-  assert.doesNotMatch(WINDOW, /capture-overlay|pending|geometry/i)
+test("the UI commits through the pending selection, never the legacy slurp path", () => {
+  // REQ-003 supersedes the REQ-002 temporary commit: argv is still built by the
+  // ONE translator, but only after a finished selection exists.
+  assert.match(WINDOW, /screenshotArgs\(\{/)
+  assert.match(WINDOW, /recordingArgs\(\{/)
+  assert.match(WINDOW, /selection: finished/)
+  assert.match(WINDOW, /runCommit\(\{/)
+  assert.match(WINDOW, /hideOverlay:/)
+  // The overlay itself lives in its own module; the bar keeps its identity.
+  assert.doesNotMatch(WINDOW, /name="capture-overlay"/)
 })

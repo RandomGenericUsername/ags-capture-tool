@@ -31,6 +31,73 @@ window#capture-window {
   color: @color_foreground;
 }
 
+/* The selection overlay is a SEPARATE layer surface (`capture-overlay`),
+   never `capture-window`. It is full-monitor and paints only CSS chrome, so a
+   palette refresh needs no Cairo/AppearanceSurface step (design.md §11.2/
+   §11.5). The window itself stays transparent for the same first-frame reason
+   as the bar. */
+window#capture-overlay {
+  background-color: transparent;
+  color: @color_foreground;
+}
+
+.overlay-root,
+.overlay-canvas {
+  background-color: transparent;
+}
+
+/* Dim = what will be EXCLUDED from the capture (Sheet 2). */
+.overlay-dim {
+  background-color: alpha(@color_background, 0.55);
+}
+
+/* Pending region: same accent as the bar's selection (no recording red here —
+   that is REQ-004). */
+.selrect {
+  border: 2px solid @color_10;
+  background-color: alpha(@color_10, 0.1);
+  border-radius: 4px;
+}
+
+/* Eight handle squares, 9px with a dark ring so they read on the tint. */
+.selhandle {
+  min-width: 9px;
+  min-height: 9px;
+  border: 2px solid @color_00;
+  border-radius: 999px;
+  background-color: @color_10;
+}
+
+/* Window hover/pin ring. */
+.selring {
+  border: 2px solid @color_10;
+  background-color: alpha(@color_10, 0.06);
+  border-radius: 5px;
+}
+
+/* Screen pending pick: the monitor itself is the target. */
+.mon-outline {
+  border: 2px solid alpha(@color_foreground, 0.35);
+  border-radius: 10px;
+  background-color: transparent;
+}
+
+.mon-outline.selected {
+  border-color: @color_10;
+  background-color: alpha(@color_10, 0.08);
+}
+
+/* Live size/title chip (Sheet 2 badge). */
+.selbadge {
+  padding: 3px 9px;
+  border: 1px solid alpha(@color_foreground, 0.22);
+  border-radius: 7px;
+  background-color: alpha(@color_00, 0.92);
+  color: alpha(@color_foreground, 0.86);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 /* -------------------------------------------------------------- Capture bar
  * S0 is the icon-only rail (measured 142px: three 38px icons, 4px gaps and
  * 6px padding); S1 is one row of pill groups plus the back chevron and CTA.

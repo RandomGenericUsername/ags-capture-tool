@@ -37,6 +37,10 @@ ERROR_KIND_ENCODER_UNAVAILABLE = "encoder_unavailable"
 ERROR_KIND_AUDIO_UNAVAILABLE = "audio_unavailable"
 #: The output path cannot be prepared/finalized.
 ERROR_KIND_FILE_ERROR = "file_error"
+#: A committed window reference no longer resolves to a live client. This is
+#: deliberately distinct from ``cancelled``: the commit path must never fall
+#: back to an interactive slurp pick (design.md §11.3).
+ERROR_KIND_WINDOW_NOT_FOUND = "window_not_found"
 
 
 class CaptureToolError(RuntimeError):
@@ -73,6 +77,12 @@ class CaptureFileError(CaptureToolError):
     """The output path cannot be prepared."""
 
     kind = ERROR_KIND_FILE_ERROR
+
+
+class WindowNotFoundError(CaptureToolError):
+    """A ``--window 0x…`` reference does not match a live Hyprland client."""
+
+    kind = ERROR_KIND_WINDOW_NOT_FOUND
 
 
 #: Audio sources accepted by ``start --audio``.
@@ -198,6 +208,60 @@ def hyprland_json(command):
     return json.loads(result.stdout)
 
 
+#: The ONE geometry spelling the commit path accepts. Mirrors the regex the
+#: legacy slurp paths already use: ``X,Y WxH`` with signed coordinates. The
+#: compositor/`slurp`-native ``WxH+X+Y`` form is deliberately rejected here;
+#: conversion happens ONLY in the legacy branches that already produced it.
+GEOMETRY_RE = re.compile(r"(-?\d+),(-?\d+)\s+(\d+)x(\d+)")
+
+
+def canonical_geometry(value):
+    """Validate a committed ``--geometry`` and return its canonical spelling."""
+    text = (value or "").strip()
+    match = GEOMETRY_RE.fullmatch(text)
+    if not match:
+        raise ValueError(
+            f"invalid geometry: {value!r} (expected canonical 'X,Y WxH')"
+        )
+    x, y, width, height = (int(part) for part in match.groups())
+    if width <= 0 or height <= 0:
+        raise ValueError(f"invalid geometry: {value!r} (width/height must be > 0)")
+    return f"{x},{y} {width}x{height}"
+
+
+def slurp_region_to_recorder(geometry):
+    """Convert canonical ``X,Y WxH`` to the recorder's ``WxH+X+Y`` form.
+
+    The legacy region path already handed this form to ``_build_recording_
+    command`` (it is what ``resolve_target('region')`` returned), so the commit
+    path converts here rather than changing the recorder command builder.
+    """
+    match = GEOMETRY_RE.fullmatch(geometry)
+    if not match:
+        raise ValueError(f"invalid geometry: {geometry!r}")
+    x, y, width, height = match.groups()
+    return f"{width}x{height}+{x}+{y}"
+
+
+def resolve_window_geometry_by_address(address):
+    """Resolve ``--window 0xADDR`` against ``hyprctl -j clients`` at commit time.
+
+    A vanished client is a LOUD, typed error. It is never a cue to open the
+    interactive slurp window picker: the user already made that choice in the
+    AGS overlay (design.md D8/§11.3).
+    """
+    wanted = str(address or "").strip().lower()
+    for client in hyprland_json("clients"):
+        if str(client.get("address", "")).lower() != wanted:
+            continue
+        x, y = client.get("at", [None, None])
+        width, height = client.get("size", [None, None])
+        if None in (x, y, width, height) or width <= 0 or height <= 0:
+            raise RuntimeError(f"invalid geometry for window {address}")
+        return canonical_geometry(f"{x},{y} {width}x{height}")
+    raise WindowNotFoundError(f"window not found: {address}")
+
+
 def resolve_target(target):
     if target == "screen":
         monitors = hyprland_json("monitors")
@@ -284,11 +348,23 @@ def screenshot(args):
     #   window — delay first, so the user can focus the intended window before
     #            its geometry is read.
     #   screen — delay first (nothing to select).
+    #
+    # The additive commit flags (design.md §11.3) REPLACE selection, so their
+    # presence must bypass the corresponding slurp call entirely. When no flag
+    # is supplied this block is byte-for-byte the legacy behaviour.
+    commit_geometry = getattr(args, "geometry", None)
+    commit_window = getattr(args, "window", None)
+    commit_monitor = getattr(args, "monitor", None)
     region_geometry = None
     if args.target == "region":
-        region_geometry = resolve_target("region")
-        if args.delay:
-            time.sleep(args.delay)
+        if commit_geometry:
+            region_geometry = canonical_geometry(commit_geometry)
+            if args.delay:
+                time.sleep(args.delay)
+        else:
+            region_geometry = resolve_target("region")
+            if args.delay:
+                time.sleep(args.delay)
     elif args.delay:
         time.sleep(args.delay)
     config = load_config()
@@ -314,11 +390,19 @@ def screenshot(args):
     if cursor:
         # ``grim -c`` includes cursors (verified ``grim -h`` on-machine).
         command.append("-c")
-    if args.target != "screen":
-        geometry = region_geometry or resolve_target(args.target)
-        if args.target == "region":
-            width, height, x, y = re.fullmatch(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geometry).groups()
-            geometry = f"{x},{y} {width}x{height}"
+    if args.target == "screen":
+        # New per-monitor path only. Without --monitor, grim keeps its legacy
+        # all-outputs behaviour (no -o, no -g).
+        if commit_monitor:
+            command.extend(["-o", commit_monitor])
+    else:
+        if args.target == "window" and commit_window:
+            geometry = resolve_window_geometry_by_address(commit_window)
+        else:
+            geometry = region_geometry or resolve_target(args.target)
+            if args.target == "region" and not commit_geometry:
+                width, height, x, y = re.fullmatch(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geometry).groups()
+                geometry = f"{x},{y} {width}x{height}"
         command.extend(["-g", geometry])
     if output:
         Path(output).parent.mkdir(parents=True, exist_ok=True)
@@ -355,7 +439,7 @@ GSR_QUALITY_MAP = {
 
 
 def _build_recording_command(
-    backend, target, args, output_path, audio_device=None, cursor=False
+    backend, target, args, output_path, audio_device=None, cursor=False, monitor=None
 ):
     gif = args.format == "gif"
     if backend == "gpu-screen-recorder":
@@ -365,7 +449,9 @@ def _build_recording_command(
                 target = f"{width}x{height}+{x}+{y}"
             command = [backend, "-w", "region", "-region", target]
         else:
-            command = [backend, "-w", target]
+            # ``monitor`` is the additive --monitor path; without it this is
+            # the legacy focused/all-outputs target string unchanged.
+            command = [backend, "-w", monitor or target]
         command.extend([
             "-c", args.format if not gif else "mp4",
             "-f", str(args.fps),
@@ -393,7 +479,13 @@ def _build_recording_command(
             command.extend(["-k", "vp9"])
     else:
         command = [backend, "-f", output_path]
-        if args.target != "screen":
+        if args.target == "screen":
+            # wf-recorder selects a per-output capture with -o (verified
+            # ``wf-recorder --help``). Legacy screen (monitor is None) keeps
+            # its all-visible-outputs behaviour.
+            if monitor:
+                command.extend(["-o", monitor])
+        else:
             command.extend(["-g", target])
         if gif:
             # wf-recorder only honours an explicit framerate via -r.
@@ -478,9 +570,23 @@ def start_recording(args, run=subprocess.run):
         _ensure_parent_dir(output_path)
         audio_device = resolve_audio_device(args.audio, run=run)
 
-    target = resolve_target(args.target)
+    commit_geometry = getattr(args, "geometry", None)
+    commit_window = getattr(args, "window", None)
+    commit_monitor = getattr(args, "monitor", None)
+    monitor = None
+    if args.target == "region" and commit_geometry:
+        # The recorder's region vocabulary is the legacy ``WxH+X+Y`` form; the
+        # commit flag is canonical ``X,Y WxH`` (design.md §11.3).
+        target = slurp_region_to_recorder(canonical_geometry(commit_geometry))
+    elif args.target == "window" and commit_window:
+        target = resolve_window_geometry_by_address(commit_window)
+    elif args.target == "screen" and commit_monitor:
+        target = commit_monitor
+        monitor = commit_monitor
+    else:
+        target = resolve_target(args.target)
     command = _build_recording_command(
-        backend, target, args, output_path, audio_device, cursor=cursor
+        backend, target, args, output_path, audio_device, cursor=cursor, monitor=monitor
     )
     runtime = shutil.which("dotfiles-runtime")
     if runtime is None:
@@ -1374,6 +1480,18 @@ def parse_args(argv=None):
         help="draw the pointer into the recording; defaults to the config "
              "value (gpu-screen-recorder -cursor; wf-recorder has no flag)",
     )
+    start.add_argument(
+        "--geometry", default=None,
+        help="committed region geometry 'X,Y WxH' (canonical); skips slurp",
+    )
+    start.add_argument(
+        "--monitor", default=None,
+        help="committed screen target: capture only this output",
+    )
+    start.add_argument(
+        "--window", default=None,
+        help="committed window address 0x…; resolved at commit, never slurp",
+    )
     start.set_defaults(func=start_recording)
 
     shot = subparsers.add_parser("screenshot", help="capture a screenshot")
@@ -1388,6 +1506,18 @@ def parse_args(argv=None):
     shot.add_argument(
         "--cursor", action=argparse.BooleanOptionalAction, default=None,
         help="include the pointer (grim -c); defaults to the config value",
+    )
+    shot.add_argument(
+        "--geometry", default=None,
+        help="committed region geometry 'X,Y WxH' (canonical); skips slurp",
+    )
+    shot.add_argument(
+        "--monitor", default=None,
+        help="committed screen target: capture only this output (grim -o)",
+    )
+    shot.add_argument(
+        "--window", default=None,
+        help="committed window address 0x…; resolved at commit, never slurp",
     )
     shot.set_defaults(func=screenshot)
 

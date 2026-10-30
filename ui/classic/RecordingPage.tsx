@@ -42,6 +42,8 @@ export interface RecordingPageProps {
   /** Settings-derived cursor flag, mirrored into the bar's cursor pills. */
   recordingCursorGroup: Array<{ value: boolean; button: Gtk.Button }>
   setRecordingCursor: (value: boolean) => void
+  /** Re-engage the pending overlay when the target pill changes. */
+  onTargetChanged: () => void
   /** Per-window icon slots rebuilt by the live palette refresh. */
   icons: IconSlots
   /** Re-assert the layer surface size (the window owns the window handle). */
@@ -62,6 +64,7 @@ export function RecordingPage(props: RecordingPageProps) {
     recordingSizeGroup,
     recordingCursorGroup,
     setRecordingCursor,
+    onTargetChanged,
     icons,
     syncWindowSize,
     setHandle,
@@ -135,6 +138,7 @@ export function RecordingPage(props: RecordingPageProps) {
           onClicked={(self) => {
             recording.target = "region"
             select(self, recordingTargetGroup.map((entry) => entry.button))
+            onTargetChanged()
           }}
         />
         <button
@@ -144,6 +148,7 @@ export function RecordingPage(props: RecordingPageProps) {
           onClicked={(self) => {
             recording.target = "screen"
             select(self, recordingTargetGroup.map((entry) => entry.button))
+            onTargetChanged()
           }}
         />
         <button
@@ -153,6 +158,7 @@ export function RecordingPage(props: RecordingPageProps) {
           onClicked={(self) => {
             recording.target = "window"
             select(self, recordingTargetGroup.map((entry) => entry.button))
+            onTargetChanged()
           }}
         />
       </box>

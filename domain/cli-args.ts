@@ -42,6 +42,7 @@
 // ---------------------------------------------------------------------------
 
 import type { RecordingRequest, ScreenshotRequest } from "./capture-request"
+import { canonicalGeometry, type Selection } from "./selection"
 import { GIF_SIZE_ARG, isGif } from "./ui-state"
 
 /**
@@ -53,6 +54,24 @@ import { GIF_SIZE_ARG, isGif } from "./ui-state"
  */
 function audioArg(audio: RecordingRequest["audio"]): string {
   return audio === "microphone" ? "mic" : audio
+}
+
+/**
+ * The additive commit flags (design.md §11.3).
+ *
+ * Appended at the END of the legacy array by both translators below. With no
+ * selection this returns `[]`, so every pre-REQ-003 argv stays byte-identical
+ * and the legacy interactive backend path is still reachable for CLI users.
+ */
+export function selectionArgs(selection: Selection): string[] {
+  switch (selection.kind) {
+    case "region":
+      return ["--geometry", canonicalGeometry(selection.geometry)]
+    case "window":
+      return ["--window", selection.address]
+    case "screen":
+      return ["--monitor", selection.monitor]
+  }
 }
 
 /**
@@ -75,6 +94,8 @@ export function screenshotArgs(request: ScreenshotRequest): string[] {
   ]
   if (request.save) args.push("--save")
   if (request.cursor) args.push("--cursor")
+  // Appended LAST: legacy flags keep their exact order and positions.
+  if (request.selection) args.push(...selectionArgs(request.selection))
   return args
 }
 
@@ -113,5 +134,7 @@ export function recordingArgs(request: RecordingRequest): string[] {
   // `75%` -> `75`, `50%` -> `50`: bare numbers or argparse rejects the flag.
   if (gif) args.push("--size", GIF_SIZE_ARG[request.size])
   if (request.cursor) args.push("--cursor")
+  // Appended LAST: legacy flags keep their exact order and positions.
+  if (request.selection) args.push(...selectionArgs(request.selection))
   return args
 }

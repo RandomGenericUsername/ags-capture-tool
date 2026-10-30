@@ -33,6 +33,7 @@ import type {
   RecordingQuality,
   ScreenshotFormat,
 } from "../types"
+import type { Selection } from "./selection"
 
 export type { AudioSource, GifScale }
 
@@ -52,6 +53,12 @@ export interface ScreenshotRequest {
   save: boolean
   /** Settings-derived: whether the pointer is captured too. */
   cursor: boolean
+  /**
+   * The finished pending selection (REQ-003). OPTIONAL so a legacy request
+   * without one still produces the byte-identical legacy argv; the bar always
+   * supplies it on the commit path.
+   */
+  selection?: Selection
 }
 
 /** Everything needed to spawn one `capture-tool start`. */
@@ -77,4 +84,10 @@ export interface RecordingRequest {
   size: GifScale
   /** Settings-derived: whether the pointer is captured too. */
   cursor: boolean
+  /**
+   * The finished pending selection (REQ-003). OPTIONAL so a legacy request
+   * without one still produces the byte-identical legacy argv; the bar always
+   * supplies it on the commit path.
+   */
+  selection?: Selection
 }

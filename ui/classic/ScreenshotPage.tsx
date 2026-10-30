@@ -27,6 +27,8 @@ export interface ScreenshotPageProps {
   /** Settings-derived cursor flag, mirrored into the bar's cursor pills. */
   screenshotCursorGroup: Array<{ value: boolean; button: Gtk.Button }>
   setScreenshotCursor: (value: boolean) => void
+  /** Re-engage the pending overlay when the target pill changes. */
+  onTargetChanged: () => void
   /** Per-window icon slots rebuilt by the live palette refresh. */
   icons: IconSlots
   setHandle: (handle: ScreenshotPageHandle) => void
@@ -41,6 +43,7 @@ export function ScreenshotPage(props: ScreenshotPageProps) {
     screenshotOutputGroup,
     screenshotCursorGroup,
     setScreenshotCursor,
+    onTargetChanged,
     icons,
     setHandle,
   } = props
@@ -71,6 +74,7 @@ export function ScreenshotPage(props: ScreenshotPageProps) {
           onClicked={(self) => {
             screenshot.target = "region"
             select(self, screenshotTargetGroup.map((entry) => entry.button))
+            onTargetChanged()
           }}
         />
         <button
@@ -80,6 +84,7 @@ export function ScreenshotPage(props: ScreenshotPageProps) {
           onClicked={(self) => {
             screenshot.target = "screen"
             select(self, screenshotTargetGroup.map((entry) => entry.button))
+            onTargetChanged()
           }}
         />
         <button
@@ -89,6 +94,7 @@ export function ScreenshotPage(props: ScreenshotPageProps) {
           onClicked={(self) => {
             screenshot.target = "window"
             select(self, screenshotTargetGroup.map((entry) => entry.button))
+            onTargetChanged()
           }}
         />
       </box>

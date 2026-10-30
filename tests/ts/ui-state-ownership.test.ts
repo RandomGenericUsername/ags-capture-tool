@@ -197,7 +197,7 @@ test("the composition root builds ONE state and passes it to every window", () =
   assert.equal(constructions.length, 1, "expected exactly one ClassicWindow call site")
   assert.match(
     constructions[0],
-    /,\s*state\s*\)/,
+    /,\s*state\s*[,)]/,
     "the window must receive the shared state, not just the ports",
   )
   // Where the per-monitor construction now happens. It was the body of
@@ -211,7 +211,7 @@ test("the composition root builds ONE state and passes it to every window", () =
   // which the old "is it inside the loop body" check could not see at all.
   assert.match(
     source,
-    /createWindow:\s*\(monitor\)\s*=>\s*ClassicWindow\(monitor, ports, state\)/,
+    /createWindow:\s*\(monitor\)\s*=>\s*ClassicWindow\(monitor, ports, state,/,
     "the window factory must still hand every window the SAME shared state object",
   )
   // The window set itself must never construct a state: it is a pure adapter

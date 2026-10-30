@@ -25,10 +25,13 @@ import {
   openMode,
   openSettings,
   type BarState,
+  type BarMode,
 } from "../../domain/bar-state"
 import { recordingArgs, screenshotArgs } from "../../domain/cli-args"
 import type { RecordingRequest, ScreenshotRequest } from "../../domain/capture-request"
 import type { CaptureSettings } from "../../domain/settings"
+import { runCommit } from "../../lib/commit-order"
+import type { SelectionController } from "../overlay/controller"
 import { configDefaults, durationSelection, type UiState } from "../../domain/ui-state"
 import type { CapturePorts } from "../../ports/capture-ports"
 import type {
@@ -56,6 +59,7 @@ export function ClassicWindow(
   gdkmonitor: Gdk.Monitor,
   ports: CapturePorts,
   state: UiState,
+  selection: SelectionController,
 ): Astal.Window {
   const { settingsStore, uiStateStore, launcher, monitorReservedTop } = ports
 
@@ -144,6 +148,20 @@ export function ClassicWindow(
   const recordingSizeGroup: Array<{ value: GifScale; button: Gtk.Button }> = []
   const recordingCursorGroup: Array<{ value: boolean; button: Gtk.Button }> = []
 
+  function currentTarget(): CaptureTarget {
+    return barState.view === "recording" ? recording.target : screenshot.target
+  }
+
+  /**
+   * Keep the bar's commit affordance and `Monitor n` chip in step with the
+   * pending selection. The overlay itself is rendered by the controller; this
+   * only mirrors "can commit?" and the screen target's monitor identity.
+   */
+  function syncSelectionUi() {
+    const modeOpen = isModeOpen(barState)
+    if (cta) cta.sensitive = modeOpen && selection.canCommit()
+  }
+
   /** Translate the pure bar state into the built widget tree. */
   function applyBarState() {
     const modeOpen = isModeOpen(barState)
@@ -170,21 +188,34 @@ export function ClassicWindow(
       if (recordingMode) cta.add_css_class("record")
       else cta.remove_css_class("record")
     }
+    syncSelectionUi()
     syncWindowSize()
   }
 
-  function selectMode(next: "screenshot" | "recording") {
+  function selectMode(next: BarMode) {
+    const wasOpen = barState.view === next
     barState = openMode(barState, next)
+    // Entering a lane engages its pending selection immediately (S1 -> S2).
+    // Re-tapping the active lane keeps the current pending object.
+    if (!wasOpen) selection.begin(next, currentTarget())
     applyBarState()
   }
 
   function openSettingsView() {
+    selection.end()
     barState = openSettings(barState)
     applyBarState()
   }
 
   function returnHome() {
+    selection.end()
     barState = back(barState)
+    applyBarState()
+  }
+
+  function targetChanged() {
+    if (!isModeOpen(barState)) return
+    selection.retarget(currentTarget())
     applyBarState()
   }
 
@@ -208,52 +239,57 @@ export function ClassicWindow(
   }
 
   /**
-   * Commit path for this ticket — LEGACY backend flow.
+   * Commit is a ONE-WAY DOOR (D6): the pending selection is snapshotted, the
+   * session locks inactive, the overlay + bar hide SYNCHRONOUSLY, and only then
+   * does the launcher receive argv (FR-10). There is no post-commit editing
+   * state; the bar returns to S0 so the next open starts from a fresh session.
    *
-   * REQ-003 replaces this with a pending-selection commit (`--geometry`,
-   * `--window`, `--monitor`); until then the CTA launches the same backend argv
-   * as the old panel, after hiding this window. Commit returns the bar to S0 so
-   * the next open starts at rest.
+   * The legacy interactive backend path (no geometry/reference flags) is still
+   * available to CLI users, but this UI never calls it: every request carries
+   * the finished `Selection`.
    */
-  function takeScreenshot() {
-    uiStateStore.save(screenshot, recording)
-    const current = settingsStore.load()
-    const request: ScreenshotRequest = {
-      target: screenshot.target,
-      delay: screenshot.delay,
-      format: screenshot.format,
-      save: screenshot.save,
-      cursor: current.screenshot.cursor,
-    }
-    hideCaptureWindow()
-    barState = homeBar()
-    applyBarState()
-    launcher.launch(screenshotArgs(request))
-  }
-
-  function startRecording() {
-    uiStateStore.save(screenshot, recording)
-    const current = settingsStore.load()
-    const request: RecordingRequest = {
-      target: recording.target,
-      fps: recording.fps,
-      gifFps: recording.gifFps,
-      format: recording.format,
-      audio: recording.audio,
-      quality: recording.quality,
-      duration: recording.duration,
-      size: recording.size,
-      cursor: current.recording.cursor,
-    }
-    hideCaptureWindow()
-    barState = homeBar()
-    applyBarState()
-    launcher.launch(recordingArgs(request))
-  }
-
   function commitCurrentMode() {
-    if (barState.view === "recording") startRecording()
-    else takeScreenshot()
+    const finished = selection.selection()
+    if (finished === null) return
+    uiStateStore.save(screenshot, recording)
+    const current = settingsStore.load()
+    const argv =
+      barState.view === "recording"
+        ? recordingArgs({
+            target: recording.target,
+            fps: recording.fps,
+            gifFps: recording.gifFps,
+            format: recording.format,
+            audio: recording.audio,
+            quality: recording.quality,
+            duration: recording.duration,
+            size: recording.size,
+            cursor: current.recording.cursor,
+            selection: finished,
+          } satisfies RecordingRequest)
+        : screenshotArgs({
+            target: screenshot.target,
+            delay: screenshot.delay,
+            format: screenshot.format,
+            save: screenshot.save,
+            cursor: current.screenshot.cursor,
+            selection: finished,
+          } satisfies ScreenshotRequest)
+
+    runCommit({
+      // The controller clears the rect/pin and hides every overlay window
+      // synchronously. `commit()` is idempotent from this call site: it
+      // returns the same finished selection that argv was built from.
+      hideOverlay: () => {
+        selection.commit()
+      },
+      hideBar: () => {
+        barState = homeBar()
+        applyBarState()
+        hideCaptureWindow()
+      },
+      launch: () => launcher.launch(argv),
+    })
   }
 
   function onKey(keyval: number): boolean {
@@ -262,9 +298,20 @@ export function ClassicWindow(
       if (isSettingsOpen(barState) && settingsPage !== null && settingsPage.cancelPathEditor()) {
         return true
       }
-      // One level per press: settings/mode -> S0, then S0 -> hide.
+      // Pending selection ladder (design.md §4.7): first clear the pick and
+      // keep the mode open; only the next press closes the mode. Enter never
+      // participates in this ladder.
+      if (isModeOpen(barState)) {
+        if (selection.escape()) returnHome()
+        else applyBarState()
+        return true
+      }
+      // Settings -> S0, then S0 -> hide the bar.
       if (barState.view !== "home") returnHome()
-      else hideCaptureWindow()
+      else {
+        selection.end()
+        hideCaptureWindow()
+      }
       return true
     }
     if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter) {
@@ -459,6 +506,7 @@ export function ClassicWindow(
               screenshotOutputGroup={screenshotOutputGroup}
               screenshotCursorGroup={screenshotCursorGroup}
               setScreenshotCursor={setScreenshotCursor}
+              onTargetChanged={targetChanged}
               icons={iconSlots}
               setHandle={(handle) => {
                 screenshotPage = handle
@@ -477,6 +525,7 @@ export function ClassicWindow(
               recordingSizeGroup={recordingSizeGroup}
               recordingCursorGroup={recordingCursorGroup}
               setRecordingCursor={setRecordingCursor}
+              onTargetChanged={targetChanged}
               icons={iconSlots}
               syncWindowSize={syncWindowSize}
               setHandle={(handle) => {

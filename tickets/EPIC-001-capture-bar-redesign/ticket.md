@@ -36,3 +36,37 @@ rejected alternatives live in [design.md](./design.md).
 - [x] `REQ-002` — Capture bar shell: five-state S0–S4, placement + on-demand pills (`done`)
 - [ ] `REQ-003` — Selection-first capture flow: pending protocol + irreversible commit (`in-progress`)
 - [x] `REQ-004` — Recording lifecycle: red accent + live HUD (`done`)
+
+## Freeze (2026-10-31) — decision by JD
+
+**Implementation on ags-capture-tool is frozen.** Main stays at the last green
+commit (`d720c2b`, plus documentation-only commits). No new code, merges, tags
+or provisioning until the parallel CSG/theme-producer migration settles.
+
+Why: live use surfaced L3/L4 wiring defects (interactions, popups, commit
+paths) that have not been attributed yet, while theme-producer is still
+changing palette semantics (`BUG-002`, `v0.5.0 on_backdrop`). Fixing now would
+mix two moving variables and risk blaming the refactor for palette/CSG drift.
+
+Frozen state: REQ-002 done; REQ-004 done (recorded-clip proof outstanding);
+REQ-003 in-progress (two hardware ACs); EPIC-001 in-progress.
+
+### Attribution protocol (required for every symptom)
+
+1. Reproduce on the **deployed old build** (`~/.config/ags-capture`, installed
+   tag) under the current palette. Same failure there ⇒ environment / palette /
+   backend, not this refactor.
+2. Check the surface's palette tokens against the generated
+   `~/.config/ags/colors.css` (named roles + `color_00..15` aliases).
+3. Confirm backend argv/commit path parity for capture/recording behaviour.
+4. Classify: `refactor-wiring` | `palette-csg-drift` (blocked) |
+   `pre-existing-backend` | `spec-gap`.
+
+### Unfreeze criteria
+
+- CSG/theme-producer migration declared complete and palette vocabulary frozen.
+- Old app re-verified on the new palette.
+- Feedback captured as bug tickets (`repro:`, `observed:`, `expected:`) and
+  triaged by the protocol above.
+- Then reopen REQ-003 verification and file a hardening epic for L4 wiring.
+

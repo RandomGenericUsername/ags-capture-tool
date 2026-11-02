@@ -229,7 +229,7 @@ test("the window and the stylesheet agree on the name", () => {
 
   // style.css matches the window with an ID selector, which in GTK4 matches the
   // widget NAME — not the CSS class. Renaming the window without touching this
-  // line silently drops `background-color: transparent; color: @color_foreground`
+  // line silently drops `background-color: transparent; color: @on_surface`
   // onto nothing, and the panel paints a first-frame rectangle.
   const css = readFileSync(CSS, "utf8")
   assert.match(

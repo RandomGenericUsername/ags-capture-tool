@@ -17,6 +17,7 @@
 - [REQ-002-capture-bar-shell/ticket.md](./REQ-002-capture-bar-shell/ticket.md) — Capture bar shell: five-state S0–S4, placement, on-demand pills | `done` | links: worktree .worktrees/REQ-002/, branch ticket/REQ-002-capture-bar-shell
 - [REQ-003-selection-first-flow/ticket.md](./REQ-003-selection-first-flow/ticket.md) — Selection-first capture flow: pending protocol + irreversible commit | `in-progress` | links: worktree .worktrees/REQ-003/, branch ticket/REQ-003-selection-first-flow
 - [REQ-004-recording-lifecycle/ticket.md](./REQ-004-recording-lifecycle/ticket.md) — Recording lifecycle: red accent + live HUD | `in-progress` | links: worktree .worktrees/REQ-004/, branch ticket/REQ-004-recording-lifecycle
+- [REQ-005-theme-roles/ticket.md](./REQ-005-theme-roles/ticket.md) — Migrate capture CSS to semantic palette.v1 roles | `in-progress` | links: worktree .worktrees/REQ-005/, branch ticket/REQ-005-theme-roles
 
 ## Bugs
 

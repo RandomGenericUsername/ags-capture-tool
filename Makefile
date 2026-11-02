@@ -1,9 +1,10 @@
 .PHONY: help platform-dev contracts-dev deps types test-deps test conformance backend ci bundle typecheck gates clean
 
-# The program tuple this app builds/tests against (AD-31/AD-34). v0.3.0 is the
-# REQ-008 adoption tuple and is LOCAL-ONLY in this run: local gates symlink it
-# from .dev/ (gitignored), CI checks out the tags explicitly once published.
-AGS_PLATFORM_VERSION := v0.3.0
+# The program tuple this app builds/tests against (AD-31/AD-34). v0.4.0 is the
+# theme-provider role tuple (palette.v1) the CSS migration consumes; contracts
+# stays v0.3.0. The tuple is LOCAL-ONLY in this run: local gates symlink it from
+# .dev/ (gitignored), CI checks out the tags explicitly once published.
+AGS_PLATFORM_VERSION := v0.4.0
 CONTRACTS_VERSION := v0.3.0
 AGS_PLATFORM_REPO := https://github.com/RandomGenericUsername/ags-platform.git
 AGS_PLATFORM_DEV ?=
@@ -23,8 +24,8 @@ help:
 	@echo "make ci           stock-runner gates: test + conformance + backend"
 	@echo "make gates        all local gates: ci + bundle + typecheck"
 	@echo ""
-	@echo "Local-only v0.3.0 tuple: put a checkout/symlink at"
-	@echo "  .dev/ags-platform/v0.3.0  (or AGS_PLATFORM_DEV=/path/to/ags-platform)"
+	@echo "Local-only platform v0.4.0 / contracts v0.3.0 tuple: put checkouts/symlinks at"
+	@echo "  .dev/ags-platform/v0.4.0  (or AGS_PLATFORM_DEV=/path/to/ags-platform)"
 	@echo "and .dev/contracts/v0.3.0 (make conformance links ../contracts, or set CONTRACTS_ROOT)."
 
 # The platform shortcut. It MUST point outside node_modules: Node refuses to
@@ -106,6 +107,8 @@ test: test-deps platform-dev
 	@command -v node >/dev/null || { echo "FAIL: test: node is not on PATH" >&2; exit 1; }
 	@echo "==> test: node --test tests/unit.test.mjs"
 	node --test tests/unit.test.mjs
+	@echo "==> test: node --test tests/validation/*.test.mjs"
+	node --test tests/validation/*.test.mjs
 	@echo "==> test: node --import ./tests/ts/resolve-hooks.mjs --test tests/ts/*.test.ts"
 	node --import ./tests/ts/resolve-hooks.mjs --test tests/ts/*.test.ts
 	@echo "==> test: tsc --noEmit -p tests/tsconfig.tests.json"

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Migrate `style.css` from legacy `@color_*` carriers to the semantic
+  `palette.v1` roles projected by `ags-platform` v0.4.0 (`@on_surface`,
+  `@surface`, `@primary`/`@on_primary`, `@outline_variant`, `@error`). The
+  mapping is by intent per site; geometry, alpha values, selectors and the
+  palette-refresh path are unchanged.
+- Pin `ags-platform` v0.4.0 while `contracts` stays v0.3.0, and add a
+  validation gate that fails on any returning `@color_*` carrier.
+
 ## v0.1.0 — 2026-10-27
 
 - Extract `capture-tool` from `ags-apps` v0.5.0 into the standalone

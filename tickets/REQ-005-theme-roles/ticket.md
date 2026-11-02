@@ -2,7 +2,7 @@
 id: REQ-005
 title: "Migrate capture CSS to semantic palette.v1 roles"
 kind: requirement
-status: in-progress
+status: done
 lane: direct
 links:
   openspec: none
@@ -29,18 +29,18 @@ changes.
 
 ## Acceptance
 
-- [ ] `style.css` contains zero `@color_*` tokens (including comments); no
+- [x] `style.css` contains zero `@color_*` tokens (including comments); no
       other CSS/TS/TSX file references them.
-- [ ] Every replacement is a role in the live `palette.v1` vocabulary
+- [x] Every replacement is a role in the live `palette.v1` vocabulary
       (`@surface`, `@on_surface`, `@primary`, `@on_primary`, `@on_error`,
       `@outline_variant`, `@error`).
-- [ ] Alpha values, geometry, selectors and the palette-refresh path are
+- [x] Alpha values, geometry, selectors and the palette-refresh path are
       unchanged.
-- [ ] `ags-platform` is pinned to v0.4.0 in `Makefile`, CI and tests;
+- [x] `ags-platform` is pinned to v0.4.0 in `Makefile`, CI and tests;
       `contracts` stays v0.3.0.
-- [ ] A static validation gate fails on any returning `@color_*` carrier.
-- [ ] `make ci`, `make bundle` and `make typecheck` pass on the branch.
-- [ ] Visual evidence is captured where Hyprland IPC allows it; otherwise the
+- [x] A static validation gate fails on any returning `@color_*` carrier.
+- [x] `make ci`, `make bundle` and `make typecheck` pass on the branch.
+- [x] Visual evidence is captured where Hyprland IPC allows it; otherwise the
       exact eyeball checklist is recorded.
 
 ## Migration table
@@ -92,4 +92,100 @@ is the tpr semantic role. Live palette values on this host (`e44cd31…`):
 
 ## Evidence
 
-Gates and screenshots are recorded below once the branch gates run.
+### Token and role checks
+
+- `git grep -n '@color_' -- '*.css' '*.ts' '*.tsx'` (worktree root) → **no
+  matches** (exit 1). The only remaining mentions in the repo are prose: this
+  ticket, `CHANGELOG.md`, the validation test's explanatory comments (it is
+  `.mjs`, outside the gate's `.css`/`.ts`/`.tsx` scope) and the frozen design
+  note `tickets/EPIC-001-capture-bar-redesign/design.md`.
+- `rg -o '@[a-z_]+' style.css` after the migration → `@error`, `@on_error`,
+  `@on_primary`, `@on_surface`, `@outline_variant`, `@primary`, `@surface`
+  (plus the `@keyframes` at-rule). Every one is defined by the live
+  `~/.config/ags/colors.css`; a script over that file printed no
+  `UNDEFINED` role.
+- `tests/validation/theme-roles.test.mjs` (new, run by `make test`) walks every
+  `.css`/`.ts`/`.tsx` file, fails on any `@color_*`, pins the required role
+  set, and rejects `color: @surface` (page background used as accent ink).
+- Geometry/alpha audit: the `style.css` diff changes color tokens and comments
+  only. Every `alpha()` literal (0.06, 0.08, 0.1, 0.12, 0.14, 0.22, 0.3,
+  0.35, 0.42, 0.45, 0.55, 0.62, 0.85, 0.86, 0.92, 0.96) and every selector,
+  radius, padding and size is byte-identical.
+
+### Contrast (live palette, WCAG relative luminance)
+
+Log: `/tmp/opencode/capture-req005-contrast.log` (computed from
+`~/.config/ags/colors.css`, palette `e44cd31…`).
+
+| Pair | Ratio |
+|---|---|
+| `on_surface` on `surface` (body ink) | 14.35:1 |
+| `on_primary` on `primary` (selected pills/modes, CTAs) | 7.70:1 |
+| `on_error` on `error` (recording chips/CTA/dot) | 7.72:1 |
+| `error` on `surface` (settings error, HUD Stop) | 10.92:1 |
+| `on_surface` on `surface_container_high` (frozen-template ink) | 11.10:1 |
+
+The old recording CTA used `@color_foreground` on `@error` = **1.31:1**; the
+paired `@on_error` fixes it without changing geometry.
+
+### Gates
+
+All logs under `/tmp/opencode/capture-req005-*.log`; implementation commit
+`036ec26` on `ticket/REQ-005-theme-roles`.
+
+- `make test` → exit 0: 10/10 `tests/unit.test.mjs`, 1/1
+  `tests/validation/theme-roles.test.mjs`, 297/297 `tests/ts`, test-program
+  `tsc` → 0 errors.
+- `make conformance` → exit 0: 16/16, including the v0.4.0 platform /
+  v0.3.0 contracts pin assertion and the platform `checkAppRepo` gate.
+- `make backend` → exit 0: 114 passed.
+- `make bundle` → exit 0: `build/capture.js`, 1,504,444 bytes.
+- `make typecheck` → exit 0: “OK: 0 errors in the ags-capture-tool tree”
+  (28 tolerated `/usr/share/ags/js` errors, 0 platform errors).
+- Local tuple: `.dev/ags-platform/v0.4.0` is the fetched v0.4.0 tag content
+  (annotated tag resolved to `1a5fb14`); `.dev/contracts/v0.3.0` points at the
+  `../contracts` checkout. Both gitignored.
+
+### Visual evidence (Hyprland IPC, grim)
+
+Before and after are the **same branch code**, differing only by `style.css`:
+- before = `git archive 0cb87f3` (base) in `/tmp/opencode/capture-req005-before`
+- after = branch worktree in `/tmp/opencode/capture-req005-app`
+
+Both harnesses got two test-only, uncommitted edits so they photograph the
+same lane: `instanceName` (`capture-mig-before` / `capture-mig-visual`) and
+the initial bar state `openMode(homeBar(), "screenshot")`. They ran under
+isolated `XDG_CONFIG_HOME`/`XDG_STATE_HOME` with the live palette, icons and
+`colors.css` symlinked in. Both instances were quit afterwards; the user's
+`capture` instance and windows were not replaced, and the bar was left
+hidden.
+
+| Shot | Path | Shows |
+|---|---|---|
+| before S1 bar | `/tmp/opencode/capture-req005-shots/before-bar.png` | legacy `@color_10` selection (dark green) and `@color_06` CTA |
+| after S1 bar | `/tmp/opencode/capture-req005-shots/after-bar.png` | `@primary` selection + `@on_primary` ink and `@primary` CTA |
+| before full screen | `/tmp/opencode/capture-req005-shots/before-same-full.png` | 1920×1080 original |
+| after full screen | `/tmp/opencode/capture-req005-shots/after-full.png` | 1920×1080 original |
+
+Both bars measured **1123×54 at (399,1026)** by `hyprctl layers`, so geometry
+did not move. The CTA renders at ~50% because it is insensitive in this state;
+that is identical before and after and is not a CSS change.
+
+### Eyeball checklist after deploying
+
+1. Selected mode / target / segment / format pills: `@primary` fill (or ring +
+   tint for icon tiles) with dark `@on_primary` text.
+2. Capture CTA: `@primary` with `@on_primary` text when enabled; the
+   insensitive state still dims it uniformly.
+3. Recording lane: `@error` chips/pills/CTA and the pulsing HUD dot; text and
+   the record dot use `@on_error` (readable dark ink).
+4. Settings error line: `@error` (was the old caution carrier).
+5. Path entry border: `@outline_variant` hairline; switch ON: `@primary` track.
+6. Panel/bar/badge/hud-popup fills: `@surface`; all ink and hairlines:
+   `@on_surface` at the existing alphas.
+
+## Outcome
+
+Implemented on `ticket/REQ-005-theme-roles`; no tag, push or merge. The
+`templates/ags-app/` copy was also moved to `@on_surface` + platform v0.4.0 so
+a newly generated app cannot inherit the legacy carrier or a stale pin.

@@ -782,3 +782,36 @@ Live evidence (`/tmp/opencode/capture-cluster-b/shots/`):
 
 Final gates after this correction: `bar-gates-visual.log` and
 `capture-gates-visual.log`, both exit 0.
+
+### Shared hover-HUD correction (JD, 2026-11-04)
+
+The previous correction covered only the capture-drawn cluster in the **top
+bar**. The capture tool's own hoverable S4 row still used the old
+`.capture-bar hud` / `.hud-*` design: text Pause/Stop pills, no icons, and the
+palette `@error` dot instead of the bar's `#e0605f`. JD called this out; the
+top-bar implementation is the reference for BOTH surfaces.
+
+- `ags-capture-tool` `9b2fdac` — extract `ui/shared/recording-cluster.tsx` as
+  the ONE `.rec-*` implementation. `ui/cluster/ClusterWindow.tsx` (top-bar
+  overlay) and `ui/classic/ClassicWindow.tsx` (capture hover S4 row) both
+  render it. The hover row now has the same dot, timer, icon-only Pause/Play/
+  Stop controls, popover and `#e0605f` pulse as the top bar.
+- Removed the old `.capture-bar.hud`, `.hud-status`, `.hud-dot`, `.hud-timer`,
+  `.hud-actions`, `.hud-toggle`, `.hud-stop`, `.hud-popup` and `rec-pulse`
+  CSS. No second HUD vocabulary remains.
+- `ags-capture-tool` `28a5efa` — the shared card carries the top bar's compact
+  minimum (`109×44`) so the hover card is the same visual size, not the old
+  34px-high row.
+- Updated the S4/hover source guards to assert the shared component, not the
+  deleted HUD classes.
+
+Live evidence: `/tmp/opencode/capture-cluster-b/shots/hover-new2-crop.png`
+(shares the dot/timer/card design) and `final-compact-crop.png` (top-bar
+reference). The hover layer includes its transparent margin; the visible card
+is 109×44. Final capture gates:
+`/tmp/opencode/capture-cluster-b/gates/capture-gates-shared-hover-final.log`
+(exit 0). Bar commits are unchanged from `e5f3490`.
+
+Note: the test injected `recording_hud: "always"` temporarily to make the
+hover surface visible without pointer injection; the user config was restored
+to `hover`, `bar_compact_controls: true`, and `capture.state` was reset to idle.

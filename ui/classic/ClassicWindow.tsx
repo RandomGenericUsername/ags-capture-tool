@@ -18,14 +18,17 @@ import { Astal, Gdk, Gtk } from "ags/gtk4"
 import GLib from "gi://GLib?version=2.0"
 import { barMarginTop } from "../../domain/bar-placement"
 import {
+  applyHoverLeaveGrace,
   barFootprint,
   createHoverRevealState,
   growHoverRect,
   hoverBarSize,
+  unionHoverRects,
   updateHoverReveal,
   type HoverBarMeasurement,
   type HoverRect,
   type HoverRevealState,
+  type HoverSize,
 } from "../../domain/hover-region"
 import {
   back,
@@ -91,6 +94,12 @@ const HOVER_POLL_MS = 50
  */
 const HOVER_TOLERANCE_PX = 0
 
+/**
+ * BUG-003: brief leave grace so moving from the resting bar to the expanded
+ * HUD/popover cannot cross a 1 px gap and unmap the surface mid-gesture.
+ */
+const HOVER_HIDE_GRACE_MS = 200
+
 export function ClassicWindow(
   gdkmonitor: Gdk.Monitor,
   ports: CapturePorts,
@@ -133,6 +142,8 @@ export function ClassicWindow(
   // is the pure arm-after-leave state; `hoverPoll` is the one shared timer.
   let hoverFootprint: HoverRect | null = null
   let hoverReveal: HoverRevealState = createHoverRevealState()
+  let hoverOutsideSince: number | null = null
+  let hudPressHeld = false
   let hoverPoll: number | null = null
   // REQ-007: the real resting bar allocation, measured while S0 is on screen.
   // The S1 lane at commit is much wider (1506 vs 142 px on the reference host)
@@ -199,15 +210,19 @@ export function ClassicWindow(
    * a resized bar all follow. If no valid measurement exists, `hoverBarSize`
    * returns the window allocation: the v0.2.2 fallback, never "no reveal".
    */
-  function captureHoverFootprint(): HoverRect | null {
+  function captureHoverFootprint(): HoverRect | null
+  function captureHoverFootprint(sizeOverride: HoverSize): HoverRect | null
+  function captureHoverFootprint(sizeOverride: HoverSize | null = null): HoverRect | null {
     const window = captureWindow
     if (window === null) return null
     const geometry = gdkmonitor.get_geometry()
-    const size = hoverBarSize(
-      restingBar,
-      gdkmonitor.get_connector(),
-      { width: window.get_width(), height: window.get_height() },
-    )
+    const size =
+      sizeOverride ??
+      hoverBarSize(
+        restingBar,
+        gdkmonitor.get_connector(),
+        { width: window.get_width(), height: window.get_height() },
+      )
     if (size === null) return null
     const footprint = barFootprint(
       {
@@ -226,6 +241,62 @@ export function ClassicWindow(
     return growHoverRect(footprint, HOVER_TOLERANCE_PX)
   }
 
+  /**
+   * BUG-003: the rectangle of the surface that is actually mapped right now.
+   *
+   * While hidden this is the HUD row's future allocation, but `hoverFootprint`
+   * keeps the resting bar in the union. Once revealed, the HUD row can be
+   * wider (full Pause/Stop lane) than the 142 px resting bar, and the trigger
+   * must follow it. A collapse simply makes this measurement smaller again;
+   * the next poll recomputes the union, so no stale lane survives.
+   */
+  function visibleBarHoverRect(): HoverRect | null {
+    const window = captureWindow
+    if (window === null) return null
+    return captureHoverFootprint({
+      width: window.get_width(),
+      height: window.get_height(),
+    })
+  }
+
+  /**
+   * BUG-003: the on-demand Pause/Stop popover (`bar_compact_controls = true`).
+   *
+   * A Gtk.Popover is its own Gdk popup surface, so the bar window's rectangle
+   * does not contain it. Its position is relative to the parent surface, which
+   * is the already-fitted bar rect. If the compositor/GTK cannot report that
+   * geometry, `null` makes the poll fall back to "keep mapped while the popover
+   * is open", never to an invented rectangle.
+   */
+  function popupHoverRect(): HoverRect | null {
+    const popup = hudPopup
+    const window = captureWindow
+    if (popup === null || window === null || !popup.get_visible()) return null
+    const surface = popup.get_native()?.get_surface() ?? null
+    if (surface === null) return null
+    const popupSurface = surface as Gdk.Popup
+    if (
+      typeof popupSurface.get_position_x !== "function" ||
+      typeof popupSurface.get_position_y !== "function"
+    ) {
+      return null
+    }
+    const anchor = visibleBarHoverRect()
+    if (anchor === null) return null
+    const width = surface.get_width()
+    const height = surface.get_height()
+    if (width <= 0 || height <= 0) return null
+    return growHoverRect(
+      {
+        x: anchor.x + popupSurface.get_position_x(),
+        y: anchor.y + popupSurface.get_position_y(),
+        width,
+        height,
+      },
+      HOVER_TOLERANCE_PX,
+    )
+  }
+
   /** Stop the poll but keep the cached footprint (e.g. a mode switch). */
   function stopHoverPoll() {
     if (hoverPoll !== null) {
@@ -239,6 +310,8 @@ export function ClassicWindow(
     stopHoverPoll()
     hoverFootprint = null
     hoverReveal = createHoverRevealState()
+    hoverOutsideSince = null
+    hudPressHeld = false
     pointerInside = false
   }
 
@@ -249,10 +322,18 @@ export function ClassicWindow(
    * The first sample cannot reveal when the pointer is already inside (the
    * Record-CTA case): `updateHoverReveal` stays unarmed until an outside
    * sample, so the opening frames stay clean.
+   *
+   * BUG-003: every tick recomputes the trigger as the union of the resting
+   * footprint, the CURRENT mapped bar/HUD rect and an open Pause/Stop popover.
+   * The resting 142x54 rect alone made the poll unmap the HUD as soon as the
+   * pointer moved onto the wider controls. A short leave grace plus a press
+   * hold keep that expanded surface mapped while it is being clicked.
    */
   function syncHoverPoll() {
     stopHoverPoll()
     hoverReveal = createHoverRevealState()
+    hoverOutsideSince = null
+    hudPressHeld = false
     pointerInside = false
     if (
       !isLive(barState) ||
@@ -268,13 +349,35 @@ export function ClassicWindow(
         if (isLive(barState)) applyHudVisibility()
         return false
       }
+      const popupOpen = hudPopup?.get_visible() === true
+      const popupRect = popupHoverRect()
+      // Only a MAPPED (or currently revealing) bar may contribute its larger
+      // HUD rect. While hidden the window may already carry the HUD's future
+      // allocation; including it would widen the initial trigger back beyond
+      // REQ-007's resting bar.
+      const surfaceActive =
+        captureWindow?.visible === true || pointerInside
+      const region = unionHoverRects(
+        hoverFootprint,
+        surfaceActive ? visibleBarHoverRect() : null,
+        popupRect,
+      )
       const next = updateHoverReveal(
         hoverReveal,
         ports.pointerPosition.current(),
-        hoverFootprint,
+        region,
       )
-      const revealed = next.revealed
-      hoverReveal = next
+      const grace = applyHoverLeaveGrace(
+        hoverReveal,
+        next,
+        hoverOutsideSince,
+        Date.now(),
+        HOVER_HIDE_GRACE_MS,
+        hudPressHeld || (popupOpen && popupRect === null),
+      )
+      const revealed = grace.state.revealed
+      hoverReveal = grace.state
+      hoverOutsideSince = grace.outsideSinceMs
       if (revealed !== pointerInside) {
         pointerInside = revealed
         applyHudVisibility()
@@ -514,6 +617,28 @@ export function ClassicWindow(
   function togglePause() {
     if (hud.jobId === null) return
     captureState.control(hud.jobId, pauseAction(hud))
+  }
+
+  /**
+   * BUG-003: keep the revealed surface mapped for the whole press/release of a
+   * HUD control. Without this, a slow click (or a press that drifts past the
+   * short leave grace) could unmap the window before its `clicked` fires.
+   * The gesture only observes; it never claims the event, so the buttons keep
+   * their normal activation.
+   */
+  function watchHudPress(widget: Gtk.Widget) {
+    const press = new Gtk.GestureClick()
+    press.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+    press.connect("pressed", () => {
+      hudPressHeld = true
+    })
+    press.connect("released", () => {
+      hudPressHeld = false
+    })
+    press.connect("stopped", () => {
+      hudPressHeld = false
+    })
+    widget.add_controller(press)
   }
 
   /**
@@ -874,6 +999,8 @@ export function ClassicWindow(
         // the presentation flag so the next `capture.state` push cannot bring
         // the surface back automatically.
         self.connect("unmap", () => {
+          // A press guard cannot survive the surface it was protecting.
+          hudPressHeld = false
           if (isLive(barState) && config.bar.recording_hud === "hidden") {
             hudPresentedByLauncher = false
           }
@@ -1093,6 +1220,7 @@ export function ClassicWindow(
             spacing={8}
             $={(self) => {
               hudRow = self
+              watchHudPress(self)
             }}
           >
             <button
@@ -1158,6 +1286,13 @@ export function ClassicWindow(
             <popover
               $={(self) => {
                 hudPopup = self
+                watchHudPress(self)
+                // Closing the expanded controls returns the trigger to the
+                // bar/HUD rect on the next poll; re-apply now so an outside
+                // pointer cannot leave a stale mapped surface until then.
+                self.connect("closed", () => {
+                  if (isLive(barState)) applyHudVisibility()
+                })
               }}
             >
               <box

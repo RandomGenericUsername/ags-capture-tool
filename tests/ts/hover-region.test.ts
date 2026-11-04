@@ -14,11 +14,13 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import {
+  applyHoverLeaveGrace,
   barFootprint,
   createHoverRevealState,
   growHoverRect,
   hoverBarSize,
   pointerInRegion,
+  unionHoverRects,
   updateHoverReveal,
   type HoverRect,
 } from "../../domain/hover-region.ts"
@@ -312,6 +314,117 @@ test("a missing compositor/footprint never reveals and preserves arming", () => 
 })
 
 // ---------------------------------------------------------------------------
+// BUG-003: the trigger follows the mapped/expanded surface.
+// ---------------------------------------------------------------------------
+
+const RESTING: HoverRect = { x: 889, y: 1026, width: 142, height: 54 }
+const EXPANDED: HoverRect = { x: 838, y: 1026, width: 244, height: 54 }
+const COMPACT_HUD: HoverRect = { x: 922, y: 1042, width: 76, height: 38 }
+
+test("the active region unions resting + expanded and ignores invalid rects", () => {
+  assert.deepEqual(unionHoverRects(RESTING, null, EXPANDED), {
+    x: 838,
+    y: 1026,
+    width: 244,
+    height: 54,
+  })
+  assert.deepEqual(unionHoverRects(RESTING, null), RESTING)
+  assert.deepEqual(
+    unionHoverRects(RESTING, { x: 0, y: 0, width: 0, height: 54 }, null),
+    RESTING,
+    "a zero-sized/unmeasured expansion cannot widen the trigger",
+  )
+  assert.equal(unionHoverRects(null, null), null)
+})
+
+test("moving from the resting bar onto expanded controls stays revealed", () => {
+  let state = createHoverRevealState()
+  state = updateHoverReveal(state, { x: 10, y: 10 }, RESTING)
+  state = updateHoverReveal(state, { x: 960, y: 1053 }, RESTING)
+  assert.equal(state.revealed, true)
+
+  // 1040 is 9 px past the resting bar's right edge (1029..1031 exclusive) but
+  // inside the expanded Pause/Stop lane.
+  const onControl = { x: 1040, y: 1053 }
+  assert.equal(pointerInRegion(onControl, RESTING), false)
+  assert.equal(
+    updateHoverReveal(state, onControl, RESTING).revealed,
+    false,
+    "the v0.2.3 resting-only trigger is exactly what hid the controls",
+  )
+  assert.equal(
+    updateHoverReveal(state, onControl, unionHoverRects(RESTING, EXPANDED)).revealed,
+    true,
+  )
+})
+
+test("leaving the expanded region hides only after the grace, then stays hidden", () => {
+  let reveal = createHoverRevealState()
+  reveal = updateHoverReveal(reveal, { x: 10, y: 10 }, EXPANDED)
+  reveal = updateHoverReveal(reveal, { x: 960, y: 1053 }, EXPANDED)
+  const outside = updateHoverReveal(reveal, { x: 1300, y: 400 }, EXPANDED)
+
+  let grace = applyHoverLeaveGrace(reveal, outside, null, 1_000, 200)
+  assert.deepEqual(grace.state, { armed: true, inside: false, revealed: true })
+  assert.equal(grace.outsideSinceMs, 1_000)
+
+  grace = applyHoverLeaveGrace(grace.state, outside, grace.outsideSinceMs, 1_199, 200)
+  assert.equal(grace.state.revealed, true, "still inside the 200 ms grace")
+  assert.equal(grace.outsideSinceMs, 1_000)
+
+  grace = applyHoverLeaveGrace(grace.state, outside, grace.outsideSinceMs, 1_200, 200)
+  assert.deepEqual(grace.state, { armed: true, inside: false, revealed: false })
+  assert.equal(grace.outsideSinceMs, null, "after the grace the surface unmaps")
+})
+
+test("re-entering during the grace cancels the hide (no 1 px-gap flicker)", () => {
+  let reveal = createHoverRevealState()
+  reveal = updateHoverReveal(reveal, { x: 10, y: 10 }, EXPANDED)
+  reveal = updateHoverReveal(reveal, { x: 960, y: 1053 }, EXPANDED)
+  const outside = updateHoverReveal(reveal, { x: 1300, y: 400 }, EXPANDED)
+  const leaving = applyHoverLeaveGrace(reveal, outside, null, 1_000, 200)
+
+  const backInside = updateHoverReveal(leaving.state, { x: 1040, y: 1053 }, EXPANDED)
+  const grace = applyHoverLeaveGrace(
+    leaving.state,
+    backInside,
+    leaving.outsideSinceMs,
+    1_100,
+    200,
+  )
+  assert.equal(grace.state.revealed, true)
+  assert.equal(grace.outsideSinceMs, null, "an inside sample resets the leave timer")
+})
+
+test("a held control keeps the surface mapped past the grace until release", () => {
+  let reveal = createHoverRevealState()
+  reveal = updateHoverReveal(reveal, { x: 10, y: 10 }, EXPANDED)
+  reveal = updateHoverReveal(reveal, { x: 960, y: 1053 }, EXPANDED)
+  const outside = updateHoverReveal(reveal, { x: 1300, y: 400 }, EXPANDED)
+
+  let grace = applyHoverLeaveGrace(reveal, outside, null, 1_000, 200, true)
+  assert.equal(grace.state.revealed, true, "press hold survives the first outside sample")
+  assert.equal(grace.outsideSinceMs, null)
+
+  grace = applyHoverLeaveGrace(grace.state, outside, grace.outsideSinceMs, 9_000, 200, true)
+  assert.equal(grace.state.revealed, true, "a long press cannot be unmapped mid-click")
+
+  // Release while still outside starts a fresh grace, then hides normally.
+  grace = applyHoverLeaveGrace(grace.state, outside, grace.outsideSinceMs, 9_000, 200)
+  assert.equal(grace.state.revealed, true)
+  grace = applyHoverLeaveGrace(grace.state, outside, grace.outsideSinceMs, 9_200, 200)
+  assert.equal(grace.state.revealed, false)
+})
+
+test("collapsing the popover/HUD returns the trigger to the resting rect", () => {
+  assert.deepEqual(
+    unionHoverRects(RESTING, COMPACT_HUD, null),
+    RESTING,
+    "the smaller collapsed HUD cannot shrink the resting trigger",
+  )
+})
+
+// ---------------------------------------------------------------------------
 // Hyprland response parsing (socket and hyprctl spellings).
 // ---------------------------------------------------------------------------
 
@@ -417,6 +530,49 @@ test("hidden hover has no mapped surface; only reveal maps the normal HUD", () =
   assert.match(
     HUD_DOMAIN,
     /case "hover":[\s\S]*?return \{ mapWindow: input\.pointerInside, showChrome: input\.pointerInside \}/,
+  )
+})
+
+test("BUG-003: the poll tracks the current visible/expanded surface and holds a click", () => {
+  const visible = functionBody(WINDOW, "function visibleBarHoverRect()")
+  assert.match(visible, /window\.get_width\(\)/)
+  assert.match(visible, /window\.get_height\(\)/)
+  assert.match(visible, /captureHoverFootprint\(/)
+
+  const popup = functionBody(WINDOW, "function popupHoverRect()")
+  assert.match(popup, /popup\.get_visible\(\)/)
+  assert.match(popup, /popup\.get_native\(\)\?\.get_surface\(\)/)
+  assert.match(popup, /get_position_x\(\)/)
+  assert.match(popup, /get_position_y\(\)/)
+  assert.match(popup, /surface\.get_width\(\)/)
+  assert.match(popup, /surface\.get_height\(\)/)
+  assert.match(popup, /return null/, "unmeasured popover geometry falls back, never invents a rect")
+
+  const poll = functionBody(WINDOW, "function syncHoverPoll()")
+  assert.match(poll, /unionHoverRects\(/)
+  assert.match(poll, /hoverFootprint/)
+  assert.match(poll, /surfaceActive \? visibleBarHoverRect\(\) : null/)
+  assert.match(poll, /captureWindow\?\.visible === true \|\| pointerInside/)
+  assert.match(poll, /popupHoverRect\(\)/)
+  assert.match(poll, /applyHoverLeaveGrace\(/)
+  assert.match(poll, /HOVER_HIDE_GRACE_MS/)
+  assert.match(poll, /hudPressHeld \|\| \(popupOpen && popupRect === null\)/)
+  assert.match(WINDOW, /const HOVER_HIDE_GRACE_MS = 200/)
+
+  const press = functionBody(WINDOW, "function watchHudPress(")
+  assert.match(press, /new Gtk\.GestureClick\(\)/)
+  assert.match(press, /"pressed"/)
+  assert.match(press, /"released"/)
+  assert.match(press, /"stopped"/)
+  assert.match(
+    WINDOW,
+    /hudRow = self\s+watchHudPress\(self\)/,
+    "the bar Pause/Stop lane observes press/release",
+  )
+  assert.match(
+    WINDOW,
+    /hudPopup = self\s+watchHudPress\(self\)/,
+    "the compact popover controls observe press/release",
   )
 })
 

@@ -178,6 +178,45 @@ export function growHoverRect(
 }
 
 /**
+ * Bounding union of the regions the pointer may currently be over.
+ *
+ * REQ-007 narrowed the trigger to the resting bar, but a revealed HUD (and an
+ * opened Pause/Stop popover) can extend beyond that rectangle. The caller
+ * passes the resting rect together with the CURRENT mapped/expanded surface;
+ * the union keeps Pause/Stop reachable without falling back to the old, much
+ * wider S1 option lane. Invalid/empty rects are ignored; all-null is null.
+ */
+export function unionHoverRects(
+  ...rects: Array<HoverRect | null>
+): HoverRect | null {
+  let left = Number.POSITIVE_INFINITY
+  let top = Number.POSITIVE_INFINITY
+  let right = Number.NEGATIVE_INFINITY
+  let bottom = Number.NEGATIVE_INFINITY
+  for (const rect of rects) {
+    if (rect === null) continue
+    if (
+      !finite(rect.x) ||
+      !finite(rect.y) ||
+      !finite(rect.width) ||
+      !finite(rect.height) ||
+      rect.width <= 0 ||
+      rect.height <= 0
+    ) {
+      continue
+    }
+    left = Math.min(left, rect.x)
+    top = Math.min(top, rect.y)
+    right = Math.max(right, rect.x + rect.width)
+    bottom = Math.max(bottom, rect.y + rect.height)
+  }
+  if (!finite(left) || !finite(top) || !finite(right) || !finite(bottom)) {
+    return null
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
+/**
  * Inclusive-left/top, exclusive-right/bottom hit test.
  *
  * The right/bottom edges are exclusive because the window occupies
@@ -237,4 +276,57 @@ export function updateHoverReveal(
     return { armed: false, inside: true, revealed: false }
   }
   return { armed: true, inside: true, revealed: true }
+}
+
+/**
+ * Short leave grace for a revealed HUD.
+ *
+ * `updateHoverReveal` stays immediate (its arm/leave contract is REQ-006
+ * compatibility), but the live poll may not unmap on the first outside sample:
+ * the pointer can cross a 1 px gap between the resting bar, the expanded HUD
+ * and its Pause/Stop popover. This holds `revealed` for `graceMs` from the
+ * first outside sample, then hides on the next one.
+ *
+ * `holding` is the click/interaction guard: while a HUD control is pressed (or
+ * an expanded surface's geometry cannot be measured yet) the reveal is kept
+ * even after the grace, so a click cannot lose its own surface mid-press.
+ *
+ * PURE: time is injected; no GLib/timer access.
+ */
+export interface HoverLeaveGrace {
+  state: HoverRevealState
+  /** First outside sample of the current leave, or null while inside/held. */
+  outsideSinceMs: number | null
+}
+
+export function applyHoverLeaveGrace(
+  previous: HoverRevealState,
+  next: HoverRevealState,
+  outsideSinceMs: number | null,
+  nowMs: number,
+  graceMs: number,
+  holding = false,
+): HoverLeaveGrace {
+  if (next.revealed || next.inside) {
+    return { state: next, outsideSinceMs: null }
+  }
+  if (!previous.revealed) {
+    return { state: next, outsideSinceMs: null }
+  }
+  if (holding) {
+    return {
+      state: { armed: next.armed, inside: next.inside, revealed: true },
+      outsideSinceMs: null,
+    }
+  }
+  const since =
+    outsideSinceMs !== null && finite(outsideSinceMs) ? outsideSinceMs : nowMs
+  const grace = finite(graceMs) && graceMs > 0 ? graceMs : 0
+  if (finite(nowMs) && nowMs - since < grace) {
+    return {
+      state: { armed: next.armed, inside: next.inside, revealed: true },
+      outsideSinceMs: since,
+    }
+  }
+  return { state: next, outsideSinceMs: null }
 }

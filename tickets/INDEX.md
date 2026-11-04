@@ -10,6 +10,15 @@
   - [REQ-002-capture-bar-shell/ticket.md](./REQ-002-capture-bar-shell/ticket.md) — Capture bar shell: five-state S0–S4, placement + on-demand pills (`done`)
   - [REQ-003-selection-first-flow/ticket.md](./REQ-003-selection-first-flow/ticket.md) — Selection-first capture flow: pending protocol + irreversible commit (`done`)
   - [REQ-004-recording-lifecycle/ticket.md](./REQ-004-recording-lifecycle/ticket.md) — Recording lifecycle: red accent + live HUD (`done`)
+- [EPIC-002-monitor-catalog-dropdowns/ticket.md](./EPIC-002-monitor-catalog-dropdowns/ticket.md) — Shared monitor catalog + capture dropdown UI | `in-progress` | 1/8 children done | done-when: parity harness green, live evidence, runtime v0.6.0 + capture v0.4.0 pinned, no mockup drift | current mockup: `EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html`
+  - [REQ-008-shared-monitor-catalog/ticket.md](./REQ-008-shared-monitor-catalog/ticket.md) — Shared monitor catalog service (`proposed`)
+  - [REQ-009-dropdown-primitive-screenshot/ticket.md](./REQ-009-dropdown-primitive-screenshot/ticket.md) — Dropdown primitive + screenshot lane (`proposed`)
+  - [REQ-010-recording-lane-dropdowns/ticket.md](./REQ-010-recording-lane-dropdowns/ticket.md) — Recording lane dropdowns + conditional states (`proposed`)
+  - [REQ-011-dynamic-monitor-dropdown/ticket.md](./REQ-011-dynamic-monitor-dropdown/ticket.md) — Dynamic monitor dropdown + remove cycle chip (`proposed`)
+  - [REQ-012-settings-cleanup-persistence/ticket.md](./REQ-012-settings-cleanup-persistence/ticket.md) — Settings cleanup + persistence (`proposed`)
+  - [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness (`proposed`)
+  - [OPS-008-docs-reconciliation/ticket.md](./OPS-008-docs-reconciliation/ticket.md) — Documentation reconciliation (`done`)
+  - [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins (`proposed`)
 
 ## Requirements
 
@@ -20,6 +29,12 @@
 - [REQ-005-theme-roles/ticket.md](./REQ-005-theme-roles/ticket.md) — Migrate capture CSS to semantic palette.v1 roles | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
 - [REQ-006-hover-region-reveal/ticket.md](./REQ-006-hover-region-reveal/ticket.md) — Widen S4 hover reveal to the full S1 footprint without click interception | `done` | links: worktree .worktrees/REQ-006/, branch ticket/REQ-006-hover-region-reveal | delivered v0.2.2/PIN-0133; refined by REQ-007 (v0.2.3) and BUG-003 (v0.2.4) | live probe `/tmp/opencode/capture-hover-c/`
 - [REQ-007-hover-smart-footprint/ticket.md](./REQ-007-hover-smart-footprint/ticket.md) — Derive the S4 hover footprint from the configured bar rectangle | `done` | links: worktree .worktrees/REQ-007/, branch ticket/REQ-007-hover-smart-footprint | delivered v0.2.3/PIN-0134; exact 142×54 resting rect; expanded controls handled by BUG-003 v0.2.4/PIN-0135 | live probe `/tmp/opencode/capture-hover-smart/`
+- [REQ-008-shared-monitor-catalog/ticket.md](./REQ-008-shared-monitor-catalog/ticket.md) — Shared monitor catalog service (`dotfiles-runtime` + capture consumer contract) | `proposed` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns | design: `EPIC-002-monitor-catalog-dropdowns/design.md`
+- [REQ-009-dropdown-primitive-screenshot/ticket.md](./REQ-009-dropdown-primitive-screenshot/ticket.md) — Dropdown primitive + screenshot lane | `proposed` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
+- [REQ-010-recording-lane-dropdowns/ticket.md](./REQ-010-recording-lane-dropdowns/ticket.md) — Recording lane dropdowns + conditional states | `proposed` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
+- [REQ-011-dynamic-monitor-dropdown/ticket.md](./REQ-011-dynamic-monitor-dropdown/ticket.md) — Dynamic monitor dropdown + remove cycle chip | `proposed` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
+- [REQ-012-settings-cleanup-persistence/ticket.md](./REQ-012-settings-cleanup-persistence/ticket.md) — Settings cleanup + persistence | `proposed` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
+- [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness | `proposed` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 
 ## Bugs
 
@@ -35,6 +50,8 @@
 - [OPS-004-cleanup/ticket.md](./OPS-004-cleanup/ticket.md) — Remove merged REQ-002..005 worktrees/branches and installed v0.1.0 (T5) | `done` | worktree none, branch main | v0.1.0 tag retained as rollback record
 - [OPS-005-t4-refinement-intake/ticket.md](./OPS-005-t4-refinement-intake/ticket.md) — Refinement intake for capture v0.2.0 (T4): JD live pass recorded; C5+C17 confirmed, deferred list recorded | `done` | worktree none, branch main | filed BUG-001/BUG-002; v0.2.1 retest closed both and JD live-confirmed them; C3 is expected hover behaviour, positive path verified reachable on probe (no BUG-003); 3 not-bug, 1 accepted, 10 deferred
 - [OPS-006-ci-conformance-checkout/ticket.md](./OPS-006-ci-conformance-checkout/ticket.md) — Fix CI conformance: ignore the contracts checkout in the source walk | `done` | worktree none, branch main | root cause: CI checks out contracts inside ROOT; local `.dev` sibling masked it
+- [OPS-008-docs-reconciliation/ticket.md](./OPS-008-docs-reconciliation/ticket.md) — Documentation reconciliation: historical mockup/design + stale comments | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
+- [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins | `proposed` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 
 ## Spikes
 

@@ -1,8 +1,8 @@
 ---
 id: OPS-005
-title: "Refinement intake for capture v0.2.0 (T4) — candidates awaiting JD live pass"
+title: "Refinement intake for capture v0.2.0 (T4) — JD live pass recorded, tickets filed"
 kind: ops-task
-status: in-progress
+status: done
 lane: direct
 links:
   openspec: none
@@ -23,11 +23,11 @@ asks for a refinement backlog, but JD has no written list. This ticket is the
 **intake only**: a read-only audit of the shipped refactor that turns the known
 rough edges into a candidate list JD can confirm or reject during a live pass.
 
-**No per-behaviour bug ticket is filed yet.** The lifecycle gate
-(`tickets/LIFECYCLE.md:22-29`) rejects a bug without `repro:` / `observed:` /
-`expected:`. Rows below are shaped to those fields, but a candidate does not
-become a bug until JD confirms the behaviour in the live pass. Nothing in this
-ticket changes code, the `v0.2.0` tag, the deployed pin, or runtime state.
+**Intake is complete.** The lifecycle gate (`tickets/LIFECYCLE.md:22-29`)
+rejects a bug without `repro:` / `observed:` / `expected:`. Rows below were
+shaped to those fields, and after the live pass only the confirmed behaviours
+became tickets (`BUG-001`, `BUG-002`). Nothing in this ticket changes code, the
+`v0.2.0` tag, the deployed pin, or runtime state.
 
 ## How the list was built
 
@@ -83,6 +83,47 @@ not a temporary one.
 | C14 | Astal client assertion | Restart capture; read the log around startup. | `known from artifact` — `Json-CRITICAL … json_node_get_string` plus `CRITICAL … astal_hyprland_hyprland_get_client: assertion 'address != NULL'` at 07:43:40. No capture source calls `get_client`, so attribution is open (Astal internals vs adapter). | Attribution recorded; no assertion on a clean start. | low | no | `~/.local/state/ags/capture.log:135-137` |
 | C15 | Unattributed L3/L4 defects | Ask JD to name what he hit before the 2026-10-31 freeze; reproduce each on v0.2.0. | `known from artifact` — the freeze record says live use surfaced "L3/L4 wiring defects (interactions, popups, commit paths) that have not been attributed yet". No repro was recorded. | JD names each behaviour. Only then can a bug ticket pass the lifecycle gate. | unknown | yes | `tickets/EPIC-001-capture-bar-redesign/ticket.md:77-80` |
 | C16 | Default `recording_hud=hidden` | Start a recording with defaults; look for a capture-bar timer/Stop while live. | `known from artifact` — the default is `hidden`: the bar is not mapped automatically and ags-bar is the sole live timer/Stop. The launcher presents the capture-bar HUD on demand. | Confirm JD expects no capture-bar HUD by default (D9) or wants `always`/`hover` as the shipped default. | low | yes (S4 HUD is new) | `domain/settings.ts:69`; `tickets/REQ-004-recording-lifecycle/ticket.md:280-307`; `domain/recording-hud.ts:58-76` |
+
+## JD live pass — 2026-11-04
+
+JD ran the pass on the live `v0.2.0` instance. C5 was confirmed, and while
+trying C3 he found a bigger new defect: the Settings panel has no card
+background and is unreadable over the window behind (C17). C17 is now the
+second filed bug. The rest of the list is recorded below as **not a bug**,
+**accepted**, **unconfirmed**, or **deferred / not pursued**.
+
+| # | area | verdict | result / reason | follow-up |
+|---|---|---|---|---|
+| C5 | Small region move/resize | **confirmed** | Drawing a minimal-size rectangle (~15×15) and dragging from its centre resizes instead of moves. | `BUG-002-small-region-move` (medium). |
+| C17 | Settings panel background | **confirmed** (new; not in the original 16) | While trying C3, JD opened Settings (his note calls it the "S4 Settings panel"): the panel has a fully transparent background. Labels float directly over the text-heavy window behind; there is no card, border or readable surface. | `BUG-001-settings-transparency` (high). |
+| C3 | `recording_hud=hover` first frame | **unconfirmed** | Not tested: the C17 Settings defect interrupted the hover-HUD attempt. | Re-run after BUG-001 is fixed; no ticket now. |
+| C6 | Screenshot delay feedback | **not a bug** | Capture appears after 10 s as expected. | None. |
+| C1 | Capture vs Shutter CTA | **not a bug** | "Capture" is fine. | None; spec wording can stay as implemented. |
+| C9 | Window ring absent until pointer moves | **accepted** | JD accepted/liked the current behaviour; not a bug. | None. |
+| C16 | Default `recording_hud=hidden` = no timer | **not a bug** | Confirmed true; by design D9. Only becomes a change if JD explicitly wants the timer by default. | None. |
+| C2 | Settings ⚙ inside S4 | **deferred** | The design allows a ⚙ inside the recording popup and it is not there; a missing-feature question, not a confirmed bug. | Not pursued; no ticket. |
+| C4 | Window pick stacking | **deferred** | Two overlapping windows / which one gets picked was not understood; edge case. | Not pursued; no ticket. |
+| C7 | Enter inside Settings | **deferred** | Pressing Enter in any settings field saves and closes the panel; minor UX question. | Not pursued; no ticket. |
+| C8 | Lane switch discards pending pick | **deferred** | Switching Screenshot ↔ Recording lanes while a selection is pending throws the selection away; minor. | Not pursued; no ticket. |
+| C10 | Drag survives a missed release | **deferred** | Speculative edge case: a release outside the overlay could leave a drag armed. | Not pursued; no ticket. |
+| C11 | Hover ring responsiveness | **deferred** | Speculative: a fast sweep may look laggy; not measured. | Not pursued; no ticket. |
+| C12 | Boot hydration timeout | **deferred** | Restarting capture while a recording is live can leave the HUD unhydrated after a log timeout; edge case. | Not pursued; no ticket. |
+| C13 | GTK throttling warnings | **deferred** | GTK log noise; ignore unless visible jank is actually seen. | Not pursued; no ticket. |
+| C14 | Astal client assertion | **deferred** | Astal log assertion; ignore unless it correlates with a crash or visible defect. | Not pursued; no ticket. |
+| C15 | Unattributed L3/L4 defects | **deferred** | The freeze record named unattributed interactions/popups/commit paths, but JD supplied no specific behaviour to reproduce. | Nothing to file until JD names one. |
+
+**Tally:** 2 confirmed (C5, C17), 3 not a bug (C1, C6, C16), 1 accepted (C9),
+1 unconfirmed (C3), 10 deferred (C2, C4, C7, C8, C10–C15). The confirmed items
+each have exactly one ticket; nothing in the deferred list was filed.
+
+### T2 test residue in JD's screenshot
+
+The "Capture failed — segment join failed" toast visible in JD's screenshot is
+**T2 test residue** from
+`rec_tmp/.../rec-geometry.mp4`, not a normal product failure. T2's geometry
+proof deliberately started and stopped a backend recording; the leftover temp
+segment triggered the toast. It is not a new bug and has no ticket. See
+`/tmp/opencode/capture-t2/EVIDENCE.md` and `OPS-002-verification-proof/`.
 
 ## Named design / verification limitations (not bugs unless JD re-decides)
 
@@ -151,13 +192,28 @@ terminal; note timestamps for anything that becomes a bug.
 
 ## Done-when
 
-- JD has confirmed or rejected every C-row (and explicitly re-decided or kept
-  each L-row).
-- Every confirmed behaviour has exactly one bug ticket with `repro:`,
-  `observed:`, `expected:` and a severity; rejects are recorded here with the
-  reason.
-- This ticket is marked `done` and INDEX is updated in the same commit.
-- No code, tag, deployed-pin or runtime change is made by this intake.
+- [x] JD has confirmed or rejected every C-row (and explicitly re-decided or
+  kept each L-row). C3 is recorded as unconfirmed because the C17 defect
+  interrupted it.
+- [x] Every confirmed behaviour has exactly one bug ticket with `repro:`,
+  `observed:`, `expected:` and a severity; rejected/accepted/deferred rows are
+  recorded here with the reason.
+- [x] This ticket is marked `done` and INDEX is updated in the same commit.
+- [x] No code, tag, deployed-pin or runtime change is made by this intake.
+
+## Closeout
+
+T4 intake is complete (2026-11-04). Filed from the live pass:
+
+| Ticket | Behaviour | Severity | Status |
+|---|---|---|---|
+| [BUG-001](../BUG-001-settings-transparency/ticket.md) | Settings panel transparent / unreadable over the window behind (C17) | high | `triage` |
+| [BUG-002](../BUG-002-small-region-move/ticket.md) | Minimal-size region resizes instead of moves from its centre (C5) | medium | `triage` |
+
+Not filed: C1/C6/C16 are not bugs, C9 is accepted, C3 is unconfirmed, and
+C2/C4/C7/C8/C10–C15 are deferred (plain-language reasons in the table above).
+The T2 toast residue is noted above and is not a product failure. This commit
+is docs-only; BUG-001 and BUG-002 are for the next fix batch, not this task.
 
 ## Provenance / what this list is not
 

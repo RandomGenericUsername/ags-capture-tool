@@ -1,7 +1,7 @@
 ---
 id: SPIKE-004
 title: "Unify recording-controls presentation across capture and the top bar"
-status: investigating
+status: done
 owner: JD
 created: 2026-11-04
 repos:
@@ -359,3 +359,14 @@ The compact switch **displays off** while On hover is selected (not just
 disabled in the on position); the stored preference is preserved for the next
 Top bar / Always visible selection. Gate:
 `/tmp/opencode/recording-controls/gates/capture-gates-compact-display.log`.
+
+## Outcome
+
+Delivered 2026-11-04:
+
+- `ags-platform v0.5.0` (capture-cluster contract)
+- `ags-bar v0.3.0`
+- `ags-capture-tool v0.3.0`, then `v0.3.1` for the on-disk legacy migration
+- `dotfiles-provision v0.1.33` (platform pin mirror)
+- `dotfiles-v3` PIN-0140: tuple + app tags + installer pin
+- live install on the new tags; `dotfiles-provision verify` exit 0

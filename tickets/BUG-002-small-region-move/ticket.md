@@ -69,7 +69,8 @@ produces `kind: "move"`.
 ## Implementation — 2026-11-04
 
 Branch `ticket/BUG-FIX-capture-bugs`, worktree `.worktrees/BUG-FIX/`, code
-commit `2445d44`. Status stays `in-progress` until the orchestrator deploys.
+commit `2445d44`. Status stayed `in-progress` until deploy; closed by the
+v0.2.1 verification below.
 
 - `handleHitRadius()` now clamps each axis to
   `min(HANDLE_HIT_RADIUS, max(0, floor((dimension - 1) / 3)))`. For a 15×15

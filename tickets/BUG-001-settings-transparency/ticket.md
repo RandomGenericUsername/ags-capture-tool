@@ -97,7 +97,8 @@ is opaque/readable; keep the first-frame no-rectangle behaviour.
 ## Implementation — 2026-11-04
 
 Branch `ticket/BUG-FIX-capture-bugs`, worktree `.worktrees/BUG-FIX/`, code
-commit `2445d44`. Status stays `in-progress` until the orchestrator deploys.
+commit `2445d44`. Status stayed `in-progress` until deploy; closed by the
+v0.2.1 verification below.
 
 - `.capture-view` now paints its own card: `background-color: @surface`, a
   1px `alpha(@on_surface, 0.12)` border, 18px radius and 18px padding. The

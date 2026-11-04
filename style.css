@@ -303,6 +303,10 @@ window.capture-cluster-window {
   border-color: alpha(@tertiary, 0.45);
 }
 
+.rec-cluster.full {
+  min-width: 161px;
+}
+
 .rec-dot {
   min-width: 9px;
   min-height: 9px;

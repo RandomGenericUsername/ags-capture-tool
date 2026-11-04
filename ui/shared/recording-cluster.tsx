@@ -125,6 +125,10 @@ export function RecordingCluster(
     if (timer) timer.set_label(hudTimer(state.hud, Date.now()))
     if (inlineToggle) inlineToggle.visible = !state.compact
     if (inlineStop) inlineStop.visible = !state.compact
+    if (root) {
+      if (state.compact) root.remove_css_class("full")
+      else root.add_css_class("full")
+    }
     if (!state.compact) popover?.popdown()
 
     if (popupStatus) {

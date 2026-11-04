@@ -118,6 +118,8 @@ test("S4 renders the shared bar cluster, not a second HUD design", () => {
   assert.match(CLUSTER, /class="rec-timer"/)
   assert.match(CLUSTER, /class="rec-btn stop"/)
   assert.match(CLUSTER, /options\.onStop\(\)/)
+  assert.match(CLUSTER, /add_css_class\("full"\)/)
+  assert.match(CSS, /\.rec-cluster\.full\s*\{[^}]*min-width:\s*161px/)
 
   assert.doesNotMatch(CLUSTER, /bar-back|label="←"/, "INV-2: no back chevron in S4")
   assert.doesNotMatch(CLUSTER, /<RecordingPage|<ScreenshotPage/, "no option pages in S4")

@@ -13,21 +13,19 @@
 // vocabulary and the merge, which is where every tolerance rule lives.
 // ---------------------------------------------------------------------------
 
+import {
+  DEFAULT_RECORDING_CONTROLS,
+  RECORDING_CONTROLS_MODES,
+  resolveRecordingControls,
+  type RecordingControlsMode,
+} from "./recording-presentation.ts"
+
 export type ConfigScreenshotFormat = "png" | "jpeg"
 export type ConfigScreenshotOutput = "clipboard" | "save"
 export type ConfigRecordingFps = 24 | 30 | 60
 export type ConfigRecordingQuality = "low" | "medium" | "high"
 export type ConfigRecordingAudio = "none" | "system" | "mic"
 export type ConfigBarPosition = "bottom" | "top"
-/**
- * S4 chrome visibility while a recording is live (design.md D9/§6):
- *   hidden = the bar stays out of the way; ags-bar is the sole live timer and
- *            a launcher invocation presents the HUD on demand;
- *   always = the Sheet 3 HUD is rendered (and therefore recorded);
- *   hover  = the bar stays mapped with chrome hidden until pointer entry.
- */
-export type ConfigRecordingHud = "hidden" | "always" | "hover"
-
 export interface CaptureSettings {
   screenshot_dir: string
   recording_dir: string
@@ -37,6 +35,13 @@ export interface CaptureSettings {
    *  carries pause/resume/stop; false = the bar carries the buttons itself. */
   bar_compact_controls: boolean
   /**
+   * Which automatic surface owns the recording controls: the top bar's
+   * reserved slot, the capture tool's hover bar, or the capture tool's
+   * always-visible bar. The old `bar.recording_hud` key is migrated by
+   * `mergeSettings` and is no longer written.
+   */
+  recording_controls: RecordingControlsMode
+  /**
    * Capture-bar placement (design.md §6). `bottom` is the default-recommended
    * position; `top` is auto-slotted below the compositor's reserved zone, with
    * `offsetPx` as the manual escape hatch for non-exclusive top overlays.
@@ -44,8 +49,6 @@ export interface CaptureSettings {
   bar: {
     position: ConfigBarPosition
     offsetPx: number
-    /** S4 live-HUD visibility (D9); `hidden` keeps recordings clean. */
-    recording_hud: ConfigRecordingHud
   }
   screenshot: {
     format: ConfigScreenshotFormat
@@ -66,7 +69,8 @@ export const DEFAULT_SETTINGS: CaptureSettings = {
   filename_pattern: "{kind}_%Y-%m-%d_%H-%M-%S",
   notifications: true,
   bar_compact_controls: false,
-  bar: { position: "bottom", offsetPx: 0, recording_hud: "hidden" },
+  recording_controls: DEFAULT_RECORDING_CONTROLS,
+  bar: { position: "bottom", offsetPx: 0 },
   screenshot: { format: "png", output: "clipboard", cursor: false },
   recording: { fps: 60, quality: "high", audio: "system", cursor: true },
 }
@@ -81,11 +85,7 @@ export const CONFIG_RECORDING_QUALITIES: readonly ConfigRecordingQuality[] = [
 ]
 export const CONFIG_RECORDING_AUDIO: readonly ConfigRecordingAudio[] = ["none", "system", "mic"]
 export const CONFIG_BAR_POSITIONS: readonly ConfigBarPosition[] = ["bottom", "top"]
-export const CONFIG_RECORDING_HUD_MODES: readonly ConfigRecordingHud[] = [
-  "hidden",
-  "always",
-  "hover",
-]
+export const CONFIG_RECORDING_CONTROLS = RECORDING_CONTROLS_MODES
 
 export function configOneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback
@@ -137,16 +137,15 @@ export function mergeSettings(raw: unknown): CaptureSettings {
       record.bar_compact_controls,
       DEFAULT_SETTINGS.bar_compact_controls,
     ),
+    recording_controls: resolveRecordingControls(
+      record.recording_controls,
+      bar.recording_hud,
+    ),
     bar: {
       position: configOneOf(bar.position, CONFIG_BAR_POSITIONS, DEFAULT_SETTINGS.bar.position),
       offsetPx: Math.max(
         0,
         Math.round(configNumber(bar.offsetPx, DEFAULT_SETTINGS.bar.offsetPx)),
-      ),
-      recording_hud: configOneOf(
-        bar.recording_hud,
-        CONFIG_RECORDING_HUD_MODES,
-        DEFAULT_SETTINGS.bar.recording_hud,
       ),
     },
     screenshot: {

@@ -269,9 +269,9 @@ test("the contracts v0.3.0 manifest schema agrees with the platform", () => {
   )
 })
 
-test("the Makefile pins the v0.4.0 platform / v0.3.0 contracts tuple", () => {
+test("the Makefile pins the v0.5.0 platform / v0.3.0 contracts tuple", () => {
   const makefile = readText("Makefile")
-  assert.match(makefile, /^AGS_PLATFORM_VERSION := v0\.4\.0$/m)
+  assert.match(makefile, /^AGS_PLATFORM_VERSION := v0\.5\.0$/m)
   assert.match(makefile, /^CONTRACTS_VERSION := v0\.3\.0$/m)
 })
 
@@ -281,9 +281,18 @@ test("app.tsx registers the real palette-refresh handler, not a Theme-only ack",
   const app = readText("app.tsx")
   assert.match(app, /from\s+"\.\/lib\/palette-refresh"/)
   assert.match(app, /createCapturePaletteRefresh\(/)
-  assert.match(app, /requestHandler:\s*paletteRefresh/)
+  assert.match(app, /createCaptureRequestHandler\(paletteRefresh/)
+  assert.match(app, /requestHandler,/)
   assert.match(app, /theme\.apply\(\)/, "the stable Theme pointer is re-applied")
   assert.match(app, /refreshAppAppearance\(\)/, "the generated icons/windows are refreshed")
+})
+
+test("app.tsx dispatches capture-cluster through the pure handler", () => {
+  const app = readText("app.tsx")
+  assert.match(app, /from\s+"\.\/lib\/cluster-request"/)
+  assert.match(app, /createClusterRequestHandler\(clusterController\)/)
+  assert.match(app, /from\s+"\.\/ui\/cluster\/controller"/)
+  assert.match(app, /createClusterController\(\{/)
 })
 
 test("the refresh clears icon caches before rebuilding icons and re-measuring", () => {

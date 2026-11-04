@@ -37,11 +37,11 @@ import type {
   ConfigBarPosition,
   ConfigRecordingAudio,
   ConfigRecordingFps,
-  ConfigRecordingHud,
   ConfigRecordingQuality,
   ConfigScreenshotFormat,
   ConfigScreenshotOutput,
 } from "../../domain/settings"
+import type { RecordingControlsMode } from "../../domain/recording-presentation"
 
 /**
  * What the window needs back from this page.
@@ -177,12 +177,15 @@ export function SettingsPage(props: SettingsPageProps) {
       ),
       toggleRow(
         "Compact bar indicator",
-        "Bar shows only the timer; pause/stop appear in the popup. Off: the bar shows the buttons and opens no popup.",
-        () => settingsConfig.bar_compact_controls,
+        "Available for Top bar and Always visible. On hover forces the inline controls so Pause/Stop is one click.",
+        () =>
+          settingsConfig.bar_compact_controls &&
+          settingsConfig.recording_controls !== "hover",
         (value) => {
           settingsConfig.bar_compact_controls = value
         },
         rowContext,
+        () => settingsConfig.recording_controls !== "hover",
       ),
       pillRow<ConfigBarPosition>(
         "Bar position",
@@ -205,18 +208,19 @@ export function SettingsPage(props: SettingsPageProps) {
         },
         rowContext,
       ),
-      pillRow<ConfigRecordingHud>(
-        "Recording HUD",
+      pillRow<RecordingControlsMode>(
+        "Recording controls",
         [
-          { label: "Hidden", value: "hidden" },
-          { label: "Always", value: "always" },
+          { label: "Top bar", value: "top-bar" },
           { label: "On hover", value: "hover" },
+          { label: "Always visible", value: "always" },
         ],
-        () => settingsConfig.bar.recording_hud,
+        () => settingsConfig.recording_controls,
         (value) => {
-          settingsConfig.bar.recording_hud = value
+          settingsConfig.recording_controls = value
         },
         rowContext,
+        () => renderSettings(),
       ),
     ])
 

@@ -277,80 +277,154 @@ window#capture-overlay {
   font-weight: 700;
 }
 
-/* ------------------------------------------------------------ S4 live HUD
- * Recording-live is dot + timer + Pause/Stop, never options (design.md §5,
- * Sheet 3). The dot is the ONE pulsing element; the recording accent comes
- * from --rec-accent, so a palette refresh restyles the pulse too. */
-.capture-bar.hud {
-  padding: 6px 8px;
-}
-
-.hud-status {
-  padding: 0 6px;
-  border: none;
-  border-radius: 8px;
+/* --------------------------------------------------- capture-drawn cluster
+ * SPIKE-003 option B: the bar reserves a slot and the capture process draws
+ * this surface at the same monitor-local rectangle. The window itself must be
+ * transparent; only the cluster card paints. */
+window.capture-cluster-window {
   background-color: transparent;
-  color: @on_surface;
 }
 
-.hud-status:hover {
-  background-color: alpha(@on_surface, 0.08);
+/* Recording indicator — exactly the bar's accepted design. The capture
+   process now owns this surface, but the visual vocabulary is the bar's old
+   `.rec-*` set: rounded translucent card, pulsing #e0605f dot, 13px tabular
+   timer, icon-only Pause/Play/Stop buttons, and the same popover card. */
+.rec-cluster {
+  min-width: 109px;
+  min-height: 44px;
+  background-color: alpha(@surface, 0.55);
+  border: 1px solid alpha(@on_surface, 0.12);
+  border-radius: 10px;
+  padding: 4px 8px 4px 10px;
+  margin-right: 4px;
 }
 
-.hud-dot {
+.rec-cluster.paused {
+  border-color: alpha(@tertiary, 0.45);
+}
+
+.rec-cluster.full {
+  min-width: 161px;
+}
+
+.rec-dot {
   min-width: 9px;
   min-height: 9px;
   border-radius: 999px;
-  background-color: var(--rec-accent);
-  animation: rec-pulse 1.6s ease-in-out infinite;
+  background-color: #e0605f;
+  animation: cluster-rec-pulse 1.6s ease-out infinite;
 }
 
-.hud-dot.paused {
-  animation: none;
-  opacity: 0.45;
-}
-
-@keyframes rec-pulse {
+@keyframes cluster-rec-pulse {
   0% {
-    opacity: 1;
+    box-shadow: 0 0 0 0 alpha(#e0605f, 0.55);
   }
-  50% {
-    opacity: 0.35;
+  70% {
+    box-shadow: 0 0 0 8px alpha(#e0605f, 0);
   }
   100% {
-    opacity: 1;
+    box-shadow: 0 0 0 0 alpha(#e0605f, 0);
   }
 }
 
-.hud-timer {
-  font-size: 12px;
-  font-weight: 700;
+.rec-dot.paused {
+  background-color: @tertiary;
+  animation: none;
+  box-shadow: none;
+}
+
+.rec-status {
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+  padding: 0 2px;
   color: @on_surface;
 }
 
-.hud-actions {
-  /* Pause/Stop in the bar (bar_compact_controls = false). */
+.rec-timer {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  min-width: 46px;
+  color: @on_surface;
 }
 
-.hud-toggle {
-  min-width: 68px;
+.rec-btn {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: 7px;
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+  color: @on_surface;
 }
 
-.hud-stop {
-  color: var(--rec-accent);
+.rec-btn:hover,
+.rec-btn:active,
+.rec-btn:checked,
+.rec-btn:focus {
+  background-color: alpha(@on_surface, 0.1);
+  background-image: none;
+  border: none;
+  box-shadow: none;
 }
 
-.hud-popup {
-  padding: 10px;
-  border-radius: 12px;
-  background-color: alpha(@surface, 0.96);
+.rec-btn.stop:hover {
+  background-color: alpha(@tertiary, 0.22);
+  color: @tertiary;
 }
 
-.hud-popup-row {
+.rec-popup {
+  min-width: 216px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background-color: alpha(@surface, 0.92);
+  border: 1px solid alpha(@on_surface, 0.12);
+}
+
+.rec-popup.paused {
+  border-color: alpha(@tertiary, 0.45);
+}
+
+.rec-popup-row {
+  font-size: 13px;
+  font-weight: 600;
+  color: @on_surface;
+}
+
+.rec-popup-actions {
+  margin-top: 8px;
+}
+
+.rec-popup-action {
+  min-height: 38px;
+  padding: 0 8px;
+  border-radius: 9px;
+  border: 1px solid alpha(@on_surface, 0.12);
+  background-color: alpha(@surface, 0.45);
+  background-image: none;
+  box-shadow: none;
   color: @on_surface;
   font-size: 12px;
   font-weight: 600;
 }
+
+.rec-popup-action:hover {
+  border-color: alpha(@on_surface, 0.22);
+}
+
+.rec-popup-action.danger:hover {
+  background-color: alpha(@tertiary, 0.2);
+  border-color: @tertiary;
+  color: @tertiary;
+}
+
+/* S4 has no separate HUD vocabulary: both the top-bar cluster and the
+   capture hover row render the shared `.rec-*` design above. */
 
 .bar-custom-duration spinbutton,
 .bar-offset-spin {

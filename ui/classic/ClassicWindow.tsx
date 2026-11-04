@@ -47,17 +47,16 @@ import { recordingArgs, screenshotArgs } from "../../domain/cli-args"
 import type { RecordingRequest, ScreenshotRequest } from "../../domain/capture-request"
 import {
   hudControlPlacement,
-  hudTimer,
   hudVisibility,
   idleHud,
   isHudLive,
   pauseAction,
-  pauseLabel,
   reduceCaptureState,
   stoppedHud,
   type RecordingHudState,
 } from "../../domain/recording-hud"
 import type { CaptureSettings } from "../../domain/settings"
+import { recordingSurfaces } from "../../domain/recording-presentation"
 import { runCommit } from "../../lib/commit-order"
 import type { CaptureStatePayload } from "../../ports/capture-state-feed"
 import type { SelectionController } from "../overlay/controller"
@@ -73,6 +72,10 @@ import type {
 } from "../../types"
 import { applyGroup } from "../shared/groups"
 import { createIconSlots, withIcon } from "../shared/icons"
+import {
+  RecordingCluster,
+  type RecordingClusterHandle,
+} from "../shared/recording-cluster"
 import { appearanceRegistry } from "../appearance"
 import { RecordingPage, type RecordingPageHandle } from "./RecordingPage"
 import { ScreenshotPage, type ScreenshotPageHandle } from "./ScreenshotPage"
@@ -123,11 +126,10 @@ export function ClassicWindow(
   let barState: BarState = homeBar()
   let config: CaptureSettings = initialSettings
 
-  // S4 feed. `hud` is the pure snapshot; the widgets below are a projection of
-  // it. `hudCompact` mirrors `bar_compact_controls` at the moment the lane went
-  // live (options are locked while live, so it cannot change under the user).
+  // S4 feed. `hud` is the pure snapshot; the shared recording-cluster row is a
+  // projection of it. `bar_compact_controls` is locked while live, so it
+  // cannot change under the user.
   let hud: RecordingHudState = idleHud()
-  let hudCompact = false
   // D9 hover/on-demand inputs. `pointerInside` is pure UI state (never a
   // capture control); `hudPresentedByLauncher` remembers that the user asked
   // for the HUD mid-recording in `hidden` mode.
@@ -337,13 +339,13 @@ export function ClassicWindow(
     pointerInside = false
     if (
       !isLive(barState) ||
-      config.bar.recording_hud !== "hover" ||
+      surfaces().captureBar !== "hover" ||
       hoverFootprint === null
     ) {
       return
     }
     hoverPoll = GLib.timeout_add(GLib.PRIORITY_DEFAULT, HOVER_POLL_MS, () => {
-      if (!isLive(barState) || config.bar.recording_hud !== "hover") {
+      if (!isLive(barState) || surfaces().captureBar !== "hover") {
         stopHoverPoll()
         pointerInside = false
         if (isLive(barState)) applyHudVisibility()
@@ -417,14 +419,8 @@ export function ClassicWindow(
   let cta: Gtk.Button | null = null
   let ctaLabel: Gtk.Label | null = null
   let hudRow: Gtk.Box | null = null
-  let hudDot: Gtk.Box | null = null
-  let hudTimerLabel: Gtk.Label | null = null
-  let hudActions: Gtk.Box | null = null
-  let hudToggle: Gtk.Button | null = null
-  let hudToggleLabel: Gtk.Label | null = null
   let hudPopup: Gtk.Popover | null = null
-  let hudPopupToggle: Gtk.Button | null = null
-  let hudPopupToggleLabel: Gtk.Label | null = null
+  let hudCluster: RecordingClusterHandle | null = null
   let monitorChip: Gtk.Button | null = null
   let monitorChipLabel: Gtk.Label | null = null
   let screenshotPage: ScreenshotPageHandle | null = null
@@ -477,11 +473,18 @@ export function ClassicWindow(
    * true = dot+timer only in the bar, the popup carries the controls; false =
    * the bar carries them. Both are the SAME state; only the widgets move.
    */
+  function surfaces() {
+    return recordingSurfaces(config.recording_controls)
+  }
+
+  /** Hover forces the full inline controls; compact is only for top-bar/always. */
+  function effectiveCompact(): boolean {
+    return config.bar_compact_controls && surfaces().compactAllowed
+  }
+
   function applyHudPlacement() {
-    const placement = hudControlPlacement(config.bar_compact_controls)
-    hudCompact = placement.popup
-    if (hudActions) hudActions.visible = placement.barControls
-    if (!placement.popup) hudPopup?.popdown()
+    const placement = hudControlPlacement(effectiveCompact())
+    if (!placement.popup) hudCluster?.closePopover()
   }
 
   /**
@@ -495,11 +498,13 @@ export function ClassicWindow(
    */
   function applyHudVisibility() {
     const live = isLive(barState)
+    const current = surfaces()
     const visibility = hudVisibility({
-      mode: config.bar.recording_hud,
+      mode: current.captureBar,
       live,
       pointerInside,
       presentedByLauncher: hudPresentedByLauncher,
+      allowLauncherHud: current.allowLauncherHud,
     })
     if (hudRow) hudRow.opacity = visibility.showChrome ? 1 : 0
     // A popover is a separate surface and would otherwise outlive hidden
@@ -518,20 +523,9 @@ export function ClassicWindow(
     }
   }
 
-  /** Project the pure HUD snapshot onto the built widgets (no state change). */
+  /** Project the pure HUD snapshot onto the shared cluster row. */
   function updateHudUi() {
-    if (hudTimerLabel) hudTimerLabel.set_label(hudTimer(hud, Date.now()))
-    if (hudDot) {
-      if (hud.phase === "paused") hudDot.add_css_class("paused")
-      else hudDot.remove_css_class("paused")
-    }
-    const label = pauseLabel(hud)
-    if (hudToggleLabel) hudToggleLabel.set_label(label)
-    if (hudPopupToggleLabel) hudPopupToggleLabel.set_label(label)
-    // Pause needs a job id to route `Control`; before the first snapshot there
-    // is nothing to control. Stop remains available as the one exit.
-    if (hudToggle) hudToggle.sensitive = hud.jobId !== null
-    if (hudPopupToggle) hudPopupToggle.sensitive = hud.jobId !== null
+    hudCluster?.render({ hud, compact: effectiveCompact() })
     if (isLive(barState)) applyHudPlacement()
   }
 
@@ -567,9 +561,10 @@ export function ClassicWindow(
     // `hover` owns no surface when recording ends: the revealed HUD unmaps
     // (REQ-006 lifecycle). `hidden` had no automatic surface either, but a
     // launcher-presented HUD goes away on stop. `always` returns to S0.
-    const hoverMode = config.bar.recording_hud === "hover"
+    const current = surfaces()
+    const hoverMode = current.captureBar === "hover"
     const hideAfterStop =
-      config.bar.recording_hud === "hidden" && hudPresentedByLauncher
+      current.captureBar === "hidden" && hudPresentedByLauncher
     barState = homeBar()
     hudPresentedByLauncher = false
     applyBarState()
@@ -886,7 +881,7 @@ export function ClassicWindow(
     // or start the hover poll and re-apply the pure rule without touching the
     // capture (options stay locked; this is the external-config path).
     if (isLive(barState)) {
-      if (config.bar.recording_hud === "hover") syncHoverPoll()
+      if (surfaces().captureBar === "hover") syncHoverPoll()
       else {
         stopHoverPoll()
         pointerInside = false
@@ -894,6 +889,21 @@ export function ClassicWindow(
       applyHudVisibility()
     }
   }
+
+  // The S4 row is the SAME shared cluster the top bar shows. The capture
+  // window only supplies the row/window visibility; it must not grow a second
+  // dot/timer/button/popover design.
+  hudCluster = RecordingCluster({
+    onToggle: togglePause,
+    onStop: stopRecording,
+    onPopoverClose: () => {
+      if (isLive(barState)) applyHudVisibility()
+    },
+  })
+  hudRow = hudCluster.root
+  hudPopup = hudCluster.popover
+  watchHudPress(hudCluster.root)
+  watchHudPress(hudCluster.popover)
 
   return (
     <window
@@ -938,13 +948,13 @@ export function ClassicWindow(
         // Continuous rendering between pushes: the backend's pushed timer is
         // the source of truth, and paused/idle values are frozen.
         hudTicker = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
-          if (isLive(barState) && hud.phase === "recording" && hudTimerLabel !== null) {
-            hudTimerLabel.set_label(hudTimer(hud, Date.now()))
-          }
+          if (isLive(barState) && hud.phase === "recording") updateHudUi()
           return true
         })
         self.connect("destroy", () => {
           // No poll, cached footprint or armed state survives the window.
+          hudCluster?.destroy()
+          hudCluster = null
           clearHoverReveal()
           if (unsubscribeSelection !== null) {
             unsubscribeSelection()
@@ -1001,7 +1011,7 @@ export function ClassicWindow(
         self.connect("unmap", () => {
           // A press guard cannot survive the surface it was protecting.
           hudPressHeld = false
-          if (isLive(barState) && config.bar.recording_hud === "hidden") {
+          if (isLive(barState) && !surfaces().allowLauncherHud) {
             hudPresentedByLauncher = false
           }
         })
@@ -1012,7 +1022,12 @@ export function ClassicWindow(
           // the ONE on-demand presentation path: mapping while live means the
           // user asked for the HUD, so reveal it (Stop/Pause) without touching
           // the capture. `always`/`hover` are already reachable by definition.
-          if (isLive(barState) && config.bar.recording_hud === "hidden") {
+          const current = surfaces()
+          if (
+            isLive(barState) &&
+            current.allowLauncherHud &&
+            current.captureBar === "hidden"
+          ) {
             hudPresentedByLauncher = true
           }
           // Focus changes re-map which monitor's bar is visible (D2). The
@@ -1208,128 +1223,7 @@ export function ClassicWindow(
             </button>
           </box>
 
-          {/* --------------------------------------------------- S4 HUD
-              Recording-live is HUD only (INV-2/INV-5): pulse dot, elapsed
-              timer, Pause/Stop. No back chevron, no target/fps/quality/audio
-              pills, no settings entry. `bar_compact_controls` decides whether
-              the controls live in this row or in the popup. */}
-          <box
-            visible={false}
-            class="capture-bar hud"
-            orientation={Gtk.Orientation.HORIZONTAL}
-            spacing={8}
-            $={(self) => {
-              hudRow = self
-              watchHudPress(self)
-            }}
-          >
-            <button
-              class="hud-status"
-              tooltipText="Recording controls"
-              onClicked={() => {
-                if (hudCompact) hudPopup?.popup()
-              }}
-            >
-              <box
-                orientation={Gtk.Orientation.HORIZONTAL}
-                spacing={6}
-                halign={Gtk.Align.CENTER}
-                valign={Gtk.Align.CENTER}
-              >
-                <box
-                  class="hud-dot"
-                  valign={Gtk.Align.CENTER}
-                  $={(self) => {
-                    hudDot = self
-                  }}
-                />
-                <label
-                  class="hud-timer"
-                  label="00:00"
-                  $={(self) => {
-                    hudTimerLabel = self
-                  }}
-                />
-              </box>
-            </button>
-            <box
-              class="hud-actions"
-              orientation={Gtk.Orientation.HORIZONTAL}
-              spacing={6}
-              $={(self) => {
-                hudActions = self
-              }}
-            >
-              <button
-                class="bar-pill hud-toggle"
-                tooltipText="Pause or resume the recording"
-                onClicked={togglePause}
-                $={(self) => {
-                  hudToggle = self
-                }}
-              >
-                <label
-                  label="Pause"
-                  $={(self) => {
-                    hudToggleLabel = self
-                  }}
-                />
-              </button>
-              <button
-                class="bar-pill hud-stop"
-                tooltipText="Stop recording"
-                onClicked={stopRecording}
-              >
-                <label label="⏹ Stop" />
-              </button>
-            </box>
-            <popover
-              $={(self) => {
-                hudPopup = self
-                watchHudPress(self)
-                // Closing the expanded controls returns the trigger to the
-                // bar/HUD rect on the next poll; re-apply now so an outside
-                // pointer cannot leave a stale mapped surface until then.
-                self.connect("closed", () => {
-                  if (isLive(barState)) applyHudVisibility()
-                })
-              }}
-            >
-              <box
-                class="hud-popup"
-                orientation={Gtk.Orientation.VERTICAL}
-                spacing={8}
-              >
-                <box
-                  class="hud-popup-row"
-                  orientation={Gtk.Orientation.HORIZONTAL}
-                  spacing={8}
-                >
-                  <box class="hud-dot" valign={Gtk.Align.CENTER} />
-                  <label label="Recording" />
-                </box>
-                <box homogeneous spacing={8}>
-                  <button
-                    class="bar-pill hud-toggle"
-                    onClicked={togglePause}
-                    $={(self) => {
-                      hudPopupToggle = self
-                    }}
-                  >
-                    <label
-                      label="Pause"
-                      $={(self) => {
-                        hudPopupToggleLabel = self
-                      }}
-                    />
-                  </button>
-                  <button class="bar-pill hud-stop" onClicked={stopRecording}>
-                    <label label="⏹ Stop" />
-                  </button>
-                </box>
-              </box>
-            </popover>
-          </box>
+          {hudCluster?.element ?? null}
 
           <SettingsPage
             settingsStore={settingsStore}

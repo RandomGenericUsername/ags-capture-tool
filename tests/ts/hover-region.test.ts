@@ -496,7 +496,7 @@ test("the poll runs only while hover is live and reads the pointer port", () => 
   assert.match(poll, /GLib\.timeout_add\(GLib\.PRIORITY_DEFAULT, HOVER_POLL_MS/)
   assert.match(poll, /ports\.pointerPosition\.current\(\)/)
   assert.match(poll, /updateHoverReveal\(/)
-  assert.match(poll, /config\.bar\.recording_hud !== "hover"/)
+  assert.match(poll, /surfaces\(\)\.captureBar !== "hover"/)
   assert.match(poll, /hoverFootprint === null/)
   assert.match(poll, /if \(!isLive\(barState\)/)
   assert.match(poll, /stopHoverPoll\(\)/)
@@ -508,7 +508,7 @@ test("recording entry starts a clean poll; stop and destroy clear it", () => {
 
   const leave = functionBody(WINDOW, "function leaveLiveHud()")
   assert.match(leave, /clearHoverReveal\(\)/)
-  assert.match(leave, /const hoverMode = config\.bar\.recording_hud === "hover"/)
+  assert.match(leave, /const hoverMode = current\.captureBar === "hover"/)
   assert.match(leave, /hideAfterStop \|\| hoverMode\) hideCaptureWindow\(\)/)
   assert.ok(
     leave.indexOf("clearHoverReveal()") < leave.indexOf("applyBarState()"),
@@ -564,16 +564,10 @@ test("BUG-003: the poll tracks the current visible/expanded surface and holds a 
   assert.match(press, /"pressed"/)
   assert.match(press, /"released"/)
   assert.match(press, /"stopped"/)
-  assert.match(
-    WINDOW,
-    /hudRow = self\s+watchHudPress\(self\)/,
-    "the bar Pause/Stop lane observes press/release",
-  )
-  assert.match(
-    WINDOW,
-    /hudPopup = self\s+watchHudPress\(self\)/,
-    "the compact popover controls observe press/release",
-  )
+  assert.match(WINDOW, /hudRow = hudCluster\.root/)
+  assert.match(WINDOW, /watchHudPress\(hudCluster\.root\)/)
+  assert.match(WINDOW, /hudPopup = hudCluster\.popover/)
+  assert.match(WINDOW, /watchHudPress\(hudCluster\.popover\)/)
 })
 
 test("the adapter prefers the command socket and falls back to hyprctl", () => {

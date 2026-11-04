@@ -21,10 +21,16 @@ import {
 } from "./adapters/monitor-window-set"
 import { createOverlayWindowSet } from "./adapters/overlay-window-set"
 import { createUiState } from "./domain/ui-state"
+import {
+  createClusterRequestHandler,
+  type ClusterHandler,
+} from "./lib/cluster-request"
 import { createCapturePaletteRefresh } from "./lib/palette-refresh"
+import { createCaptureRequestHandler } from "./lib/request-dispatch"
 import type { CapturePorts } from "./ports/capture-ports"
 import { refreshAppAppearance } from "./ui/appearance"
 import { ClassicWindow } from "./ui/classic/ClassicWindow"
+import { createClusterController } from "./ui/cluster/controller"
 import { createSelectionController } from "./ui/overlay/controller"
 import { SelectionOverlay } from "./ui/overlay/SelectionOverlay"
 
@@ -46,6 +52,19 @@ import { SelectionOverlay } from "./ui/overlay/SelectionOverlay"
 const paletteRefresh = createCapturePaletteRefresh(() => {
   theme.apply()
   refreshAppAppearance()
+})
+
+// The cluster controller is built inside `main()` (it needs the live topology
+// and the capture-state feed), but AGS registers the request handler before
+// `main()` runs. The indirection keeps the palette handler reachable during
+// that window and answers a cluster request retryably until the controller is
+// ready.
+let clusterHandler: ClusterHandler | null = null
+const requestHandler = createCaptureRequestHandler(paletteRefresh, (text) => {
+  if (clusterHandler === null) {
+    return { ok: false, error: "internal", retryable: true }
+  }
+  return clusterHandler(text)
 })
 
 // Composition root (design.md §2, task 8.5). The ONE place that knows which
@@ -76,7 +95,7 @@ function buildPorts(): CapturePorts {
 app.start({
   instanceName: "capture",
   css: style,
-  requestHandler: paletteRefresh,
+  requestHandler,
   main() {
     try {
       theme.apply()
@@ -101,6 +120,16 @@ app.start({
     // single owner of "what is selected"; the overlay set is a second,
     // selection-driven window set that mirrors the monitors (design.md §11.2).
     const topology = gdkMonitorTopology(Gdk.Display.get_default() as Gdk.Display)
+    // The bar asks this process to draw its recording cluster; this controller
+    // owns the window/timer/actions for every reporting monitor. It subscribes
+    // once to the same `capture.state` feed the S4 HUD uses.
+    const clusterController = createClusterController({
+      app,
+      topology,
+      captureState: ports.captureState,
+      report: (message) => console.log(message),
+    })
+    clusterHandler = createClusterRequestHandler(clusterController)
     const focus = hyprlandMonitorFocus()
     const windowClients = hyprlandWindowClients()
     const selection = createSelectionController({

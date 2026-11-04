@@ -19,6 +19,7 @@
 - [REQ-004-recording-lifecycle/ticket.md](./REQ-004-recording-lifecycle/ticket.md) — Recording lifecycle: red accent + live HUD | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
 - [REQ-005-theme-roles/ticket.md](./REQ-005-theme-roles/ticket.md) — Migrate capture CSS to semantic palette.v1 roles | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
 - [REQ-006-hover-region-reveal/ticket.md](./REQ-006-hover-region-reveal/ticket.md) — Widen S4 hover reveal to the full S1 footprint without click interception | `done` | links: worktree .worktrees/REQ-006/, branch ticket/REQ-006-hover-region-reveal | live probe `/tmp/opencode/capture-hover-c/`
+- [REQ-007-hover-smart-footprint/ticket.md](./REQ-007-hover-smart-footprint/ticket.md) — Derive the S4 hover footprint from the configured bar rectangle | `done` | links: worktree .worktrees/REQ-007/, branch ticket/REQ-007-hover-smart-footprint | live probe `/tmp/opencode/capture-hover-smart/`
 
 ## Bugs
 

@@ -173,9 +173,14 @@ bar in its S4 state (HUD visible, Stop available) even mid-recording; presenting
 it does not alter the running capture. In `hover`, the bar window is **unmapped**
 while chrome is hidden (REQ-006 supersedes the original "stays mapped for its
 hit area" wording): a 10–20 Hz compositor pointer poll compares the cursor with
-the S1 footprint cached at commit, maps the normal HUD on entry and unmaps it on
-exit, so hidden state is fully click-through. Reveal is armed only after the
-pointer leaves once, keeping a commit from the Record CTA out of the first
+the bar rectangle cached at commit, maps the normal HUD on entry and unmaps it
+on exit, so hidden state is fully click-through. REQ-007 narrows that rectangle
+from the S1 window to the **configured resting bar** (the S0 rail, 142×54 on the
+reference host, not the 1506×54 option lane): the rail is measured while S0 is
+visible, then placed with the current monitor geometry, `bar.position` and
+`offsetPx`/margins at commit. Nothing else on the edge band (a dock, a
+full-width overlay, the empty S1 lane) triggers it. Reveal is armed only after
+the pointer leaves once, keeping a commit from the Record CTA out of the first
 frame. When the recording ends in `hover`, the surface stays unmapped and the
 poll/footprint state is cleared; `always`/on-demand presentation still returns
 to S0.

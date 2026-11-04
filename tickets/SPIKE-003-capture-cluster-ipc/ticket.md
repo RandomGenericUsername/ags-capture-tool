@@ -25,8 +25,8 @@ links:
   openspec: none
   bmad: none
   spike: SPIKE-002
-worktree: none
-branch: main
+worktree: .worktrees/SPIKE-003/
+branch: ticket/SPIKE-003-capture-cluster-ipc
 ---
 
 # Capture-drawn recording cluster over the AGS request channel (option B)

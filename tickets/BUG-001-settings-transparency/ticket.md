@@ -2,7 +2,7 @@
 id: BUG-001
 title: "Settings panel has no card background and is unreadable over the window behind"
 kind: bug
-status: in-progress
+status: done
 lane: direct
 severity: high
 links:
@@ -127,6 +127,28 @@ commit `2445d44`. Status stays `in-progress` until the orchestrator deploys.
 **Verify:** open Settings over a text-heavy window; the panel must have an
 opaque fill and a visible card edge, while the S0 bar keeps its translucent
 plate.
+
+## Verification — v0.2.1 live (2026-11-04)
+
+Status moved `in-progress` → `done` after the deployed `v0.2.1` instance was
+re-tested (pin `v0.2.1`, config → `apps/capture/v0.2.1`, PID 902796).
+
+- Method: widened a text-heavy kitty to 1520×1014, kept Chrome with the older
+  v0.2.0 screenshot as a second text surface on the right, opened the bar and
+  clicked ⚙.
+- After (live): `/tmp/opencode/capture-verify-v021/after-settings-over-text-v021.png`
+  — opaque `@surface` card, readable labels, no text bleed-through.
+- Before (v0.2.0): `/tmp/opencode/capture-verify-v021/before-settings-over-text-v020.png`
+  (copied from `/tmp/opencode/capture-fix-batch/before-settings-over-text.png`).
+- Quantitative check at the card's left padding (`x=618`): the before shot has
+  std 0.286 / 0.244 at `y=400` / `y=600` (text behind), the after shot has
+  **std 0** and a uniform mean 0.0797 at both points. Full write-up:
+  `/tmp/opencode/capture-verify-v021/EVIDENCE.md`.
+- Live state after: capture still running `v0.2.1`, Settings closed to S0,
+  wallpaper unchanged, `dotfiles-runtime doctor` clean (21 items).
+
+**Result:** fixed; no regression observed in the S0 bar plate or first-frame
+transparency.
 
 ## Evidence
 

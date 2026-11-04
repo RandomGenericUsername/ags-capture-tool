@@ -2,7 +2,7 @@
 id: BUG-002
 title: "Minimal-size region resizes instead of moving when dragged from its centre"
 kind: bug
-status: in-progress
+status: done
 lane: direct
 severity: medium
 links:
@@ -97,6 +97,30 @@ commit `2445d44`. Status stays `in-progress` until the orchestrator deploys.
 
 **Verify:** draw a ~15×15 rect, drag from its centre, and confirm the whole
 rect translates; then drag a corner/edge and confirm resize still works.
+
+## Verification — v0.2.1 live (2026-11-04)
+
+Status moved `in-progress` → `done` after the deployed `v0.2.1` instance was
+re-tested (pin `v0.2.1`, config → `apps/capture/v0.2.1`, PID 902796).
+
+- Minimal region: drew `(400,400)` → `(415,415)` (badge `15×15 · editable`),
+  then dragged the centre `(407,407)` → `(507,507)`. Badge stayed
+  `15×15 · editable`; the accent/handle bbox moved from
+  `(398,398)–(421,421)` to `(498,498)–(521,521)` — exactly **+100,+100**, 279
+  pixels both times. Size unchanged.
+  Evidence: `/tmp/opencode/capture-verify-v021/tiny-region-drawn.png`,
+  `tiny-region-moved.png`.
+- Normal region: drew `(300,250)` → `(500,370)` (badge `200×120 · editable`),
+  centre drag `(400,310)` → `(450,360)` kept `200×120` and translated
+  **+50,+50** (`normal-region-drawn.png`, `normal-region-moved.png`).
+- Corner resize: bottom-right `(550,420)` → `(600,450)` produced badge
+  `250×150 · editable` with the top-left fixed at `(350,300)`
+  (`normal-region-resized.png`).
+- Full write-up: `/tmp/opencode/capture-verify-v021/EVIDENCE.md`.
+- Live state after: capture still running `v0.2.1`, HUD setting restored to
+  `hidden`, wallpaper unchanged, `dotfiles-runtime doctor` clean (21 items).
+
+**Result:** fixed; centre move, corner resize and normal-size move all pass.
 
 ## Evidence
 

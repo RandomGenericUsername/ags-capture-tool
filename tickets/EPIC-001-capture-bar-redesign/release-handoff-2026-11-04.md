@@ -260,3 +260,12 @@ Evidence that changes the picture:
 - `gh auth status` → authenticated as `RandomGenericUsername` with `repo` scope; `gh release view v0.2.0` → `release not found`. T1's release step is **not blocked**.
 - Live: `apps/capture/pinned` = `v0.2.0`; `~/.config/ags-capture` resolves to `apps/capture/v0.2.0`; PID 511294 running.
 - Repo is clean at `1897607` = `origin/main`; no force-push needed. Worktrees REQ-002..005 present as listed.
+
+### v0.2.1 verification — 2026-11-04
+
+Deployed `v0.2.1` live retest (pin `v0.2.1`; `~/.config/ags-capture` → `apps/capture/v0.2.1`; capture PID 902796). Docs/evidence only; no app code, tag, release or pin change.
+
+- **BUG-001 — done.** Settings card is opaque over a text-heavy kitty + Chrome window. At the card's left padding (`x=618`) the v0.2.0 before shot has std 0.286/0.244 (text bleed-through); v0.2.1 has std 0 (uniform `@surface`). `after-settings-over-text-v021.png` vs `before-settings-over-text-v020.png`.
+- **BUG-002 — done.** A `15×15` region centre-dragged `(407,407)` → `(507,507)` kept the `15×15` badge and translated its handle bbox exactly **+100,+100** (279 pixels before/after). A normal `200×120` region still moved from the centre at the same size, and a bottom-right corner drag resized it to `250×150`.
+- **C3 — not reproduced; dismissed with evidence.** Two region recordings including the bar: `recording_2026-11-04_12-42-02.mp4` (clicked Record) and `recording_2026-11-04_12-45-32.mp4` (pointer parked inside the live 200×200 hit area at `860,880`, started with Enter). Frames at 0.05/0.2/0.5/1 s show **no capture-bar HUD**; the C3 first-frame condition is not met, so no ticket was filed. Caveat: live pointer re-entry also did not reveal the hover chrome in this automated run; that positive hover path is recorded as unverified/automation-limited, not as a C3 confirmation.
+- **Live after:** capture running `v0.2.1`; `recording_hud` restored to `hidden`; wallpaper untouched (`current.json` mtime 12:30:01, sha256 unchanged); `dotfiles-runtime doctor` clean (21 items). Evidence: `/tmp/opencode/capture-verify-v021/EVIDENCE.md`. Tickets/INDEX updated: BUG-001 and BUG-002 `done`; OPS-005 records the C3 retest.

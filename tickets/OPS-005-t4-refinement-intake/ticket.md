@@ -96,7 +96,7 @@ second filed bug. The rest of the list is recorded below as **not a bug**,
 |---|---|---|---|---|
 | C5 | Small region move/resize | **confirmed** | Drawing a minimal-size rectangle (~15×15) and dragging from its centre resizes instead of moves. | `BUG-002-small-region-move` (medium). |
 | C17 | Settings panel background | **confirmed** (new; not in the original 16) | While trying C3, JD opened Settings (his note calls it the "S4 Settings panel"): the panel has a fully transparent background. Labels float directly over the text-heavy window behind; there is no card, border or readable surface. | `BUG-001-settings-transparency` (high). |
-| C3 | `recording_hud=hover` first frame | **unconfirmed** | Not tested: the C17 Settings defect interrupted the hover-HUD attempt. | Re-run after BUG-001 is fixed; no ticket now. |
+| C3 | `recording_hud=hover` first frame | **unconfirmed on v0.2.0; not reproduced on v0.2.1** | Not tested on v0.2.0: the C17 Settings defect interrupted the hover-HUD attempt. Re-tested live on v0.2.1 (2026-11-04): the HUD was **absent** in clip frames at 0.05/0.2/0.5/1 s, including a run that parked the pointer inside the live hover hit area before commit. See the v0.2.1 retest section below. | Dismissed with evidence; no ticket. |
 | C6 | Screenshot delay feedback | **not a bug** | Capture appears after 10 s as expected. | None. |
 | C1 | Capture vs Shutter CTA | **not a bug** | "Capture" is fine. | None; spec wording can stay as implemented. |
 | C9 | Window ring absent until pointer moves | **accepted** | JD accepted/liked the current behaviour; not a bug. | None. |
@@ -112,9 +112,41 @@ second filed bug. The rest of the list is recorded below as **not a bug**,
 | C14 | Astal client assertion | **deferred** | Astal log assertion; ignore unless it correlates with a crash or visible defect. | Not pursued; no ticket. |
 | C15 | Unattributed L3/L4 defects | **deferred** | The freeze record named unattributed interactions/popups/commit paths, but JD supplied no specific behaviour to reproduce. | Nothing to file until JD names one. |
 
-**Tally:** 2 confirmed (C5, C17), 3 not a bug (C1, C6, C16), 1 accepted (C9),
-1 unconfirmed (C3), 10 deferred (C2, C4, C7, C8, C10–C15). The confirmed items
-each have exactly one ticket; nothing in the deferred list was filed.
+**Tally (v0.2.0 live pass):** 2 confirmed (C5, C17), 3 not a bug (C1, C6, C16),
+1 accepted (C9), 1 unconfirmed (C3), 10 deferred (C2, C4, C7, C8, C10–C15).
+The confirmed items each have exactly one ticket; nothing in the deferred list
+was filed. C3 was re-tested on v0.2.1 and not reproduced (below).
+
+## v0.2.1 retest — BUG-001, BUG-002, C3 (2026-11-04)
+
+The deployed `v0.2.1` fixes were verified on the live instance (pin `v0.2.1`,
+config → `apps/capture/v0.2.1`, PID 902796). Docs/evidence only; no app code,
+tag, release or pin change. Full evidence:
+`/tmp/opencode/capture-verify-v021/EVIDENCE.md`.
+
+- **BUG-001 — fixed.** Settings opened over a 1520×1014 text-heavy kitty plus a
+  text-heavy Chrome. The card is uniform `@surface` (12×12 crop at the left
+  padding: before std 0.286/0.244 over text, after std 0). Screenshots:
+  `after-settings-over-text-v021.png` vs `before-settings-over-text-v020.png`.
+- **BUG-002 — fixed.** `15×15` region, centre drag `(407,407)` → `(507,507)`:
+  badge stayed `15×15`, handle bbox translated exactly **+100,+100** (279
+  pixels before and after). A normal `200×120` region still moved from the
+  centre at the same size and resized from a corner to `250×150`.
+- **C3 — not reproduced; dismissed with evidence.** Two region recordings, both
+  including the bar in the recorded region:
+  `recording_2026-11-04_12-42-02.mp4` (clicked Record; pointer at the CTA) and
+  `recording_2026-11-04_12-45-32.mp4` (pointer parked at `(960,1054)` inside
+  the live `capture` hit area, 200×200 at `860,880`, and started with Enter).
+  Frames extracted at 0.05/0.2/0.5/1 s show **no capture bar / HUD**; in the
+  second clip the cursor is visible but no S4 chrome is painted. The C3
+  first-frame condition is not met, so no ticket is filed.
+  Caveat: a deliberate live re-entry in this automated run also did not reveal
+  the hover chrome; that positive hover path remains unverified and is recorded
+  as an automation limitation, not as a C3 confirmation.
+
+**State after:** capture still running `v0.2.1`; `recording_hud` restored to
+`hidden`; wallpaper untouched (`current.json` mtime 12:30:01, same sha256);
+`dotfiles-runtime doctor` clean (21 items).
 
 ### T2 test residue in JD's screenshot
 
@@ -193,8 +225,8 @@ terminal; note timestamps for anything that becomes a bug.
 ## Done-when
 
 - [x] JD has confirmed or rejected every C-row (and explicitly re-decided or
-  kept each L-row). C3 is recorded as unconfirmed because the C17 defect
-  interrupted it.
+  kept each L-row). C3 was recorded as unconfirmed on v0.2.0 because the C17
+  defect interrupted it; the v0.2.1 retest below found it not reproduced.
 - [x] Every confirmed behaviour has exactly one bug ticket with `repro:`,
   `observed:`, `expected:` and a severity; rejected/accepted/deferred rows are
   recorded here with the reason.
@@ -207,13 +239,15 @@ T4 intake is complete (2026-11-04). Filed from the live pass:
 
 | Ticket | Behaviour | Severity | Status |
 |---|---|---|---|
-| [BUG-001](../BUG-001-settings-transparency/ticket.md) | Settings panel transparent / unreadable over the window behind (C17) | high | `triage` |
-| [BUG-002](../BUG-002-small-region-move/ticket.md) | Minimal-size region resizes instead of moves from its centre (C5) | medium | `triage` |
+| [BUG-001](../BUG-001-settings-transparency/ticket.md) | Settings panel transparent / unreadable over the window behind (C17) | high | `done` (v0.2.1 verified) |
+| [BUG-002](../BUG-002-small-region-move/ticket.md) | Minimal-size region resizes instead of moves from its centre (C5) | medium | `done` (v0.2.1 verified) |
 
-Not filed: C1/C6/C16 are not bugs, C9 is accepted, C3 is unconfirmed, and
-C2/C4/C7/C8/C10–C15 are deferred (plain-language reasons in the table above).
-The T2 toast residue is noted above and is not a product failure. This commit
-is docs-only; BUG-001 and BUG-002 are for the next fix batch, not this task.
+Not filed: C1/C6/C16 are not bugs, C9 is accepted, and C2/C4/C7/C8/C10–C15
+are deferred (plain-language reasons in the table above). C3 was unconfirmed
+on v0.2.0, then re-tested on v0.2.1 and dismissed as not reproduced (evidence
+in the retest section). The T2 toast residue is noted above and is not a
+product failure. BUG-001 and BUG-002 were fixed in v0.2.1 and closed by the
+live retest; this intake remains docs-only.
 
 ## Provenance / what this list is not
 

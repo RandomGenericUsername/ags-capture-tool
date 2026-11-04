@@ -123,6 +123,17 @@ re-tested (pin `v0.2.1`, config → `apps/capture/v0.2.1`, PID 902796).
 
 **Result:** fixed; centre move, corner resize and normal-size move all pass.
 
+## JD acceptance — v0.2.1 (2026-11-04)
+
+JD re-checked the live `v0.2.1` instance after the verification evidence:
+
+- A small region at **~30 px** moves from its centre and resizes from its
+  handles as expected; JD considers this **good**.
+- The minimal-size (~15 px) centre-drag case is **accepted as out of scope**:
+  *"accepted at ≥30px; minimal-size drag not pursued."*
+- Status stays `done`. No min-size constraint or further code change is added
+  unless a new ticket is opened.
+
 ## Evidence
 
 - `domain/selection.ts:65-74` — corner-first `HANDLE_ORDER`.

@@ -69,7 +69,7 @@ not a temporary one.
 |---|---|---|---|---|---|---|---|
 | C1 | S1 screenshot CTA copy | Open the bar → tap 📷 → Region → drag a rect → read the CTA, then press Enter. | `known from artifact` — the CTA reads **Capture**. design.md §5 draws `Capture`; §3/§4, Sheet 2/3 and REQ-003 acceptance prose say `Shutter`. REQ-003 records this as an unresolved spec contradiction, not a silent rename. | One term everywhere: JD picks `Capture` or `Shutter`, and the label, ticket and design agree. | low | no | `tickets/REQ-003-selection-first-flow/ticket.md:328-332`; `tickets/EPIC-001-capture-bar-redesign/design.md:60,135`; `ui/classic/ClassicWindow.tsx:405-410` |
 | C2 | S4 settings entry | Start a recording; while the HUD is live, look for ⚙ or try to open Settings. | `known from artifact` — the S4 row is dot + timer + Pause/Stop only; no ⚙. design.md §5 says "⚙ (allowed here)"; REQ-004 records the omission as a deliberate deviation from INV-3 (settings is S0-only) and options-locked. | Decide: add an S4 settings entry, or amend design §5 so the mockup and the implemented row agree. | low | no | `tickets/REQ-004-recording-lifecycle/ticket.md:329-333`; `tickets/EPIC-001-capture-bar-redesign/design.md:139`; `ui/classic/ClassicWindow.tsx:908-1021` |
-| C3 | `recording_hud=hover` first frame | Settings → Recording HUD = **On hover** → open 🎥 → Region → drag → click **Record** with the pointer still over the bar → record ≥5 s → stop and inspect the clip while watching the bar. | `needs live confirmation` — `enterLiveHud()` does not reset `pointerInside`; `hudVisibility("hover")` shows chrome whenever the pointer is inside. Clicking Record leaves the pointer over the bar, so the HUD can be mapped from the first frame and stay visible until the pointer leaves. | Recording starts with clean frames; the HUD appears only after a fresh pointer entry after commit — or JD explicitly accepts the current behaviour. | medium | yes (hover HUD is new; v0.1.0 had no S4 HUD) | `ui/classic/ClassicWindow.tsx:298-310,681-698`; `domain/recording-hud.ts:95-110` |
+| C3 | `recording_hud=hover` first frame | Settings → Recording HUD = **On hover** → open 🎥 → Region → drag → click **Record** with the pointer still over the bar → record ≥5 s → stop and inspect the clip while watching the bar. | `not reproduced on v0.2.1; positive path reachable` — the S4 window is mapped with the HUD chrome at opacity 0 (`applyHudVisibility`), and pointer entry re-applies the rule; the first frame therefore has no chrome. Live probe 2026-11-04: the hover layer measured **76×38 at 922,1042** on eDP-1 with the pointer elsewhere, and the HUD (dot + timer) appeared after the pointer entered it. JD's "bar disappears when capturing" is the intended chrome-hidden state, not a missing surface; the S4 hit area is much smaller than the S1 bar, so hovering the old Record-CTA footprint can miss it. | A hover hit area with no visible affordance is acceptable, or JD wants an affordance/renamed option; the HUD reveals on pointer entry. | low (UX, not a bug) | yes (hover HUD is new; v0.1.0 had no S4 HUD) | `ui/classic/ClassicWindow.tsx:250-272,681-698`; `domain/recording-hud.ts:95-110` |
 | C4 | Window pick stacking | Open two overlapping windows (e.g. a terminal over a browser) → open 📷 → **Window** → hover and click the overlap. | `needs live confirmation` — `hitClient()` returns the first client in the AstalHyprland list order; that order is not a documented stacking order, so the ring/pin may resolve to a lower window. | The topmost client under the pointer is picked. | medium | maybe (old path used `slurp -r` over `hyprctl` boxes; stacking order there is also unproven) | `domain/selection.ts:226-237`; `adapters/hyprland-window-clients.ts:62-90`; `ui/overlay/controller.ts:227-241` |
 | C5 | Small region move/resize | 📷 → **Region** → draw a rect about 15×15 → release → drag from its centre to move it, then try an edge handle. | `needs live confirmation` — `HANDLE_HIT_RADIUS` is 9 px with 9 px handles and corners are checked first. Every interior point of a sub-≈18 px rect is within some handle radius, so a centre drag is treated as a resize, not a move. | Interior drag moves the rect; handles take over only near their own edges. | medium | no (new overlay) | `domain/selection.ts:62-79,199-209`; `ui/overlay/SelectionOverlay.tsx:237-262` |
 | C6 | Screenshot delay feedback | 📷 → **Region** → set delay **10s** → draw a rect → press Capture → watch the screen for the next 10 s. | `known from artifact` — commit hides the overlay and the bar before `launcher.launch`; the backend then sleeps the delay after selection. Nothing on screen says a capture is pending. | A countdown/indicator, or the bar stays visible showing "capturing in Ns". | medium | maybe (backend delay is pre-existing; the new flow removes the panel that used to be the only surface) | `ui/classic/ClassicWindow.tsx:510-530`; `bin/capture-tool:354-372` |
@@ -96,7 +96,7 @@ second filed bug. The rest of the list is recorded below as **not a bug**,
 |---|---|---|---|---|
 | C5 | Small region move/resize | **confirmed** | Drawing a minimal-size rectangle (~15×15) and dragging from its centre resizes instead of moves. | `BUG-002-small-region-move` (medium). |
 | C17 | Settings panel background | **confirmed** (new; not in the original 16) | While trying C3, JD opened Settings (his note calls it the "S4 Settings panel"): the panel has a fully transparent background. Labels float directly over the text-heavy window behind; there is no card, border or readable surface. | `BUG-001-settings-transparency` (high). |
-| C3 | `recording_hud=hover` first frame | **unconfirmed on v0.2.0; not reproduced on v0.2.1** | Not tested on v0.2.0: the C17 Settings defect interrupted the hover-HUD attempt. Re-tested live on v0.2.1 (2026-11-04): the HUD was **absent** in clip frames at 0.05/0.2/0.5/1 s, including a run that parked the pointer inside the live hover hit area before commit. See the v0.2.1 retest section below. | Dismissed with evidence; no ticket. |
+| C3 | `recording_hud=hover` first frame | **not a bug (expected hover behaviour); positive path reachable** | Not tested on v0.2.0: the C17 Settings defect interrupted the hover-HUD attempt. On v0.2.1 the HUD was absent from the first frames, as hover intends (chrome hidden). A follow-up live probe on 2026-11-04 found the hover surface mapped (76×38 at `922,1042`) and the HUD revealed on pointer entry. JD's "bar disappears when capturing" is that hidden-chrome state; the smaller S4 hit area explains why hovering the old bar footprint can miss it. See the C3 follow-up section below. | No ticket. JD may decide the invisible hit area needs an affordance or a clearer option label. |
 | C6 | Screenshot delay feedback | **not a bug** | Capture appears after 10 s as expected. | None. |
 | C1 | Capture vs Shutter CTA | **not a bug** | "Capture" is fine. | None; spec wording can stay as implemented. |
 | C9 | Window ring absent until pointer moves | **accepted** | JD accepted/liked the current behaviour; not a bug. | None. |
@@ -113,9 +113,11 @@ second filed bug. The rest of the list is recorded below as **not a bug**,
 | C15 | Unattributed L3/L4 defects | **deferred** | The freeze record named unattributed interactions/popups/commit paths, but JD supplied no specific behaviour to reproduce. | Nothing to file until JD names one. |
 
 **Tally (v0.2.0 live pass):** 2 confirmed (C5, C17), 3 not a bug (C1, C6, C16),
-1 accepted (C9), 1 unconfirmed (C3), 10 deferred (C2, C4, C7, C8, C10–C15).
-The confirmed items each have exactly one ticket; nothing in the deferred list
-was filed. C3 was re-tested on v0.2.1 and not reproduced (below).
+1 accepted (C9), 1 unconfirmed at the time (C3), 10 deferred (C2, C4, C7, C8,
+C10–C15). The confirmed items each have exactly one ticket; nothing in the
+deferred list was filed. C3 was re-tested on v0.2.1: the hidden first frame is
+intended, and the follow-up probe verified the positive hover path is reachable
+(below).
 
 ## v0.2.1 retest — BUG-001, BUG-002, C3 (2026-11-04)
 
@@ -132,7 +134,7 @@ tag, release or pin change. Full evidence:
   badge stayed `15×15`, handle bbox translated exactly **+100,+100** (279
   pixels before and after). A normal `200×120` region still moved from the
   centre at the same size and resized from a corner to `250×150`.
-- **C3 — not reproduced; dismissed with evidence.** Two region recordings, both
+- **C3 — not reproduced (expected); positive path verified in the follow-up.** Two region recordings, both
   including the bar in the recorded region:
   `recording_2026-11-04_12-42-02.mp4` (clicked Record; pointer at the CTA) and
   `recording_2026-11-04_12-45-32.mp4` (pointer parked at `(960,1054)` inside
@@ -140,13 +142,52 @@ tag, release or pin change. Full evidence:
   Frames extracted at 0.05/0.2/0.5/1 s show **no capture bar / HUD**; in the
   second clip the cursor is visible but no S4 chrome is painted. The C3
   first-frame condition is not met, so no ticket is filed.
-  Caveat: a deliberate live re-entry in this automated run also did not reveal
-  the hover chrome; that positive hover path remains unverified and is recorded
-  as an automation limitation, not as a C3 confirmation.
+  Follow-up (same day): the positive hover path **is** reachable. The
+  automation run above did not produce a pointer-entry event; a direct probe
+  with a real cursor move revealed the HUD (below). No C3 bug exists.
 
 **State after:** capture still running `v0.2.1`; `recording_hud` restored to
 `hidden`; wallpaper untouched (`current.json` mtime 12:30:01, same sha256);
 `dotfiles-runtime doctor` clean (21 items).
+
+### C3 follow-up — hover reachability (2026-11-04)
+
+JD reported: *"if this refers to the capture tool bar (bottom), hover never
+shows because the bar disappears when capturing."* Source, design and a live
+probe all agree on what actually happens:
+
+- **Design intent (D9/§6).** `hover` keeps the bar window mapped with the
+  chrome at opacity 0; pointer entry reveals the HUD. `hidden` (default) maps
+  nothing; `always` maps and shows it. Design:
+  `tickets/EPIC-001-capture-bar-redesign/design.md:47,140-141,166-173`.
+- **Implementation.** `hudVisibility("hover")` returns
+  `{mapWindow: true, showChrome: pointerInside}` —
+  `domain/recording-hud.ts:95-110`. `applyHudVisibility()` sets
+  `hudRow.opacity` from `showChrome` and maps the window when `mapWindow` —
+  `ui/classic/ClassicWindow.tsx:250-272`. A `Gtk.EventControllerMotion`
+  (`enter`/`motion`/`leave`) flips `pointerInside` and re-applies the rule —
+  `ui/classic/ClassicWindow.tsx:681-698`.
+- **Live probe (v0.2.1, eDP-1, `recording_hud=hover`).** A synthetic
+  `capture.state=recording` bus event put the bar in S4 without starting a
+  real recording. `hyprctl layers` reported the capture layer at
+  **`xywh: 922 1042 76 38`** (the S4 HUD row, chrome transparent). Moving the
+  pointer into that area with
+  `hyprctl dispatch 'hl.dsp.cursor.move({x=960,y=1058})'` revealed the
+  dot + `00:03` HUD; the `leave` handler applies the same rule in reverse.
+  Screenshot: `/tmp/opencode/hover-probe/s4-hover-enter.png` (revealed HUD).
+- **Why JD saw "no hover".** The S4 hit area is only the HUD row
+  (76×38 here), centred at the bottom. The S1 bar is much wider (142 px at
+  rest, ~1123 px in a lane); the Record CTA sits near its right edge. Moving
+  the pointer back to *where the Record button was* leaves it outside the S4
+  hit area, so no chrome appears. The bar has not vanished; its chrome is
+  hidden and its hit area moved/resized to the HUD row.
+
+**Verdict:** expected behaviour, not an unreachable positive path; **no
+BUG-003 was filed**. The open question is a UX/design choice for JD: accept
+the invisible, smaller hover target, add a faint affordance (e.g. a persistent
+dot/timer), or rename the option to make the reveal behaviour explicit. No
+code or runtime change is made by this note. The probe restored the hub topic
+to `idle` and the bar to S0; `recording_hud` remains `hover` as JD left it.
 
 ### T2 test residue in JD's screenshot
 
@@ -225,8 +266,9 @@ terminal; note timestamps for anything that becomes a bug.
 ## Done-when
 
 - [x] JD has confirmed or rejected every C-row (and explicitly re-decided or
-  kept each L-row). C3 was recorded as unconfirmed on v0.2.0 because the C17
-  defect interrupted it; the v0.2.1 retest below found it not reproduced.
+  kept each L-row). C3 was unconfirmed on v0.2.0 because the C17 defect
+  interrupted it; the v0.2.1 retest showed the hidden first frame is intended,
+  and the follow-up probe verified the positive hover path (no ticket).
 - [x] Every confirmed behaviour has exactly one bug ticket with `repro:`,
   `observed:`, `expected:` and a severity; rejected/accepted/deferred rows are
   recorded here with the reason.
@@ -239,15 +281,19 @@ T4 intake is complete (2026-11-04). Filed from the live pass:
 
 | Ticket | Behaviour | Severity | Status |
 |---|---|---|---|
-| [BUG-001](../BUG-001-settings-transparency/ticket.md) | Settings panel transparent / unreadable over the window behind (C17) | high | `done` (v0.2.1 verified) |
-| [BUG-002](../BUG-002-small-region-move/ticket.md) | Minimal-size region resizes instead of moves from its centre (C5) | medium | `done` (v0.2.1 verified) |
+| [BUG-001](../BUG-001-settings-transparency/ticket.md) | Settings panel transparent / unreadable over the window behind (C17) | high | `done` (v0.2.1 verified; JD live-confirmed good 2026-11-04) |
+| [BUG-002](../BUG-002-small-region-move/ticket.md) | Minimal-size region resizes instead of moves from its centre (C5) | medium | `done` (v0.2.1 verified; JD accepted at ≥30px 2026-11-04, minimal-size drag not pursued) |
 
 Not filed: C1/C6/C16 are not bugs, C9 is accepted, and C2/C4/C7/C8/C10–C15
 are deferred (plain-language reasons in the table above). C3 was unconfirmed
-on v0.2.0, then re-tested on v0.2.1 and dismissed as not reproduced (evidence
-in the retest section). The T2 toast residue is noted above and is not a
-product failure. BUG-001 and BUG-002 were fixed in v0.2.1 and closed by the
-live retest; this intake remains docs-only.
+on v0.2.0, then re-tested on v0.2.1, where the hidden first frame is the
+intended hover behaviour. The follow-up probe verified that the positive path
+is reachable (chrome appears on pointer entry), so no BUG-003 was filed; the
+remaining question is the invisible hit area's UX, which is JD's call. The T2
+toast residue is noted above and is not a product failure. BUG-001 and BUG-002
+were fixed in v0.2.1 and closed by the live retest; JD then live-confirmed both
+(BUG-002 accepted at ≥30px, minimal-size drag not pursued). This intake
+remains docs-only.
 
 ## Provenance / what this list is not
 

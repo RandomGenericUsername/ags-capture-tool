@@ -151,6 +151,12 @@ re-tested (pin `v0.2.1`, config → `apps/capture/v0.2.1`, PID 902796).
 **Result:** fixed; no regression observed in the S0 bar plate or first-frame
 transparency.
 
+## JD acceptance — v0.2.1 (2026-11-04)
+
+JD re-checked the live `v0.2.1` instance after the verification evidence and
+confirmed the Settings transparency fix is **good/fixed**. Status stays `done`;
+no further code change is required.
+
 ## Evidence
 
 - `style.css:43-46` — window background transparent.

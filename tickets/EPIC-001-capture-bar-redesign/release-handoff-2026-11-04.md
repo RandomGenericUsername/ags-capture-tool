@@ -203,6 +203,7 @@ Today the code box exists and is deployed, but **the label is missing** (no GitH
 - **Promotion:** once you take ownership, copy it into `tickets/EPIC-001-capture-bar-redesign/release-handoff-2026-11-04.md` so it lives beside the ticket set, and reference it from EPIC-001. (The sender is in Plan mode and cannot write outside the plan directory.)
 - **Cadence:** reply before starting T1, then one update per completed task. If a gate fails, stop and report the failing command rather than working around it.
 - **T4 status (2026-11-04):** T4 — pass recorded; C5+C17 tickets filed; deferred list in OPS-005.
+- **SPIKE-001 status (2026-11-04):** hover-region feasibility spike reported at [../SPIKE-001-hover-region/ticket.md](../SPIKE-001-hover-region/ticket.md). Recommends option C (low-rate Hyprland `cursorpos` poll) so the bar reveals over the full 1546×54 lane footprint while hidden state stays click-through; option A would swallow ~4% of the screen's clicks during recording. Decision pending JD: approve C (poll) or explicitly accept A (click-blocking strip). Docs/evidence only; no code, tag, release or pin change.
 
 ---
 

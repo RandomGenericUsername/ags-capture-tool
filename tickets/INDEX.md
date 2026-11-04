@@ -34,7 +34,7 @@
 
 ## Spikes
 
-(none)
+- [SPIKE-001-hover-region/ticket.md](./SPIKE-001-hover-region/ticket.md) — Widen the S4 hover reveal region during recording | `reported` | timebox 2h | recommendation: pointer-poll reveal (C); JD decision pending
 
 ## Tasks
 

@@ -81,11 +81,12 @@ test("mergeSettings: unknown extra keys are dropped, not merged through", () => 
     "filename_pattern",
     "notifications",
     "recording",
+    "recording_controls",
     "recording_dir",
     "screenshot",
     "screenshot_dir",
   ])
-  assert.deepEqual(Object.keys(merged.bar).sort(), ["offsetPx", "position", "recording_hud"])
+  assert.deepEqual(Object.keys(merged.bar).sort(), ["offsetPx", "position"])
   assert.deepEqual(Object.keys(merged.screenshot).sort(), ["cursor", "format", "output"])
   assert.deepEqual(Object.keys(merged.recording).sort(), ["audio", "cursor", "fps", "quality"])
 })
@@ -143,9 +144,10 @@ test("mergeSettings: unknown enum values fall back per field", () => {
 // bar placement (REQ-002, design.md §6): missing/corrupt degrades to defaults
 // ---------------------------------------------------------------------------
 
-test("mergeSettings: bar placement defaults to bottom/0/hidden when the section is absent", () => {
+test("mergeSettings: bar placement defaults to bottom/0 and top-bar controls", () => {
   const merged = mergeSettings({})
-  assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0, recording_hud: "hidden" })
+  assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0 })
+  assert.equal(merged.recording_controls, "top-bar")
 })
 
 test("mergeSettings: valid bar position and offset round-trip", () => {
@@ -156,47 +158,73 @@ test("mergeSettings: valid bar position and offset round-trip", () => {
   assert.equal(mergeSettings({ bar: { offsetPx: 12.7 } }).bar.offsetPx, 13)
 })
 
-test("mergeSettings: recording_hud defaults to hidden and every mode round-trips", () => {
-  // D9: hidden is the default because recordings must not carry the bar HUD.
-  assert.equal(mergeSettings({}).bar.recording_hud, "hidden")
-  for (const mode of ["hidden", "always", "hover"] as const) {
-    assert.equal(mergeSettings({ bar: { recording_hud: mode } }).bar.recording_hud, mode)
+test("mergeSettings: recording_controls defaults to top-bar and every mode round-trips", () => {
+  assert.equal(mergeSettings({}).recording_controls, "top-bar")
+  for (const mode of ["top-bar", "hover", "always"] as const) {
+    assert.equal(
+      mergeSettings({ recording_controls: mode }).recording_controls,
+      mode,
+    )
   }
 })
 
-test("mergeSettings: corrupt recording_hud values degrade to hidden without throwing", () => {
-  for (const bad of [
-    null,
-    undefined,
-    "visible",
-    "HIDDEN",
-    1,
-    true,
-    {},
-    [],
-  ]) {
+test("mergeSettings: legacy recording_hud values migrate to the unified mode", () => {
+  assert.equal(
+    mergeSettings({ bar: { recording_hud: "hidden" } }).recording_controls,
+    "top-bar",
+    "legacy hidden meant the top bar was the only surface",
+  )
+  assert.equal(
+    mergeSettings({ bar: { recording_hud: "hover" } }).recording_controls,
+    "hover",
+  )
+  assert.equal(
+    mergeSettings({ bar: { recording_hud: "always" } }).recording_controls,
+    "always",
+  )
+  assert.equal(
+    mergeSettings({ recording_controls: "always", bar: { recording_hud: "hover" } })
+      .recording_controls,
+    "always",
+    "the new key wins",
+  )
+})
+
+test("mergeSettings: corrupt recording_controls and legacy values fall back safely", () => {
+  for (const bad of [null, undefined, "hidden", "visible", "HIDDEN", 1, true, {}, []]) {
     assert.equal(
-      mergeSettings({ bar: { recording_hud: bad } }).bar.recording_hud,
-      "hidden",
-      `expected recording_hud fallback for ${String(bad)}`,
+      mergeSettings({ recording_controls: bad }).recording_controls,
+      "top-bar",
+      `expected recording_controls fallback for ${String(bad)}`,
     )
   }
-  // A bad HUD mode must not poison the valid siblings in the same half.
+  // A corrupt new value may still use a valid legacy key.
+  assert.equal(
+    mergeSettings({
+      recording_controls: "sometimes",
+      bar: { recording_hud: "hover" },
+    }).recording_controls,
+    "hover",
+  )
+  // A bad controls mode must not poison the valid bar siblings.
   assert.deepEqual(
-    mergeSettings({ bar: { position: "top", offsetPx: 24, recording_hud: "sometimes" } }).bar,
-    { position: "top", offsetPx: 24, recording_hud: "hidden" },
+    mergeSettings({
+      recording_controls: "sometimes",
+      bar: { position: "top", offsetPx: 24, recording_hud: "nope" },
+    }).bar,
+    { position: "top", offsetPx: 24 },
   )
 })
 
 test("mergeSettings: corrupt bar values degrade instead of throwing", () => {
   for (const bad of [null, "top", 7, []]) {
     const merged = mergeSettings({ bar: bad })
-    assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0, recording_hud: "hidden" })
+    assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0 })
   }
   const merged = mergeSettings({
     bar: { position: "middle", offsetPx: "48" },
   })
-  assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0, recording_hud: "hidden" })
+  assert.deepEqual(merged.bar, { position: "bottom", offsetPx: 0 })
   for (const bad of [NaN, Infinity, -Infinity, "12", null, undefined, {}, []]) {
     assert.equal(
       mergeSettings({ bar: { offsetPx: bad } }).bar.offsetPx,
@@ -210,7 +238,7 @@ test("mergeSettings: corrupt bar values degrade instead of throwing", () => {
 
 test("mergeSettings: a valid bar half keeps its sibling despite one corrupt key", () => {
   const merged = mergeSettings({ bar: { position: "top", offsetPx: "nope" } })
-  assert.deepEqual(merged.bar, { position: "top", offsetPx: 0, recording_hud: "hidden" })
+  assert.deepEqual(merged.bar, { position: "top", offsetPx: 0 })
 })
 
 test("mergeSettings: a valid value in a partially corrupt half is still honoured", () => {
@@ -300,7 +328,8 @@ test("mergeSettings: does not mutate DEFAULT_SETTINGS or alias its nested object
     filename_pattern: "{kind}_%Y-%m-%d_%H-%M-%S",
     notifications: true,
     bar_compact_controls: false,
-    bar: { position: "bottom", offsetPx: 0, recording_hud: "hidden" },
+    recording_controls: "top-bar",
+    bar: { position: "bottom", offsetPx: 0 },
     screenshot: { format: "png", output: "clipboard", cursor: false },
     recording: { fps: 60, quality: "high", audio: "system", cursor: true },
   })
@@ -319,11 +348,11 @@ test("mergeSettings: defaultSettings() hands out an independent deep copy each c
   assert.notEqual(a.screenshot, b.screenshot)
   assert.notEqual(a.recording, b.recording)
   a.bar.position = "top"
-  a.bar.recording_hud = "always"
+  a.recording_controls = "always"
   a.screenshot.format = "jpeg"
   a.recording.audio = "none"
   assert.equal(b.bar.position, "bottom")
-  assert.equal(b.bar.recording_hud, "hidden")
+  assert.equal(b.recording_controls, "top-bar")
   assert.equal(b.screenshot.format, "png")
   assert.equal(b.recording.audio, "system")
 })

@@ -37,11 +37,11 @@ import type {
   ConfigBarPosition,
   ConfigRecordingAudio,
   ConfigRecordingFps,
-  ConfigRecordingHud,
   ConfigRecordingQuality,
   ConfigScreenshotFormat,
   ConfigScreenshotOutput,
 } from "../../domain/settings"
+import type { RecordingControlsMode } from "../../domain/recording-presentation"
 
 /**
  * What the window needs back from this page.
@@ -205,16 +205,16 @@ export function SettingsPage(props: SettingsPageProps) {
         },
         rowContext,
       ),
-      pillRow<ConfigRecordingHud>(
-        "Recording HUD",
+      pillRow<RecordingControlsMode>(
+        "Recording controls",
         [
-          { label: "Hidden", value: "hidden" },
-          { label: "Always", value: "always" },
+          { label: "Top bar", value: "top-bar" },
           { label: "On hover", value: "hover" },
+          { label: "Always visible", value: "always" },
         ],
-        () => settingsConfig.bar.recording_hud,
+        () => settingsConfig.recording_controls,
         (value) => {
-          settingsConfig.bar.recording_hud = value
+          settingsConfig.recording_controls = value
         },
         rowContext,
       ),

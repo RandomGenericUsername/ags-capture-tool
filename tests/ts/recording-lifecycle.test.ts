@@ -49,6 +49,7 @@ const CSS = read("style.css")
 const CSS_NO_COMMENTS = CSS.replace(/\/\*[\s\S]*?\*\//g, "")
 const WINDOW = code(read("ui", "classic", "ClassicWindow.tsx"))
 const CLUSTER = code(read("ui", "shared", "recording-cluster.tsx"))
+const PRESENTATION = read("domain", "recording-presentation.ts")
 const SETTINGS_PAGE = code(read("ui", "classic", "SettingsPage.tsx"))
 const SETTINGS_DOMAIN = read("domain", "settings.ts")
 const HUD_DOMAIN = read("domain", "recording-hud.ts")
@@ -201,34 +202,36 @@ test("a palette refresh re-measures the HUD window without resetting it", () => 
 // D9 / design.md §6: settings-driven S4 chrome visibility.
 // ---------------------------------------------------------------------------
 
-test("bar.recording_hud is a tolerant setting with hidden as the default", () => {
+test("recording_controls is tolerant and defaults to the top bar", () => {
+  assert.match(SETTINGS_DOMAIN, /recording_controls: DEFAULT_RECORDING_CONTROLS/)
+  assert.match(SETTINGS_DOMAIN, /resolveRecordingControls\(/)
   assert.match(
     SETTINGS_DOMAIN,
-    /export type ConfigRecordingHud = "hidden" \| "always" \| "hover"/,
+    /resolveRecordingControls\(\s*record\.recording_controls,\s*bar\.recording_hud/,
+    "the old key must keep migrating",
   )
-  assert.match(SETTINGS_DOMAIN, /recording_hud: "hidden"/, "the default must be hidden")
-  assert.match(SETTINGS_DOMAIN, /recording_hud: configOneOf\(/)
   assert.match(
     SETTINGS_DOMAIN,
-    /bar\.recording_hud,\s*CONFIG_RECORDING_HUD_MODES,\s*DEFAULT_SETTINGS\.bar\.recording_hud/,
-    "corrupt/missing values must degrade through the existing tolerance helper",
+    /from "\.\/recording-presentation\.ts"/,
+    "the pure presentation contract is the source of truth",
   )
 })
 
-test("the settings page exposes all three HUD modes and persists through the store", () => {
-  assert.match(SETTINGS_PAGE, /pillRow<ConfigRecordingHud>\(\s*"Recording HUD"/)
+test("the settings page exposes the three unified modes and persists them", () => {
+  assert.match(SETTINGS_PAGE, /pillRow<RecordingControlsMode>\(\s*"Recording controls"/)
   for (const [label, value] of [
-    ["Hidden", "hidden"],
-    ["Always", "always"],
+    ["Top bar", "top-bar"],
     ["On hover", "hover"],
+    ["Always visible", "always"],
   ] as const) {
     assert.match(
       SETTINGS_PAGE,
       new RegExp(`\\{ label: "${label}", value: "${value}" \\}`),
-      `missing HUD mode ${label}`,
+      `missing recording-controls mode ${label}`,
     )
   }
-  assert.match(SETTINGS_PAGE, /settingsConfig\.bar\.recording_hud = value/)
+  assert.doesNotMatch(SETTINGS_PAGE, /\{ label: "Hidden", value: "hidden" \}/)
+  assert.match(SETTINGS_PAGE, /settingsConfig\.recording_controls = value/)
   // The row builder persists via RowContext, the same chain as bar placement.
   assert.match(SETTINGS_PAGE, /rowContext,/)
 })
@@ -240,7 +243,8 @@ test("the pure visibility rule is the only S4 decision", () => {
   assert.match(HUD_DOMAIN, /case "hidden":/)
   const apply = functionBody(WINDOW, "function applyHudVisibility()")
   assert.match(apply, /hudVisibility\(\{/)
-  assert.match(apply, /mode: config\.bar\.recording_hud/)
+  assert.match(apply, /mode: current\.captureBar/)
+  assert.match(apply, /allowLauncherHud: current\.allowLauncherHud/)
   assert.match(apply, /live,/)
   assert.match(apply, /pointerInside,/)
   assert.match(apply, /presentedByLauncher: hudPresentedByLauncher/)
@@ -250,7 +254,7 @@ test("the pure visibility rule is the only S4 decision", () => {
   assert.match(apply, /if \(!visibility\.showChrome\) hudPopup\?\.popdown\(\)/)
 })
 
-test("hidden does not auto-show the HUD after commit", () => {
+test("top-bar mode does not auto-map the capture HUD after commit", () => {
   const enter = functionBody(WINDOW, "function enterLiveHud()")
   assert.match(enter, /applyBarState\(\)/)
   assert.doesNotMatch(
@@ -263,25 +267,14 @@ test("hidden does not auto-show the HUD after commit", () => {
   assert.match(commit, /showHud: committingRecording \? enterLiveHud : undefined/)
 })
 
-test("a launcher presentation mid-recording reveals hidden chrome", () => {
+test("top-bar mode cannot use the capture launcher as a manual override", () => {
   assert.match(
     WINDOW,
-    /if \(isLive\(barState\) && config\.bar\.recording_hud === "hidden"\) \{\s*hudPresentedByLauncher = true/,
+    /const current = surfaces\(\)\s+if \(\s*isLive\(barState\) &&\s*current\.allowLauncherHud &&\s*current\.captureBar === "hidden"/,
   )
-  // Toggling that on-demand HUD away must not be undone by the next bus push.
-  assert.match(
-    WINDOW,
-    /self\.connect\("unmap",[\s\S]*?hudPresentedByLauncher = false/,
-  )
-  // The presentation path is a map, so it works for always/hover too; it never
-  // touches captureState/launcher/argv.
-  assert.doesNotMatch(
-    WINDOW.slice(
-      WINDOW.indexOf('self.connect("map"'),
-      WINDOW.indexOf("applyBarState()", WINDOW.indexOf('self.connect("map"')),
-    ),
-    /captureState\.control|launcher\.launch|recordingArgs/,
-  )
+  // The pure rule says top-bar disables the launcher override.
+  assert.match(PRESENTATION, /case "top-bar":\s*return \{ topBar: true, captureBar: "hidden", allowLauncherHud: false \}/)
+  assert.match(WINDOW, /recordingSurfaces\(/)
 })
 
 test("hover installs a pointer controller that only re-applies visibility", () => {
@@ -295,9 +288,9 @@ test("hover installs a pointer controller that only re-applies visibility", () =
   assert.match(body, /if \(isLive\(barState\)\) applyHudVisibility\(\)/)
 })
 
-test("hidden launcher-presented chrome is hidden again on stop", () => {
+test("launcher-presented chrome is hidden again on stop", () => {
   const leave = functionBody(WINDOW, "function leaveLiveHud()")
-  assert.match(leave, /config\.bar\.recording_hud === "hidden" && hudPresentedByLauncher/)
+  assert.match(leave, /current\.captureBar === "hidden" && hudPresentedByLauncher/)
   assert.match(leave, /hideAfterStop/)
   assert.match(leave, /hideCaptureWindow\(\)/)
   assert.match(leave, /hudPresentedByLauncher = false/)

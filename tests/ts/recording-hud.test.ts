@@ -182,29 +182,45 @@ test("a recording snapshot without a job id keeps the known job", () => {
 // D9 / design.md §6: the pure S4 visibility rule.
 // ---------------------------------------------------------------------------
 
-test("recording_hud hidden: no automatic chrome or mapping; launcher reveals it", () => {
+test("hidden without a launcher override maps nothing", () => {
   for (const pointerInside of [false, true]) {
-    assert.deepEqual(
-      hudVisibility({
-        mode: "hidden",
-        live: true,
-        pointerInside,
-        presentedByLauncher: false,
-      }),
-      { mapWindow: false, showChrome: false },
-      "hidden must never map or show chrome on its own",
-    )
-    assert.deepEqual(
-      hudVisibility({
-        mode: "hidden",
-        live: true,
-        pointerInside,
-        presentedByLauncher: true,
-      }),
-      { mapWindow: true, showChrome: true },
-      "an explicit launcher presentation exposes Stop/Pause",
-    )
+    for (const presentedByLauncher of [false, true]) {
+      assert.deepEqual(
+        hudVisibility({
+          mode: "hidden",
+          live: true,
+          pointerInside,
+          presentedByLauncher,
+          allowLauncherHud: false,
+        }),
+        { mapWindow: false, showChrome: false },
+        "top-bar mode must not add a capture control surface",
+      )
+    }
   }
+})
+
+test("a legacy hidden mode can still be presented by the launcher", () => {
+  assert.deepEqual(
+    hudVisibility({
+      mode: "hidden",
+      live: true,
+      pointerInside: false,
+      presentedByLauncher: false,
+      allowLauncherHud: true,
+    }),
+    { mapWindow: false, showChrome: false },
+  )
+  assert.deepEqual(
+    hudVisibility({
+      mode: "hidden",
+      live: true,
+      pointerInside: false,
+      presentedByLauncher: true,
+      allowLauncherHud: true,
+    }),
+    { mapWindow: true, showChrome: true },
+  )
 })
 
 test("recording_hud always: maps and shows the HUD automatically", () => {
@@ -216,6 +232,7 @@ test("recording_hud always: maps and shows the HUD automatically", () => {
           live: true,
           pointerInside,
           presentedByLauncher,
+          allowLauncherHud: false,
         }),
         { mapWindow: true, showChrome: true },
       )
@@ -231,6 +248,7 @@ test("recording_hud hover: hidden means unmapped, entry maps the revealed HUD", 
         live: true,
         pointerInside: false,
         presentedByLauncher,
+        allowLauncherHud: false,
       }),
       { mapWindow: false, showChrome: false },
       "hidden hover has no input surface (clicks pass through)",
@@ -241,6 +259,7 @@ test("recording_hud hover: hidden means unmapped, entry maps the revealed HUD", 
         live: true,
         pointerInside: true,
         presentedByLauncher,
+        allowLauncherHud: false,
       }),
       { mapWindow: true, showChrome: true },
       "pointer entry maps only the normal HUD and reveals Pause/Stop",
@@ -248,36 +267,30 @@ test("recording_hud hover: hidden means unmapped, entry maps the revealed HUD", 
   }
 })
 
-test("the full live/pointer/presentation matrix is total and stop-reachable", () => {
+test("the full live/pointer/presentation matrix is total", () => {
   const modes = ["hidden", "always", "hover"] as const
   for (const mode of modes) {
     for (const live of [false, true]) {
       for (const pointerInside of [false, true]) {
         for (const presentedByLauncher of [false, true]) {
-          const result = hudVisibility({
-            mode,
-            live,
-            pointerInside,
-            presentedByLauncher,
-          })
-          if (!live) {
-            // S0/S1 visibility is not this rule's business.
-            assert.deepEqual(result, { mapWindow: false, showChrome: false })
-          } else {
-            // There is always a reachable Stop state: `always` shows it,
-            // `hover` shows it on pointer entry, `hidden` on presentation.
-            const reachable =
-              mode === "always" ||
-              (mode === "hover" && pointerInside) ||
-              (mode === "hidden" && presentedByLauncher)
-            assert.equal(result.showChrome, reachable, `${mode} stop reachability`)
-            assert.equal(
-              result.mapWindow,
-              mode === "always" ||
+          for (const allowLauncherHud of [false, true]) {
+            const result = hudVisibility({
+              mode,
+              live,
+              pointerInside,
+              presentedByLauncher,
+              allowLauncherHud,
+            })
+            if (!live) {
+              assert.deepEqual(result, { mapWindow: false, showChrome: false })
+            } else {
+              const reachable =
+                mode === "always" ||
                 (mode === "hover" && pointerInside) ||
-                (mode === "hidden" && presentedByLauncher),
-              `${mode} mapping`,
-            )
+                (mode === "hidden" && allowLauncherHud && presentedByLauncher)
+              assert.equal(result.showChrome, reachable, `${mode} stop reachability`)
+              assert.equal(result.mapWindow, reachable, `${mode} mapping`)
+            }
           }
         }
       }
@@ -291,6 +304,7 @@ test("an unknown/corrupt recording_hud value behaves like hidden, never always",
     live: true,
     pointerInside: true,
     presentedByLauncher: false,
+    allowLauncherHud: false,
   })
   assert.deepEqual(corrupt, { mapWindow: false, showChrome: false })
 })

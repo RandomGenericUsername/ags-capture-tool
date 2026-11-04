@@ -56,6 +56,7 @@ import {
   type RecordingHudState,
 } from "../../domain/recording-hud"
 import type { CaptureSettings } from "../../domain/settings"
+import { recordingSurfaces } from "../../domain/recording-presentation"
 import { runCommit } from "../../lib/commit-order"
 import type { CaptureStatePayload } from "../../ports/capture-state-feed"
 import type { SelectionController } from "../overlay/controller"
@@ -338,13 +339,13 @@ export function ClassicWindow(
     pointerInside = false
     if (
       !isLive(barState) ||
-      config.bar.recording_hud !== "hover" ||
+      surfaces().captureBar !== "hover" ||
       hoverFootprint === null
     ) {
       return
     }
     hoverPoll = GLib.timeout_add(GLib.PRIORITY_DEFAULT, HOVER_POLL_MS, () => {
-      if (!isLive(barState) || config.bar.recording_hud !== "hover") {
+      if (!isLive(barState) || surfaces().captureBar !== "hover") {
         stopHoverPoll()
         pointerInside = false
         if (isLive(barState)) applyHudVisibility()
@@ -472,6 +473,10 @@ export function ClassicWindow(
    * true = dot+timer only in the bar, the popup carries the controls; false =
    * the bar carries them. Both are the SAME state; only the widgets move.
    */
+  function surfaces() {
+    return recordingSurfaces(config.recording_controls)
+  }
+
   function applyHudPlacement() {
     const placement = hudControlPlacement(config.bar_compact_controls)
     if (!placement.popup) hudCluster?.closePopover()
@@ -488,11 +493,13 @@ export function ClassicWindow(
    */
   function applyHudVisibility() {
     const live = isLive(barState)
+    const current = surfaces()
     const visibility = hudVisibility({
-      mode: config.bar.recording_hud,
+      mode: current.captureBar,
       live,
       pointerInside,
       presentedByLauncher: hudPresentedByLauncher,
+      allowLauncherHud: current.allowLauncherHud,
     })
     if (hudRow) hudRow.opacity = visibility.showChrome ? 1 : 0
     // A popover is a separate surface and would otherwise outlive hidden
@@ -549,9 +556,10 @@ export function ClassicWindow(
     // `hover` owns no surface when recording ends: the revealed HUD unmaps
     // (REQ-006 lifecycle). `hidden` had no automatic surface either, but a
     // launcher-presented HUD goes away on stop. `always` returns to S0.
-    const hoverMode = config.bar.recording_hud === "hover"
+    const current = surfaces()
+    const hoverMode = current.captureBar === "hover"
     const hideAfterStop =
-      config.bar.recording_hud === "hidden" && hudPresentedByLauncher
+      current.captureBar === "hidden" && hudPresentedByLauncher
     barState = homeBar()
     hudPresentedByLauncher = false
     applyBarState()
@@ -868,7 +876,7 @@ export function ClassicWindow(
     // or start the hover poll and re-apply the pure rule without touching the
     // capture (options stay locked; this is the external-config path).
     if (isLive(barState)) {
-      if (config.bar.recording_hud === "hover") syncHoverPoll()
+      if (surfaces().captureBar === "hover") syncHoverPoll()
       else {
         stopHoverPoll()
         pointerInside = false
@@ -998,7 +1006,7 @@ export function ClassicWindow(
         self.connect("unmap", () => {
           // A press guard cannot survive the surface it was protecting.
           hudPressHeld = false
-          if (isLive(barState) && config.bar.recording_hud === "hidden") {
+          if (isLive(barState) && !surfaces().allowLauncherHud) {
             hudPresentedByLauncher = false
           }
         })
@@ -1009,7 +1017,12 @@ export function ClassicWindow(
           // the ONE on-demand presentation path: mapping while live means the
           // user asked for the HUD, so reveal it (Stop/Pause) without touching
           // the capture. `always`/`hover` are already reachable by definition.
-          if (isLive(barState) && config.bar.recording_hud === "hidden") {
+          const current = surfaces()
+          if (
+            isLive(barState) &&
+            current.allowLauncherHud &&
+            current.captureBar === "hidden"
+          ) {
             hudPresentedByLauncher = true
           }
           // Focus changes re-map which monitor's bar is visible (D2). The

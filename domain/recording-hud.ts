@@ -20,7 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import type { CaptureStatePayload } from "../ports/capture-state-feed"
-import type { ConfigRecordingHud } from "./settings"
+import type { CaptureBarMode } from "./recording-presentation.ts"
 
 export type HudPhase = "idle" | "recording" | "paused"
 
@@ -78,13 +78,15 @@ export function isHudLive(state: RecordingHudState): boolean {
 // ---------------------------------------------------------------------------
 
 export interface HudVisibilityInput {
-  mode: ConfigRecordingHud
+  mode: CaptureBarMode
   /** The capture is live (S4); the bar state owns this, not the bus snapshot. */
   live: boolean
   /** Pointer is inside the bar area (hover mode). */
   pointerInside: boolean
   /** The launcher/keybind presented the bar during this live recording. */
   presentedByLauncher: boolean
+  /** Whether a launcher may present an otherwise hidden capture bar. */
+  allowLauncherHud: boolean
 }
 
 export interface HudVisibility {
@@ -107,9 +109,11 @@ export function hudVisibility(input: HudVisibilityInput): HudVisibility {
     case "hidden":
     default:
       // An unknown/corrupt value behaves like the default, never like `always`.
+      // The top-bar presentation uses this branch with `allowLauncherHud:false`,
+      // so opening the capture UI cannot add a second control surface.
       return {
-        mapWindow: input.presentedByLauncher,
-        showChrome: input.presentedByLauncher,
+        mapWindow: input.allowLauncherHud && input.presentedByLauncher,
+        showChrome: input.allowLauncherHud && input.presentedByLauncher,
       }
   }
 }

@@ -134,3 +134,25 @@ export function validClusterAnchor(anchor: ClusterAnchor): boolean {
     anchor.y < anchor.monitorHeight
   )
 }
+
+/**
+ * Decide whether a request is stale relative to the last accepted sequence.
+ *
+ * The payload has no bar-instance id. A bar restart resets its local sequence
+ * to 1, so `seq === 1` is treated as a new generation and the tombstone is
+ * discarded. A later stale request from the old instance would have to also
+ * carry seq 1, which only happens at its own start.
+ */
+export interface SequenceDecision {
+  stale: boolean
+  generationReset: boolean
+}
+
+export function sequenceDecision(
+  last: number | undefined,
+  seq: number,
+): SequenceDecision {
+  if (last === undefined) return { stale: false, generationReset: false }
+  if (seq === 1) return { stale: false, generationReset: true }
+  return { stale: seq < last, generationReset: false }
+}

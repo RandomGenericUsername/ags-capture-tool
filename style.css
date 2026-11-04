@@ -290,6 +290,8 @@ window.capture-cluster-window {
    `.rec-*` set: rounded translucent card, pulsing #e0605f dot, 13px tabular
    timer, icon-only Pause/Play/Stop buttons, and the same popover card. */
 .rec-cluster {
+  min-width: 109px;
+  min-height: 44px;
   background-color: alpha(@surface, 0.55);
   border: 1px solid alpha(@on_surface, 0.12);
   border-radius: 10px;

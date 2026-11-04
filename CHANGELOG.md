@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.2.3 — 2026-11-04
+
+Hover reveal now follows the configured resting bar (REQ-007). No identity,
+palette-role, tag-history or deployed-pin changes.
+
+### REQ-007 — exact bar rectangle for the hover trigger
+
+- `hover` recording HUD now reveals over the **resting bar** (S0 rail,
+  142×54 at `889,1026` on the reference host), not the S1 option lane that was
+  allocated at Record time (1506×54 at `207,1026`). The surplus was 682 px each
+  side — 35.5% of 1920 — which is what JD felt as "too wide".
+- The rail allocation is measured while S0 is visible (the hidden rail measures
+  0×0 at S1), then combined at commit with the current monitor geometry,
+  `bar.position`, `bar.offsetPx`/margins and the monitor's logical origin. Top,
+  bottom, offset and resize changes therefore move the trigger.
+- The cached measurement carries its monitor connector; a mismatched output
+  returns no region instead of revealing from a stale rectangle. Only the bar
+  rect triggers: a dock or any other surface in the same edge band is outside
+  it.
+- Tolerance is explicitly `0 px` (exact bar rect). `growHoverRect()` is tested
+  for an optional future 1–4 px tweak but called with zero.
+- A failed measurement falls back to the v0.2.2 window-based footprint. The
+  unmapped hidden surface, click-through behaviour, arm-after-leave guard,
+  50 ms poll and all lifecycle cleanup are unchanged.
+
+### Test coverage
+
+- `make test`: 10/10 unit, 1/1 validation, 324/324 TypeScript, test `tsc`
+  clean.
+- `make conformance`: 16/16. `make backend`: 114 passed. `make typecheck`: 0
+  errors in the ags-capture-tool tree.
+
 ## v0.2.2 — 2026-11-04
 
 Hover-region reveal for the live recording HUD (SPIKE-001 option C, REQ-006).

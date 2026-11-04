@@ -20,7 +20,10 @@ import { barMarginTop } from "../../domain/bar-placement"
 import {
   barFootprint,
   createHoverRevealState,
+  growHoverRect,
+  hoverBarSize,
   updateHoverReveal,
+  type HoverBarMeasurement,
   type HoverRect,
   type HoverRevealState,
 } from "../../domain/hover-region"
@@ -81,6 +84,13 @@ const WINDOW_NAME = "capture-window"
 /** 20 Hz: ≤50 ms reveal latency on the measured sub-ms socket query. */
 const HOVER_POLL_MS = 50
 
+/**
+ * REQ-007: exact bar rectangle, no pointer slack. The helper exists so a future
+ * 1–4 px adjustment is a single explicit, tested constant rather than an
+ * accidental full-width band.
+ */
+const HOVER_TOLERANCE_PX = 0
+
 export function ClassicWindow(
   gdkmonitor: Gdk.Monitor,
   ports: CapturePorts,
@@ -124,6 +134,10 @@ export function ClassicWindow(
   let hoverFootprint: HoverRect | null = null
   let hoverReveal: HoverRevealState = createHoverRevealState()
   let hoverPoll: number | null = null
+  // REQ-007: the real resting bar allocation, measured while S0 is on screen.
+  // The S1 lane at commit is much wider (1506 vs 142 px on the reference host)
+  // and must not become the trigger.
+  let restingBar: HoverBarMeasurement | null = null
   let unsubscribeFeed: (() => void) | null = null
   let unsubscribeRestart: (() => void) | null = null
 
@@ -155,34 +169,61 @@ export function ClassicWindow(
     const [, width] = panel.measure(Gtk.Orientation.HORIZONTAL, -1)
     const [, height] = panel.measure(Gtk.Orientation.VERTICAL, width)
     window.set_default_size(width, height)
+    // REQ-007: remember the real bar while it is still the S0 rail. At commit
+    // the rail is hidden (get_width/measure return 0), so the S1 window cannot
+    // provide this number. A hidden frame cannot leave a stale rectangle that
+    // outlives its monitor: the measurement carries the connector and
+    // `hoverBarSize()` invalidates a cross-monitor cache.
+    if (rail?.visible && barState.view === "home") {
+      const [, railWidth] = rail.measure(Gtk.Orientation.HORIZONTAL, -1)
+      const [, railHeight] = rail.measure(Gtk.Orientation.VERTICAL, railWidth)
+      if (railWidth > 0 && railHeight > 0) {
+        restingBar = {
+          connector: gdkmonitor.get_connector(),
+          width: railWidth,
+          height: railHeight,
+        }
+      }
+    }
   }
 
   /**
-   * Snapshot the CURRENT S1 surface as the hover trigger (REQ-006, SPIKE-001 C).
+   * Snapshot the hover trigger from the CONFIGURED BAR, not the S1 window
+   * (REQ-007).
    *
-   * Called from `hideBar` while the bar is still S1 and before
-   * `applyBarState()` re-measures it to S0. The window's actual allocation and
-   * margins are used, so a wider/narrower lane (target/format pills) and top
-   * vs bottom placement follow the config; nothing is hardcoded.
+   * Called from `hideBar` while the lane is still S1 and before
+   * `applyBarState()` shrinks it. The S1 row is 1506×54 here because it carries
+   * every option pill; the resting bar is only 142×54. `restingBar` is measured
+   * while S0 is on screen (`syncWindowSize`), then combined at commit with the
+   * CURRENT monitor geometry, placement and margins, so top/bottom, offset and
+   * a resized bar all follow. If no valid measurement exists, `hoverBarSize`
+   * returns the window allocation: the v0.2.2 fallback, never "no reveal".
    */
   function captureHoverFootprint(): HoverRect | null {
     const window = captureWindow
     if (window === null) return null
     const geometry = gdkmonitor.get_geometry()
-    return barFootprint(
+    const size = hoverBarSize(
+      restingBar,
+      gdkmonitor.get_connector(),
+      { width: window.get_width(), height: window.get_height() },
+    )
+    if (size === null) return null
+    const footprint = barFootprint(
       {
         x: geometry.x,
         y: geometry.y,
         width: geometry.width,
         height: geometry.height,
       },
-      { width: window.get_width(), height: window.get_height() },
+      size,
       {
         position: config.bar.position,
         marginTop: window.margin_top,
         marginBottom: window.margin_bottom,
       },
     )
+    return growHoverRect(footprint, HOVER_TOLERANCE_PX)
   }
 
   /** Stop the poll but keep the cached footprint (e.g. a mode switch). */

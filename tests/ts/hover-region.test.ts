@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url"
 import {
   barFootprint,
   createHoverRevealState,
+  growHoverRect,
+  hoverBarSize,
   pointerInRegion,
   updateHoverReveal,
   type HoverRect,
@@ -139,6 +141,108 @@ test("invalid/zero geometry yields no region instead of a corner rect", () => {
 })
 
 // ---------------------------------------------------------------------------
+// REQ-007: configured resting bar, not the S1 window.
+// ---------------------------------------------------------------------------
+
+test("the trigger uses the resting bar size, not the wider S1 window", () => {
+  // Live reference: S1 lane 1506x54, resting bar 142x54, both on 1920x1080.
+  const size = hoverBarSize(
+    { connector: "eDP-1", width: 142, height: 54 },
+    "eDP-1",
+    { width: 1506, height: 54 },
+  )
+  assert.deepEqual(size, { width: 142, height: 54 })
+  assert.deepEqual(
+    barFootprint(
+      { x: 0, y: 0, width: 1920, height: 1080 },
+      size!,
+      { position: "bottom", marginTop: 0, marginBottom: 0 },
+    ),
+    { x: 889, y: 1026, width: 142, height: 54 },
+  )
+})
+
+test("top placement and offset move the resting-bar rect", () => {
+  const size = { width: 142, height: 54 }
+  assert.deepEqual(
+    barFootprint(
+      { x: 0, y: 0, width: 1920, height: 1080 },
+      size,
+      { position: "top", marginTop: 60, marginBottom: 0 },
+    ),
+    { x: 889, y: 60, width: 142, height: 54 },
+  )
+  assert.deepEqual(
+    barFootprint(
+      { x: 0, y: 0, width: 1920, height: 1080 },
+      size,
+      { position: "bottom", marginTop: 0, marginBottom: 0 },
+    ),
+    { x: 889, y: 1026, width: 142, height: 54 },
+  )
+})
+
+test("monitor origin and logical scale are honored once, not multiplied", () => {
+  // Logical 1280x720 at x=1920 is a 1920x1080 output at scale 1.5. Both the
+  // monitor geometry and the widget allocation are already logical.
+  assert.deepEqual(
+    barFootprint(
+      { x: 1920, y: 0, width: 1280, height: 720 },
+      { width: 142, height: 54 },
+      { position: "bottom", marginTop: 0, marginBottom: 0 },
+    ),
+    { x: 2489, y: 666, width: 142, height: 54 },
+  )
+})
+
+test("a measurement from another monitor never reveals", () => {
+  assert.equal(
+    hoverBarSize(
+      { connector: "DP-1", width: 142, height: 54 },
+      "eDP-1",
+      { width: 1506, height: 54 },
+    ),
+    null,
+  )
+  // Unknown connectors cannot prove a mismatch, so the measurement is used.
+  assert.deepEqual(
+    hoverBarSize(
+      { connector: null, width: 142, height: 54 },
+      "eDP-1",
+      { width: 1506, height: 54 },
+    ),
+    { width: 142, height: 54 },
+  )
+})
+
+test("a failed measurement falls back to the window footprint", () => {
+  const window = { width: 1506, height: 54 }
+  assert.deepEqual(hoverBarSize(null, "eDP-1", window), window)
+  assert.deepEqual(
+    hoverBarSize(
+      { connector: "eDP-1", width: 0, height: 54 },
+      "eDP-1",
+      window,
+    ),
+    window,
+  )
+  assert.equal(hoverBarSize(null, "eDP-1", { width: 0, height: 54 }), null)
+})
+
+test("tolerance defaults to exact and grows symmetrically only when asked", () => {
+  const rect = { x: 889, y: 1026, width: 142, height: 54 }
+  assert.deepEqual(growHoverRect(rect, 0), rect)
+  assert.deepEqual(growHoverRect(rect, -3), rect)
+  assert.deepEqual(growHoverRect(rect, 2), {
+    x: 887,
+    y: 1024,
+    width: 146,
+    height: 58,
+  })
+  assert.equal(growHoverRect(null, 2), null)
+})
+
+// ---------------------------------------------------------------------------
 // Hit test.
 // ---------------------------------------------------------------------------
 
@@ -241,15 +345,27 @@ const ADAPTER = read("adapters", "hyprland-pointer-position.ts")
 const APP = read("app.tsx")
 const HUD_DOMAIN = read("domain", "recording-hud.ts")
 
-test("the footprint is captured from the real S1 allocation before S0 shrinks it", () => {
+test("the footprint is captured from the real bar allocation before S0 shrinks it", () => {
   const capture = functionBody(WINDOW, "function captureHoverFootprint()")
   assert.match(capture, /gdkmonitor\.get_geometry\(\)/)
+  assert.match(capture, /hoverBarSize\(/)
+  assert.match(capture, /restingBar/)
   assert.match(capture, /window\.get_width\(\)/)
   assert.match(capture, /window\.get_height\(\)/)
   assert.match(capture, /window\.margin_top/)
   assert.match(capture, /window\.margin_bottom/)
   assert.match(capture, /barFootprint\(/)
+  assert.match(capture, /growHoverRect\(/)
   assert.doesNotMatch(capture, /1546|1026|76\b/, "no measured size may be hardcoded")
+
+  // The resting bar is measured while S0 owns the real allocation; the hidden
+  // rail at S1 measures 0, so this is the only moment its size is available.
+  const sync = functionBody(WINDOW, "function syncWindowSize()")
+  assert.match(sync, /rail\?\.visible/)
+  assert.match(sync, /barState\.view === "home"/)
+  assert.match(sync, /restingBar =/)
+  assert.match(sync, /gdkmonitor\.get_connector\(\)/)
+  assert.match(WINDOW, /const HOVER_TOLERANCE_PX = 0/)
 
   // Captured in hideBar while S1 is still allocated, before homeBar/apply.
   const commit = functionBody(WINDOW, "function commitCurrentMode()")

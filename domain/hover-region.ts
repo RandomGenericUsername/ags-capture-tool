@@ -8,11 +8,11 @@
 //
 // Two pieces live here, both pure:
 //
-//   barFootprint      the S1 surface rectangle in compositor coordinates,
-//                     derived from the monitor geometry + the window's actual
-//                     allocation at the moment the bar leaves S1. It is NOT a
-//                     hardcoded 1546x54: target/options change the width, and
-//                     top/bottom placement changes y.
+//   barFootprint      the bar rectangle in compositor coordinates, derived
+//                     from the monitor geometry + the configured resting bar
+//                     allocation (REQ-007), not the S1 option-lane window. It
+//                     is NOT a hardcoded 1546x54: the rail follows its content,
+//                     and top/bottom placement changes y.
 //
 //   updateHoverReveal the arm-after-leave state machine. If the pointer is on
 //                     the Record CTA at commit it is already inside the
@@ -46,19 +46,32 @@ export interface HoverPlacement {
   marginBottom: number
 }
 
+/**
+ * The last allocation measured on the RESTING bar (S0 `.capture-bar.rail`),
+ * including the connector of the monitor that owned it.
+ *
+ * REQ-007: the S1 lane is often much wider than the bar itself (1506 px vs
+ * 142 px on the reference host), so the reveal must not inherit the S1 window
+ * bounds. This is the real bar size, not the window size.
+ */
+export interface HoverBarMeasurement extends HoverSize {
+  connector: string | null
+}
+
 function finite(value: number): boolean {
   return Number.isFinite(value)
 }
 
 /**
- * The S1 surface footprint in compositor logical coordinates.
+ * The bar footprint in compositor logical coordinates.
  *
  * `monitor` and the returned rect use the same coordinate space as
  * `Gdk.Monitor.get_geometry()` + Hyprland `cursorpos` (both logical layout
- * pixels). The window is centred horizontally and anchored to one edge; its
- * allocation supplies both dimensions, so a wider/narrower S1 row follows
- * automatically. Invalid/zero geometry returns null (no region, no reveal)
- * rather than a rect at the origin.
+ * pixels). The bar is centred horizontally and anchored to one edge; the
+ * surface allocation supplies both dimensions. REQ-007 passes the resting S0
+ * bar (142×54 on the reference host), never the wider S1 option lane. Invalid
+ * or zero geometry returns null (no region, no reveal) rather than a rect at
+ * the origin.
  */
 export function barFootprint(
   monitor: HoverRect,
@@ -95,6 +108,73 @@ export function barFootprint(
     ? Math.trunc(monitor.y) + marginTop
     : Math.trunc(monitor.y) + monitorHeight - marginBottom - height
   return { x, y, width, height }
+}
+
+/**
+ * Choose the bar size used for the reveal trigger.
+ *
+ * REQ-007: prefer the measured resting bar (S0 rail); the S1 window may be
+ * much wider because it carries every option pill. `fallback` is the v0.2.2
+ * window allocation, kept so a failed measurement degrades to the old region
+ * instead of disabling the reveal.
+ *
+ * A cached measurement from ANOTHER monitor is never reused: each capture
+ * window owns one monitor, and a stale rail rectangle from a different output
+ * would trigger on the wrong screen. `null` means "no valid region".
+ */
+export function hoverBarSize(
+  measured: HoverBarMeasurement | null,
+  monitorConnector: string | null,
+  fallback: HoverSize,
+): HoverSize | null {
+  if (
+    measured !== null &&
+    measured.connector !== null &&
+    monitorConnector !== null &&
+    measured.connector !== monitorConnector
+  ) {
+    return null
+  }
+  if (
+    measured !== null &&
+    finite(measured.width) &&
+    finite(measured.height) &&
+    Math.trunc(measured.width) > 0 &&
+    Math.trunc(measured.height) > 0
+  ) {
+    return { width: Math.trunc(measured.width), height: Math.trunc(measured.height) }
+  }
+  if (
+    finite(fallback.width) &&
+    finite(fallback.height) &&
+    Math.trunc(fallback.width) > 0 &&
+    Math.trunc(fallback.height) > 0
+  ) {
+    return { width: Math.trunc(fallback.width), height: Math.trunc(fallback.height) }
+  }
+  return null
+}
+
+/**
+ * Optional pointer-precision slack around the exact bar rect.
+ *
+ * REQ-007 defaults to 0 (literal bar rectangle). A future 1–4 px tweak must go
+ * through this helper so the expansion is explicit and tested, never an
+ * accidental full-width band.
+ */
+export function growHoverRect(
+  rect: HoverRect | null,
+  tolerance: number,
+): HoverRect | null {
+  if (rect === null) return null
+  const amount =
+    finite(tolerance) && tolerance > 0 ? Math.trunc(tolerance) : 0
+  return {
+    x: rect.x - amount,
+    y: rect.y - amount,
+    width: rect.width + amount * 2,
+    height: rect.height + amount * 2,
+  }
 }
 
 /**

@@ -25,7 +25,7 @@
 
 ## Ops tasks
 
-(none)
+- [OPS-001-release-record-v0.2.0/ticket.md](./OPS-001-release-record-v0.2.0/ticket.md) — Correct the v0.2.0 release record (T1) | `done` | worktree none, branch main | release: v0.2.0 notes corrected 2026-11-04
 
 ## Spikes
 

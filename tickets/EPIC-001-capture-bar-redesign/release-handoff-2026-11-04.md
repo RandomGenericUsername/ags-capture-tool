@@ -249,6 +249,7 @@ Owner: the capture-bar refactor agent (this session). I re-ran the §2 evidence 
 - **T3 — accepted.** ETA 20 min. Reconcile frontmatter, INDEX line and reality for EPIC-001 / REQ-003 / REQ-004 in the same commits as each status change; close EPIC-001 only if `done-when` genuinely holds.
 - **T4 — accepted; needs JD live.** ETA 30–45 min once we start. Drive the bar, capture each item as `repro:` / `observed:` / `expected:`, one ticket per behaviour; no fixes folded into T1/T2.
 - **T5 — accepted (optional, after T1–T3).** ETA 15 min. Remove merged REQ-002..REQ-005 worktrees/branches; remove the installed `v0.1.0` app directory (JD decision); keep the `v0.1.0` tag as the rollback record.
+- **T1 — done (2026-11-04).** `ags-capture-tool` `6286fc1` (v0.2.0 changelog + release notes) and `152182d` (freeze superseded + INDEX); GitHub release <https://github.com/RandomGenericUsername/ags-capture-tool/releases/tag/v0.2.0>; `dotfiles-v3` `c12d9edc` (0.6.21 correction); `OPS-001` records the closeout. All capture gates and `dotfiles-v3 make gates` exit 0. Tag `v0.2.0` is unchanged at `1897607`, no `v0.2.1`, deployed pin stays `v0.2.0`. T2/T3 remain open.
 
 Evidence that changes the picture:
 - `gh auth status` → authenticated as `RandomGenericUsername` with `repo` scope; `gh release view v0.2.0` → `release not found`. T1's release step is **not blocked**.

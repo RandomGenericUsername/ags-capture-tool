@@ -113,6 +113,7 @@ export function toggleRow(
   getValue: () => boolean,
   setValue: (value: boolean) => void,
   ctx: RowContext,
+  enabled?: () => boolean,
 ): Gtk.Box {
   // Gtk.Switch, not a hand-rolled track+knob: a GtkBox ignores a child's
   // main-axis alignment, so the old knob's halign START/END never moved it and
@@ -122,6 +123,7 @@ export function toggleRow(
   const control = new Gtk.Switch()
   control.add_css_class("palette-switch")
   control.set_active(getValue())
+  control.set_sensitive(enabled ? enabled() : true)
   control.set_halign(Gtk.Align.END)
   control.set_valign(Gtk.Align.CENTER)
   control.connect("state-set", (_self, state: boolean) => {
@@ -138,6 +140,7 @@ export function pillRow<T>(
   getValue: () => T,
   setValue: (value: T) => void,
   ctx: RowContext,
+  onChange?: () => void,
 ): Gtk.Box {
   const segments = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 })
   segments.add_css_class("segments")
@@ -154,6 +157,7 @@ export function pillRow<T>(
         if (item.value === option.value) item.button.add_css_class("selected")
         else item.button.remove_css_class("selected")
       }
+      onChange?.()
     })
     buttons.push({ value: option.value, button })
     segments.append(button)

@@ -19,16 +19,19 @@ test("each mode chooses exactly one automatic surface", () => {
     topBar: true,
     captureBar: "hidden",
     allowLauncherHud: false,
+    compactAllowed: true,
   })
   assert.deepEqual(recordingSurfaces("hover"), {
     topBar: false,
     captureBar: "hover",
     allowLauncherHud: false,
+    compactAllowed: false,
   })
   assert.deepEqual(recordingSurfaces("always"), {
     topBar: false,
     captureBar: "always",
     allowLauncherHud: false,
+    compactAllowed: true,
   })
 
   for (const mode of RECORDING_CONTROLS_MODES) {

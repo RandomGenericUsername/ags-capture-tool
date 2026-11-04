@@ -177,12 +177,13 @@ export function SettingsPage(props: SettingsPageProps) {
       ),
       toggleRow(
         "Compact bar indicator",
-        "Bar shows only the timer; pause/stop appear in the popup. Off: the bar shows the buttons and opens no popup.",
+        "Available for Top bar and Always visible. On hover forces the inline controls so Pause/Stop is one click.",
         () => settingsConfig.bar_compact_controls,
         (value) => {
           settingsConfig.bar_compact_controls = value
         },
         rowContext,
+        () => settingsConfig.recording_controls !== "hover",
       ),
       pillRow<ConfigBarPosition>(
         "Bar position",
@@ -217,6 +218,7 @@ export function SettingsPage(props: SettingsPageProps) {
           settingsConfig.recording_controls = value
         },
         rowContext,
+        () => renderSettings(),
       ),
     ])
 

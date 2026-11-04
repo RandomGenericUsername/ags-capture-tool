@@ -33,6 +33,8 @@ export interface RecordingSurfaces {
   readonly captureBar: CaptureBarMode
   /** Whether a launcher/keybind may present the capture S4 HUD. */
   readonly allowLauncherHud: boolean
+  /** Whether compact (popover) controls are available for this surface. */
+  readonly compactAllowed: boolean
 }
 
 export function isRecordingControlsMode(
@@ -55,11 +57,28 @@ export function recordingSurfaces(
 ): RecordingSurfaces {
   switch (mode) {
     case "top-bar":
-      return { topBar: true, captureBar: "hidden", allowLauncherHud: false }
+      return {
+        topBar: true,
+        captureBar: "hidden",
+        allowLauncherHud: false,
+        compactAllowed: true,
+      }
     case "hover":
-      return { topBar: false, captureBar: "hover", allowLauncherHud: false }
+      // Hover controls must be actionable on first reveal: showing a popover
+      // trigger would force hover-then-click. The native bar is always full.
+      return {
+        topBar: false,
+        captureBar: "hover",
+        allowLauncherHud: false,
+        compactAllowed: false,
+      }
     case "always":
-      return { topBar: false, captureBar: "always", allowLauncherHud: false }
+      return {
+        topBar: false,
+        captureBar: "always",
+        allowLauncherHud: false,
+        compactAllowed: true,
+      }
   }
 }
 

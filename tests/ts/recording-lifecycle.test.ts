@@ -171,10 +171,20 @@ test("the live feed is the platform event bus, subscribed once per window", () =
 })
 
 test("bar_compact_controls moves the shared controls, never the state", () => {
-  assert.match(WINDOW, /hudControlPlacement\(config\.bar_compact_controls\)/)
+  assert.match(WINDOW, /hudControlPlacement\(effectiveCompact\(\)\)/)
   assert.match(WINDOW, /if \(!placement\.popup\) hudCluster\?\.closePopover\(\)/)
   assert.match(CLUSTER, /inlineToggle\.visible = !state\.compact/)
   assert.match(CLUSTER, /if \(!state\.compact\) popover\?\.popdown\(\)/)
+})
+
+test("hover forces the full inline controls and disables the compact setting", () => {
+  assert.match(
+    WINDOW,
+    /function effectiveCompact\(\): boolean \{\s*return config\.bar_compact_controls && surfaces\(\)\.compactAllowed/,
+  )
+  assert.match(PRESENTATION, /case "hover":[\s\S]*?compactAllowed: false/)
+  assert.match(SETTINGS_PAGE, /settingsConfig\.recording_controls !== "hover"/)
+  assert.match(SETTINGS_PAGE, /Available for Top bar and Always visible/)
 })
 
 test("recording commit stays hide-overlay -> hide-bar -> HUD -> launch", () => {
@@ -275,7 +285,7 @@ test("top-bar mode cannot use the capture launcher as a manual override", () => 
     /const current = surfaces\(\)\s+if \(\s*isLive\(barState\) &&\s*current\.allowLauncherHud &&\s*current\.captureBar === "hidden"/,
   )
   // The pure rule says top-bar disables the launcher override.
-  assert.match(PRESENTATION, /case "top-bar":\s*return \{ topBar: true, captureBar: "hidden", allowLauncherHud: false \}/)
+  assert.match(PRESENTATION, /case "top-bar":[\s\S]*?allowLauncherHud: false/)
   assert.match(WINDOW, /recordingSurfaces\(/)
 })
 

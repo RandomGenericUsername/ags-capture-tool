@@ -477,8 +477,13 @@ export function ClassicWindow(
     return recordingSurfaces(config.recording_controls)
   }
 
+  /** Hover forces the full inline controls; compact is only for top-bar/always. */
+  function effectiveCompact(): boolean {
+    return config.bar_compact_controls && surfaces().compactAllowed
+  }
+
   function applyHudPlacement() {
-    const placement = hudControlPlacement(config.bar_compact_controls)
+    const placement = hudControlPlacement(effectiveCompact())
     if (!placement.popup) hudCluster?.closePopover()
   }
 
@@ -520,7 +525,7 @@ export function ClassicWindow(
 
   /** Project the pure HUD snapshot onto the shared cluster row. */
   function updateHudUi() {
-    hudCluster?.render({ hud, compact: config.bar_compact_controls })
+    hudCluster?.render({ hud, compact: effectiveCompact() })
     if (isLive(barState)) applyHudPlacement()
   }
 

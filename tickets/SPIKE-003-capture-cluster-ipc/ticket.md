@@ -747,3 +747,38 @@ probe and restored afterwards (`ags`, `capture`, `notifications`,
 4. **Liveness semantics.** The bar sends a 15 s keepalive `update` while a
    cluster is shown. This is the capture-restart recovery path, not a display
    timer; the capture process remains the only timer/state renderer.
+
+### Visual parity correction (JD, 2026-11-04)
+
+The first implementation proved the architecture but rendered the capture HUD's
+look. JD requires the capture-drawn cluster to be the **bar's accepted
+recording design** (the `.rec-*` card, dot, timer, icon controls and popover),
+not the capture HUD. Fixed on the same branch:
+
+- `ags-capture-tool` `f29f5b2` — restore the bar's `.rec-*` CSS and markup
+  inside the capture-owned window; use the bar's icon art for Pause/Play/Stop;
+  keep the one deliberate `#e0605f` REC red; register the cluster with the
+  capture appearance registry so its icon art follows palette refreshes.
+- `ags-bar` `e5f3490` — measure from the deployed bar's actual geometry:
+  compact card 109×44 + 4px right margin → slot 113×44; full card 161×44 + 4px
+  margin → slot 165×44. Remove the extra slot padding and reserve exactly that
+  allocation.
+- The cluster now fills the reserved height, so the card is 44px tall instead
+  of being vertically centered at 34px.
+- Resizing compact↔full now re-asserts `set_default_size` after the content
+  reflows; a mapped layer surface does not shrink from a size request alone.
+- A bar restart resets its local `seq` to 1, which the capture sequence
+  tombstones used to reject. `sequenceDecision()` now treats `seq === 1` as a
+  new bar generation, and the bar rechecks its measured slot 250ms after the
+  first layout pass.
+
+Live evidence (`/tmp/opencode/capture-cluster-b/shots/`):
+
+- compact: layer `1381 2 113 44`; visual card 109×44 at `1381,2` —
+  `final-compact-crop.png`.
+- full: layer `1329 2 165 44`; visual card 161×44 at `1329,2` —
+  `new-cluster-full2-crop.png`.
+- old bar reference: `old-bar-recording.png` / `old-bar-full-recording.png`.
+
+Final gates after this correction: `bar-gates-visual.log` and
+`capture-gates-visual.log`, both exit 0.

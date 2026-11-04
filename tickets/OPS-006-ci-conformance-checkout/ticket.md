@@ -54,4 +54,5 @@ the change is pushed to `main` and the next CI run is green.
   palette application`; `tests 16 / pass 16 / fail 0`.
 - **`make ci`:** test `10/10` + `297/297`; conformance `16/16`; backend `114
   passed`; exit 0.
-- **CI:** filled in by the follow-up docs commit once the run completed.
+- **CI:** [run 41904573613](https://github.com/RandomGenericUsername/ags-capture-tool/actions/runs/41904573613)
+  on `ec906f7` — **success** (first green run since `08e8e71`).

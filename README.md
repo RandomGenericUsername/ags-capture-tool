@@ -81,13 +81,13 @@ reloads.
 
 ## Local development
 
-The program tuple is `ags-platform` `v0.4.0` / `contracts` `v0.3.0`, local-only
+The program tuple is `ags-platform` `v0.5.0` / `contracts` `v0.3.0`, local-only
 in this run. The local gates symlink both under `.dev/` (gitignored): the
 platform from `../ags-platform`, and contracts from `../contracts` via `make
 conformance`.
 
 ```sh
-ln -s ../../../ags-platform .dev/ags-platform/v0.4.0   # or use AGS_PLATFORM_DEV
+ln -s ../../../ags-platform .dev/ags-platform/v0.5.0   # or use AGS_PLATFORM_DEV
 make test          # pure unit + copied app tests (Node only)
 make conformance   # manifest + handler + template gate
 make backend       # Python backend pytest suite (uv)

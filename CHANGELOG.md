@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.3.0 — 2026-11-04
+
+Recording controls now have one presentation setting shared by the capture
+native bar and the top-bar cluster.
+
+### Added
+
+- `recording_controls`: `top-bar` / `hover` / `always`. The old
+  `bar.recording_hud` key migrates (`hidden → top-bar`).
+- The capture-drawn top-bar cluster and the capture hover/S4 row share one
+  `RecordingCluster` component and the bar's accepted `.rec-*` design.
+- The top bar reserves a slot only in `top-bar` mode; `hover`/`always` hide the
+  slot and use the capture tool's native bar.
+
+### Changed
+
+- `hover` forces the full inline Pause/Stop controls; the compact popover is
+  available only for `top-bar` and `always`. The compact switch displays off
+  and disabled while `hover` is selected.
+- `bar_compact_controls` remains an independent layout preference.
+
+### Removed
+
+- The separate `hidden` recording-HUD mode. Existing configs migrate to
+  `top-bar`, so there is always exactly one control surface.
+
 ## v0.2.4 — 2026-11-04
 
 The hover-revealed recording controls now stay usable once expanded (BUG-003).

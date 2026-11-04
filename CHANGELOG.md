@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.2.4 — 2026-11-04
+
+The hover-revealed recording controls now stay usable once expanded (BUG-003).
+No identity, palette-role, tag-history or deployed-pin changes.
+
+### BUG-003 — hover controls no longer collapse under the pointer
+
+- In `bar.recording_hud = "hover"`, the pointer poll now follows the **current
+  visible surface** instead of only the cached resting-bar rect. The trigger is
+  the union of the resting bar (142×54 here), the mapped HUD and, when open,
+  the Pause/Stop popover's actual `Gdk.Popup` rect. The 1506×54 S1 option lane
+  is still never a trigger.
+- The compact popover sits at `850,937,220,92` while the resting bar is at
+  `889,1026,142,54`; Pause/Stop are above the bar, which is why the old poll
+  unmapped them. The non-compact expanded lane measures `839,1034,243,46`.
+- Leaving the active surface now hides after a **200 ms grace**, so crossing a
+  1 px gap or moving between controls cannot flicker. Re-entry during the grace
+  cancels the hide.
+- A `Gtk.GestureClick` press/release guard on the HUD row and popover keeps the
+  surface mapped for the whole click; an open popover whose geometry cannot be
+  measured falls back to staying mapped while it is open. Arm-after-leave and
+  first-frame cleanliness are unchanged.
+- Hidden `hover` remains **unmapped** and click-through; the exact REQ-007
+  resting rect is still the initial trigger.
+- Tests add 7 hover cases: expanded-rect union, resting→expanded reveal, leave
+  grace, grace re-entry, press hold, collapse back to resting, and source
+  wiring. Live probe: Pause and Stop clicked successfully in compact and
+  non-compact modes, leave hid the surface, and a click passed through while
+  hidden.
+
+### Test coverage
+
+- `make test`: 10/10 unit, 1/1 validation, 331/331 TypeScript, test `tsc`
+  clean.
+- `make conformance`: 16/16. `make backend`: 114 passed. `make typecheck`: 0
+  errors in the ags-capture-tool tree.
+
 ## v0.2.3 — 2026-11-04
 
 Hover reveal now follows the configured resting bar (REQ-007). No identity,

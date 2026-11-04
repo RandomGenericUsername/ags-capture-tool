@@ -181,9 +181,13 @@ visible, then placed with the current monitor geometry, `bar.position` and
 `offsetPx`/margins at commit. Nothing else on the edge band (a dock, a
 full-width overlay, the empty S1 lane) triggers it. Reveal is armed only after
 the pointer leaves once, keeping a commit from the Record CTA out of the first
-frame. When the recording ends in `hover`, the surface stays unmapped and the
-poll/footprint state is cleared; `always`/on-demand presentation still returns
-to S0.
+frame. Once revealed, BUG-003 (v0.2.4) makes the trigger follow the **current
+visible surface**: the mapped HUD rect and the open Pause/Stop popover are
+unioned with the resting rect for that hover lifetime, with a 200 ms leave
+grace and a press guard. This keeps Pause/Stop clickable without widening the
+initial hidden trigger; it is still never the 1506×54 S1 lane. When the
+recording ends in `hover`, the surface stays unmapped and the poll/footprint
+state is cleared; `always`/on-demand presentation still returns to S0.
 
 Existing settings keep their meaning and surface — including
 `bar_compact_controls`, which decides **who carries Pause/Stop during S4**:

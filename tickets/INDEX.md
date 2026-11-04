@@ -25,6 +25,7 @@
 
 - [BUG-001-settings-transparency/ticket.md](./BUG-001-settings-transparency/ticket.md) — Settings panel has no card background and is unreadable over the window behind (C17) | `done` | severity high | lane direct, worktree .worktrees/BUG-FIX/, branch ticket/BUG-FIX-capture-bugs | fixed 2445d44; live v0.2.1 verified 2026-11-04 (`/tmp/opencode/capture-verify-v021/EVIDENCE.md`); JD live-confirmed good 2026-11-04
 - [BUG-002-small-region-move/ticket.md](./BUG-002-small-region-move/ticket.md) — Minimal-size region resizes instead of moving when dragged from its centre (C5) | `done` | severity medium | lane direct, worktree .worktrees/BUG-FIX/, branch ticket/BUG-FIX-capture-bugs | fixed 2445d44; live v0.2.1 verified 2026-11-04 (`/tmp/opencode/capture-verify-v021/EVIDENCE.md`); JD live-confirmed at ~30px, accepted at ≥30px 2026-11-04 (minimal-size drag not pursued)
+- [BUG-003-hover-controls-collapse/ticket.md](./BUG-003-hover-controls-collapse/ticket.md) — Hover-revealed recording controls unmap when moving to Pause/Stop | `done` | severity high | lane direct, worktree .worktrees/BUG-003/, branch ticket/BUG-003-hover-controls-collapse | live probe `/tmp/opencode/capture-hover-controls/`; expanded lane measured 243x46 (not 1506)
 
 ## Ops tasks
 

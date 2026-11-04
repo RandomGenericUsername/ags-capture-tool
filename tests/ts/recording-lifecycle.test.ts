@@ -48,6 +48,7 @@ function functionBody(source: string, marker: string): string {
 const CSS = read("style.css")
 const CSS_NO_COMMENTS = CSS.replace(/\/\*[\s\S]*?\*\//g, "")
 const WINDOW = code(read("ui", "classic", "ClassicWindow.tsx"))
+const CLUSTER = code(read("ui", "shared", "recording-cluster.tsx"))
 const SETTINGS_PAGE = code(read("ui", "classic", "SettingsPage.tsx"))
 const SETTINGS_DOMAIN = read("domain", "settings.ts")
 const HUD_DOMAIN = read("domain", "recording-hud.ts")
@@ -105,23 +106,24 @@ test("the overlay class is driven by the one OverlayView.mode value", () => {
   assert.match(overlay, /else root\.remove_css_class\("recording"\)/)
 })
 
-test("S4 is HUD only: dot, timer, Pause/Stop; no back, no options, no gear", () => {
-  const start = WINDOW.indexOf('class="capture-bar hud"')
-  const end = WINDOW.indexOf("<SettingsPage", start)
-  assert.ok(start > -1 && end > start, "the S4 HUD row is missing")
-  const hud = WINDOW.slice(start, end)
+test("S4 renders the shared bar cluster, not a second HUD design", () => {
+  assert.match(WINDOW, /hudCluster = RecordingCluster\(/)
+  assert.match(WINDOW, /\{hudCluster\?\.element \?\? null\}/)
+  assert.doesNotMatch(WINDOW, /class="capture-bar hud"/)
+  assert.doesNotMatch(WINDOW, /class="hud-dot"/)
 
-  assert.match(hud, /class="hud-dot"/)
-  assert.match(hud, /class="hud-timer"/)
-  assert.match(hud, /label="⏹ Stop"/)
-  assert.match(hud, /label="Pause"/)
+  assert.match(CLUSTER, /class="rec-cluster"/)
+  assert.match(CLUSTER, /class="rec-dot"/)
+  assert.match(CLUSTER, /class="rec-timer"/)
+  assert.match(CLUSTER, /class="rec-btn stop"/)
+  assert.match(CLUSTER, /options\.onStop\(\)/)
 
-  assert.doesNotMatch(hud, /bar-back|label="←"/, "INV-2: no back chevron in S4")
-  assert.doesNotMatch(hud, /<RecordingPage|<ScreenshotPage/, "no option pages in S4")
-  assert.doesNotMatch(hud, /label="(?:Region|Screen|Window|24|30|60|Low|Med|High|Sys|Mic|None)"/)
-  assert.doesNotMatch(hud, /recordTargetGroup|recordFpsGroup|recordQualityGroup|recordAudioGroup/)
-  assert.doesNotMatch(hud, /⚙|openSettingsView/, "options locked while live")
-  assert.doesNotMatch(hud, /bar-kbd|label="Enter"/, "Enter is not a live-HUD action")
+  assert.doesNotMatch(CLUSTER, /bar-back|label="←"/, "INV-2: no back chevron in S4")
+  assert.doesNotMatch(CLUSTER, /<RecordingPage|<ScreenshotPage/, "no option pages in S4")
+  assert.doesNotMatch(CLUSTER, /label="(?:Region|Screen|Window|24|30|60|Low|Med|High|Sys|Mic|None)"/)
+  assert.doesNotMatch(CLUSTER, /recordTargetGroup|recordFpsGroup|recordQualityGroup|recordAudioGroup/)
+  assert.doesNotMatch(CLUSTER, /⚙|openSettingsView/, "options locked while live")
+  assert.doesNotMatch(CLUSTER, /bar-kbd|label="Enter"/, "Enter is not a live-HUD action")
 })
 
 test("the S4 surface state has no Enter action and the bar state owns 'live'", () => {
@@ -165,11 +167,11 @@ test("the live feed is the platform event bus, subscribed once per window", () =
   assert.match(WINDOW, /if \(isLive\(barState\)\) leaveLiveHud\(\)/, "terminal bus state leaves S4")
 })
 
-test("bar_compact_controls moves the controls, never the state", () => {
+test("bar_compact_controls moves the shared controls, never the state", () => {
   assert.match(WINDOW, /hudControlPlacement\(config\.bar_compact_controls\)/)
-  assert.match(WINDOW, /hudActions\.visible = placement\.barControls/)
-  assert.match(WINDOW, /if \(hudCompact\) hudPopup\?\.popup\(\)/)
-  assert.match(WINDOW, /if \(!placement\.popup\) hudPopup\?\.popdown\(\)/)
+  assert.match(WINDOW, /if \(!placement\.popup\) hudCluster\?\.closePopover\(\)/)
+  assert.match(CLUSTER, /inlineToggle\.visible = !state\.compact/)
+  assert.match(CLUSTER, /if \(!state\.compact\) popover\?\.popdown\(\)/)
 })
 
 test("recording commit stays hide-overlay -> hide-bar -> HUD -> launch", () => {
@@ -301,12 +303,10 @@ test("hidden launcher-presented chrome is hidden again on stop", () => {
   assert.match(leave, /hudPresentedByLauncher = false/)
 })
 
-test("Stop remains in the S4 row for every visibility mode", () => {
-  const start = WINDOW.indexOf('class="capture-bar hud"')
-  const end = WINDOW.indexOf("<SettingsPage", start)
-  const hud = WINDOW.slice(start, end)
-  assert.match(hud, /label="⏹ Stop"/)
-  assert.match(hud, /onClicked=\{stopRecording\}/)
+test("Stop remains in the S4 shared cluster for every visibility mode", () => {
+  assert.match(WINDOW, /onStop: stopRecording/)
+  assert.match(CLUSTER, /class="rec-btn stop"/)
+  assert.match(CLUSTER, /class="rec-popup-action danger"/)
   // The row itself must stay built even when its chrome is at opacity 0.
   assert.match(WINDOW, /if \(hudRow\) hudRow\.visible = live/)
 })

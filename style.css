@@ -417,80 +417,8 @@ window.capture-cluster-window {
   color: @tertiary;
 }
 
-/* ------------------------------------------------------------ S4 live HUD
- * Recording-live is dot + timer + Pause/Stop, never options (design.md §5,
- * Sheet 3). The dot is the ONE pulsing element; the recording accent comes
- * from --rec-accent, so a palette refresh restyles the pulse too. */
-.capture-bar.hud {
-  padding: 6px 8px;
-}
-
-.hud-status {
-  padding: 0 6px;
-  border: none;
-  border-radius: 8px;
-  background-color: transparent;
-  color: @on_surface;
-}
-
-.hud-status:hover {
-  background-color: alpha(@on_surface, 0.08);
-}
-
-.hud-dot {
-  min-width: 9px;
-  min-height: 9px;
-  border-radius: 999px;
-  background-color: var(--rec-accent);
-  animation: rec-pulse 1.6s ease-in-out infinite;
-}
-
-.hud-dot.paused {
-  animation: none;
-  opacity: 0.45;
-}
-
-@keyframes rec-pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-.hud-timer {
-  font-size: 12px;
-  font-weight: 700;
-  color: @on_surface;
-}
-
-.hud-actions {
-  /* Pause/Stop in the bar (bar_compact_controls = false). */
-}
-
-.hud-toggle {
-  min-width: 68px;
-}
-
-.hud-stop {
-  color: var(--rec-accent);
-}
-
-.hud-popup {
-  padding: 10px;
-  border-radius: 12px;
-  background-color: alpha(@surface, 0.96);
-}
-
-.hud-popup-row {
-  color: @on_surface;
-  font-size: 12px;
-  font-weight: 600;
-}
+/* S4 has no separate HUD vocabulary: both the top-bar cluster and the
+   capture hover row render the shared `.rec-*` design above. */
 
 .bar-custom-duration spinbutton,
 .bar-offset-spin {

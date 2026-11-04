@@ -37,6 +37,15 @@ branch: main
 > click-through and a 20.3 ms move-to-map latency. See the REQ ticket evidence
 > directory `/tmp/opencode/capture-hover-c/`. This spike remains `reported` per
 > the spike lifecycle; the build lives in REQ-006.
+>
+> **Closed as implemented 2026-11-04.** Option C shipped in REQ-006
+> (`v0.2.2`, `PIN-0133`), narrowed to the exact 142×54 resting bar in REQ-007
+> (`v0.2.3`, `PIN-0134`), and completed for expanded controls by BUG-003
+> (`v0.2.4`, `PIN-0135`). JD accepted the hover series as baseline on
+> 2026-11-04. The later component-ownership decision for the capture-drawn
+> recording cluster is option B
+> ([SPIKE-003](../SPIKE-003-capture-cluster-ipc/ticket.md)); it does not change
+> this spike's option C outcome.
 
 ## Questions
 

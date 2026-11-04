@@ -185,6 +185,21 @@ trigger is still the exact REQ-007 resting bar; hidden remains unmapped and
 click-through. Live probe confirmed Pause and Stop are clickable in both
 compact and non-compact modes, leaving hides, and click-through still works.
 
+## JD baseline acceptance (2026-11-04)
+
+JD signed off the hover interaction as the accepted baseline:
+
+- Hover reveals the cluster; click expands; controls stay mapped and Pause/Stop
+  work.
+- Clicking outside collapses it.
+- Hidden remains click-through; the first frame remains clean when starting
+  from the Record CTA.
+
+Live deploy: `v0.2.4` (tag at `ce56c80`), deployed pin `PIN-0135`
+(`dotfiles-v3` `1141e6f7`), active app
+`~/.local/share/dotfiles/apps/capture/v0.2.4`. Docs-only closeout; no code,
+tag, pin or deployed-state change in this ticket.
+
 ## Risk
 
 - The active union includes the mapped HUD and popover only while they are

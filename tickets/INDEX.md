@@ -18,14 +18,14 @@
 - [REQ-003-selection-first-flow/ticket.md](./REQ-003-selection-first-flow/ticket.md) — Selection-first capture flow: pending protocol + irreversible commit | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
 - [REQ-004-recording-lifecycle/ticket.md](./REQ-004-recording-lifecycle/ticket.md) — Recording lifecycle: red accent + live HUD | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
 - [REQ-005-theme-roles/ticket.md](./REQ-005-theme-roles/ticket.md) — Migrate capture CSS to semantic palette.v1 roles | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
-- [REQ-006-hover-region-reveal/ticket.md](./REQ-006-hover-region-reveal/ticket.md) — Widen S4 hover reveal to the full S1 footprint without click interception | `done` | links: worktree .worktrees/REQ-006/, branch ticket/REQ-006-hover-region-reveal | live probe `/tmp/opencode/capture-hover-c/`
-- [REQ-007-hover-smart-footprint/ticket.md](./REQ-007-hover-smart-footprint/ticket.md) — Derive the S4 hover footprint from the configured bar rectangle | `done` | links: worktree .worktrees/REQ-007/, branch ticket/REQ-007-hover-smart-footprint | live probe `/tmp/opencode/capture-hover-smart/`
+- [REQ-006-hover-region-reveal/ticket.md](./REQ-006-hover-region-reveal/ticket.md) — Widen S4 hover reveal to the full S1 footprint without click interception | `done` | links: worktree .worktrees/REQ-006/, branch ticket/REQ-006-hover-region-reveal | delivered v0.2.2/PIN-0133; refined by REQ-007 (v0.2.3) and BUG-003 (v0.2.4) | live probe `/tmp/opencode/capture-hover-c/`
+- [REQ-007-hover-smart-footprint/ticket.md](./REQ-007-hover-smart-footprint/ticket.md) — Derive the S4 hover footprint from the configured bar rectangle | `done` | links: worktree .worktrees/REQ-007/, branch ticket/REQ-007-hover-smart-footprint | delivered v0.2.3/PIN-0134; exact 142×54 resting rect; expanded controls handled by BUG-003 v0.2.4/PIN-0135 | live probe `/tmp/opencode/capture-hover-smart/`
 
 ## Bugs
 
 - [BUG-001-settings-transparency/ticket.md](./BUG-001-settings-transparency/ticket.md) — Settings panel has no card background and is unreadable over the window behind (C17) | `done` | severity high | lane direct, worktree .worktrees/BUG-FIX/, branch ticket/BUG-FIX-capture-bugs | fixed 2445d44; live v0.2.1 verified 2026-11-04 (`/tmp/opencode/capture-verify-v021/EVIDENCE.md`); JD live-confirmed good 2026-11-04
 - [BUG-002-small-region-move/ticket.md](./BUG-002-small-region-move/ticket.md) — Minimal-size region resizes instead of moving when dragged from its centre (C5) | `done` | severity medium | lane direct, worktree .worktrees/BUG-FIX/, branch ticket/BUG-FIX-capture-bugs | fixed 2445d44; live v0.2.1 verified 2026-11-04 (`/tmp/opencode/capture-verify-v021/EVIDENCE.md`); JD live-confirmed at ~30px, accepted at ≥30px 2026-11-04 (minimal-size drag not pursued)
-- [BUG-003-hover-controls-collapse/ticket.md](./BUG-003-hover-controls-collapse/ticket.md) — Hover-revealed recording controls unmap when moving to Pause/Stop | `done` | severity high | lane direct, worktree .worktrees/BUG-003/, branch ticket/BUG-003-hover-controls-collapse | live probe `/tmp/opencode/capture-hover-controls/`; expanded lane measured 243x46 (not 1506)
+- [BUG-003-hover-controls-collapse/ticket.md](./BUG-003-hover-controls-collapse/ticket.md) — Hover-revealed recording controls unmap when moving to Pause/Stop | `done` | severity high | lane direct, worktree .worktrees/BUG-003/, branch ticket/BUG-003-hover-controls-collapse | JD baseline accepted 2026-11-04; deployed v0.2.4/PIN-0135 | live probe `/tmp/opencode/capture-hover-controls/`; expanded lane measured 243x46 (not 1506)
 
 ## Ops tasks
 
@@ -37,7 +37,7 @@
 
 ## Spikes
 
-- [SPIKE-001-hover-region/ticket.md](./SPIKE-001-hover-region/ticket.md) — Widen the S4 hover reveal region during recording | `reported` | timebox 2h | recommendation: pointer-poll reveal (C); JD decision pending | implemented by REQ-006 (2026-11-04)
+- [SPIKE-001-hover-region/ticket.md](./SPIKE-001-hover-region/ticket.md) — Widen the S4 hover reveal region during recording | `reported` | timebox 2h | recommendation: pointer-poll reveal (C); implemented by REQ-006 v0.2.2/PIN-0133, refined by REQ-007 v0.2.3/PIN-0134, completed by BUG-003 v0.2.4/PIN-0135 | hover series JD-accepted baseline 2026-11-04; component ownership B in SPIKE-003
 - [SPIKE-002-capture-ui-reuse/ticket.md](./SPIKE-002-capture-ui-reuse/ticket.md) — One recording cluster: capture-owned component vs a capture-drawn window | `reported` | timebox 2h | recommendation was A (shared capture-owned component hosted inline, ags-platform UI module, no IPC); **JD chose B 2026-11-04** — capture instance draws the cluster, bar only sends show/update/hide; B design in SPIKE-003
 - [SPIKE-003-capture-cluster-ipc/ticket.md](./SPIKE-003-capture-cluster-ipc/ticket.md) — Capture-drawn recording cluster over the AGS request channel (option B) | `reported` | timebox 2h | transport: `ags request capture-cluster '<json>' -i capture` (no new topic); contract, window/stacking, migration, tests, effort 4.5–5.5d; handoff `~/.opencode/plan/handoff-capture-cluster-ipc.md`
 

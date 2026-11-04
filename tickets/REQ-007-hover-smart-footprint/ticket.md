@@ -163,3 +163,11 @@ confirmed reveal inside the bar rect and no reveal 1 px outside horizontally
 hidden and no surface after stop. The isolated probe
 instance was stopped and the pointer restored; the user's `capture` instance and
 settings were untouched.
+
+Delivered in `v0.2.3` (tag at `3bb12d2`, `PIN-0134` in `dotfiles-v3`
+`fa264e6d`): the hidden trigger is the exact 142×54 resting rect
+(`HOVER_TOLERANCE_PX = 0`). Moving onto expanded controls is handled by
+[BUG-003](../BUG-003-hover-controls-collapse/ticket.md) in `v0.2.4`
+(`PIN-0135`), which follows the current HUD/popover surface without widening the
+hidden trigger. Evidence: `/tmp/opencode/capture-hover-smart/` and
+`/tmp/opencode/capture-hover-controls/`.

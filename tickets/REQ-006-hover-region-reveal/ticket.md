@@ -148,3 +148,10 @@ unmaps and clears the poll. `always`/`hidden` presentation and capture controls
 are unchanged. The live probe used an isolated app instance; the user's
 `capture` instance, settings, wallpaper and pointer position were restored
 afterwards.
+
+Delivered in `v0.2.2` (tag at `759b539`, `PIN-0133` in `dotfiles-v3`
+`33458fe3`), then refined by [REQ-007](../REQ-007-hover-smart-footprint/ticket.md)
+(`v0.2.3`, `PIN-0134`) and [BUG-003](../BUG-003-hover-controls-collapse/ticket.md)
+(`v0.2.4`, `PIN-0135`). JD accepted the hover series as baseline on 2026-11-04.
+Evidence: `/tmp/opencode/capture-hover-c/`; this ticket's evidence section and
+the BUG-003 live probe.

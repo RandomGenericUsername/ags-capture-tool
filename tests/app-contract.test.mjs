@@ -140,7 +140,12 @@ function findContractsRoot() {
   return null
 }
 
-/** Every authored file, minus generated/local-only/copied-template trees. */
+/**
+ * Every authored file, minus generated/local-only/dependency-checkout/copied
+ * template trees. `contracts` is the CI checkout path (CONTRACTS_ROOT lives
+ * inside the workspace there); locally it is a sibling via `.dev`, which is
+ * already ignored. Scanning it would flag the contract's own topic names.
+ */
 function walk(dir = ROOT) {
   const files = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -152,6 +157,7 @@ function walk(dir = ROOT) {
         ".worktrees",
         "@girs",
         "build",
+        "contracts",
         "dist",
         "node_modules",
         "templates",

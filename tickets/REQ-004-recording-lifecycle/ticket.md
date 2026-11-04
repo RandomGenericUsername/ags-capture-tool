@@ -7,11 +7,17 @@ lane: 3
 links:
   openspec: none
   bmad: none
-worktree: .worktrees/REQ-004/
-branch: ticket/REQ-004-recording-lifecycle
+worktree: none
+branch: main
 ---
 
 # Recording lifecycle: red accent + live HUD
+
+> **Closed 2026-11-04 (T3):** all acceptance boxes are ticked; the recorded HUD
+> proof was produced by T2. Evidence: `/tmp/opencode/capture-t2/EVIDENCE.md`
+> §2 and the repo record [OPS-002](../OPS-002-verification-proof/evidence.md).
+> The implementation branch `ticket/REQ-004-recording-lifecycle` is merged into
+> `main`; the worktree directory is left for T5 cleanup.
 
 ## Requirement
 
@@ -39,7 +45,8 @@ protocol.
       tree, timer and locking already verified (Evidence H1–H3) carry over.
       Pure rule, settings tolerance, commit wiring and the launcher/hover paths
       are verified (Evidence H7–H9). The literal "absent from a recorded
-      artifact" observation still needs a real clip (Verification limits).
+      artifact" observation was closed by the T2 clips recorded below
+      (Verification limits).
 - [x] Live state comes from the event bus (design.md §11.7), not backend
       stdout: `capture.state {state, elapsed_seconds, job_id}` via
       `ags-platform/adapters/event-bus`; Pause/Stop via
@@ -266,8 +273,9 @@ commit with identical results.
 - The "is the HUD in the file?" observation was reasoning from
   compositor/layer semantics at implementation time. T2 has now produced the
   real clips: `hidden` → no capture-bar HUD in the clip; `always` → the S4 HUD
-  is in the clip. Evidence: `/tmp/opencode/capture-t2/EVIDENCE.md` §2 and the
-  checked follow-up below.
+  is in the clip. Evidence: `/tmp/opencode/capture-t2/EVIDENCE.md` §2 (repo
+  record: [OPS-002 evidence](../OPS-002-verification-proof/evidence.md)) and
+  the checked follow-up below.
 
 ## Resolved: D9 (2026-10-30) — HUD modes and the ags-bar indicator
 

@@ -7,8 +7,8 @@ lane: direct
 links:
   openspec: none
   bmad: none
-worktree: .worktrees/REQ-005/
-branch: ticket/REQ-005-theme-roles
+worktree: none
+branch: main
 ---
 
 # Migrate capture CSS to semantic palette.v1 roles

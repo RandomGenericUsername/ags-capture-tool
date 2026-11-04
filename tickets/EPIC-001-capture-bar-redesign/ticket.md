@@ -2,7 +2,7 @@
 id: EPIC-001
 title: "Capture bar redesign — state-driven minimalist bar"
 kind: epic
-status: in-progress
+status: done
 lane: bmad-advisory
 links:
   openspec: none
@@ -16,6 +16,12 @@ done-when: "Bar, selection-first flow and recording lifecycle all ship per desig
 # Capture bar redesign — state-driven minimalist bar
 
 > **Release-record handoff (2026-11-04):** [release-handoff-2026-11-04.md](./release-handoff-2026-11-04.md) — T1–T5 owned by the refactor agent; the acceptance/ETA response is under §7 of that file.
+
+> **Closed 2026-11-04 (T3):** all three children are `done` and every child
+> acceptance box is ticked. T2 verification evidence lives in
+> `/tmp/opencode/capture-t2/EVIDENCE.md` and
+> [OPS-002](../OPS-002-verification-proof/evidence.md); the reconciliation is
+> recorded in [OPS-003](../OPS-003-reconcile-ticket-state/ticket.md).
 
 ## Done-when
 
@@ -36,8 +42,29 @@ rejected alternatives live in [design.md](./design.md).
 ## Children
 
 - [x] `REQ-002` — Capture bar shell: five-state S0–S4, placement + on-demand pills (`done`)
-- [ ] `REQ-003` — Selection-first capture flow: pending protocol + irreversible commit (`in-progress`)
+- [x] `REQ-003` — Selection-first capture flow: pending protocol + irreversible commit (`done`)
 - [x] `REQ-004` — Recording lifecycle: red accent + live HUD (`done`)
+
+## Done-when evidence (2026-11-04)
+
+- **REQ-002 `done`** — five-state bar shell, placement and on-demand pills;
+  acceptance checklist fully ticked at its ticket.
+- **REQ-003 `done`** — selection-first flow + `capture-overlay` window; all
+  acceptance boxes ticked. T2 closed the two formerly open proofs:
+  pending-selection chrome absent from the app's own Region+MP4 clip
+  (`/tmp/opencode/capture-t2/clips/pending-selection-app-region.mp4`), and the
+  backend flags additive (legacy argv + `slurp` path green).
+- **REQ-004 `done`** — recording lifecycle + S4 HUD; all acceptance boxes
+  ticked. T2 recorded `hidden` → no capture-bar HUD
+  (`.../clips/hud-hidden-screen.mp4`) and `always` → HUD present
+  (`.../clips/hud-always-screen.mp4`), then restored `hidden`.
+- **Scale caveat:** T2 measured one scaled output with a positive origin
+  (`eDP-1` 1.25); a scaled output with a negative monitor origin remains
+  unit-tested only (`tests/ts/selection.test.ts:204-220`) and was not measured
+  on hardware.
+
+Evidence index: `/tmp/opencode/capture-t2/EVIDENCE.md`; repo copy
+[OPS-002](../OPS-002-verification-proof/evidence.md).
 
 ## Freeze superseded by v0.2.0 (record corrected)
 
@@ -67,14 +94,20 @@ met at release time: theme-producer shipped `v0.5.1` on 2026-11-04 07:54 and
 its `EPIC-003` closed 2026-11-04 10:14. The record therefore treats the release
 as a supersession to reconcile, not as evidence that the condition held.
 
-Open debt linked to this supersession:
+Debt linked to this supersession (both items now closed):
 
-- **T2 — verification:** overlay-never-captured clip (FR-10), HUD `hidden` vs
-  `always` clip, and `scale≠1` geometry. Tracked in
-  [OPS-001](../OPS-001-release-record-v0.2.0/ticket.md).
-- **T3 — ticket-state reconciliation:** EPIC-001, REQ-003 and REQ-004
-  frontmatter/INDEX/reality alignment. This epic stays `in-progress` (2/3
-  children) until the children and acceptance genuinely close.
+- **T2 — verification (closed 2026-11-04):** overlay-never-captured clip
+  (FR-10), HUD `hidden` vs `always` clip, additive backend flags, and one
+  positive-origin `scale≠1` pick. Evidence:
+  [OPS-002](../OPS-002-verification-proof/ticket.md) /
+  [`evidence.md`](../OPS-002-verification-proof/evidence.md) and
+  `/tmp/opencode/capture-t2/EVIDENCE.md`. Caveat: negative-origin scaled
+  output is unit-tested only.
+- **T3 — ticket-state reconciliation (closed 2026-11-04):** EPIC-001, REQ-003
+  and REQ-004 frontmatter/INDEX/reality now agree; all children and acceptance
+  boxes are closed. Recorded in
+  [OPS-003](../OPS-003-reconcile-ticket-state/ticket.md). The epic was
+  `in-progress` at 2/3 children until this reconciliation; it is now `done`.
 
 The attribution protocol and unfreeze criteria below are retained as
 historical context; they are no longer a live gate.

@@ -7,8 +7,8 @@ lane: 4
 links:
   openspec: none
   bmad: none
-worktree: .worktrees/REQ-002/
-branch: ticket/REQ-002-capture-bar-shell
+worktree: none
+branch: main
 ---
 
 # Capture bar shell

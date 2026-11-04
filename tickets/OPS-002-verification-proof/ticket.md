@@ -71,6 +71,7 @@ Full commands, timestamps, frame-extraction commands and raw output:
 
 ## Follow-ups
 
-- T3 (status/frontmatter/INDEX reconciliation) remains separate; this ticket
-  only ticks the proof boxes.
+- T3 (status/frontmatter/INDEX reconciliation) is closed by
+  [`OPS-003-reconcile-ticket-state`](../OPS-003-reconcile-ticket-state/ticket.md);
+  this ticket only ticked the proof boxes.
 - T5 cleanup (worktrees, installed v0.1.0) remains separate.

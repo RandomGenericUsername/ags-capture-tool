@@ -2,16 +2,22 @@
 id: REQ-003
 title: "Selection-first capture flow — pending protocol + irreversible commit"
 kind: requirement
-status: in-progress
+status: done
 lane: 4
 links:
   openspec: none
   bmad: none
-worktree: .worktrees/REQ-003/
-branch: ticket/REQ-003-selection-first-flow
+worktree: none
+branch: main
 ---
 
 # Selection-first capture flow
+
+> **Closed 2026-11-04 (T3):** all acceptance boxes are ticked. T2 verification
+> evidence lives in `/tmp/opencode/capture-t2/EVIDENCE.md` and the repo record
+> [OPS-002](../OPS-002-verification-proof/evidence.md). The implementation
+> branch `ticket/REQ-003-selection-first-flow` is merged into `main`; the
+> worktree directory is left for T5 cleanup.
 
 ## Requirement
 
@@ -172,7 +178,9 @@ Source-pinned by `tests/ts/overlay-contract.test.ts:109-117`.
 
 `domain/selection.ts:281-296` (`localToGlobal`/`globalToLocal`);
 `tests/ts/selection.test.ts:204-220` asserts negative origins exactly.
-A scale≠1 output could not be measured (see Verification limits).
+T2 measured one scaled output with a positive origin (`eDP-1`, scale 1.25);
+a scaled output with a negative monitor origin remains unit-tested only (see
+Verification limits).
 
 ### C1 — exact argv per selection kind
 
@@ -306,11 +314,16 @@ asserts the controller has no runtime platform import.
   overlay stacking over `ags-bar`, and keyboard focus after mapping are
   **not measured** here.
 - The `scale≠1` coordinate check that was originally unmeasured is now closed
-  by T2: `eDP-1` was temporarily set to scale 1.25, one region pick produced
-  `-region 640x440+280+160` → an 800x550 clip, and the display was restored to
-  scale 1.0. Evidence: `/tmp/opencode/capture-t2/EVIDENCE.md` §4.
+  for a **positive-origin** output by T2: `eDP-1` was temporarily set to scale
+  1.25, one region pick produced `-region 640x440+280+160` → an 800x550 clip,
+  and the display was restored to scale 1.0. Evidence:
+  `/tmp/opencode/capture-t2/EVIDENCE.md` §4. A scaled output with a **negative
+  monitor origin** was not measured on hardware and remains unit-tested only
+  (`tests/ts/selection.test.ts:204-220`); do not claim otherwise.
 - The manual 2-second FR-10 recording artifact is now produced and linked in
-  the "Overlay never captured" item above. Evidence: `EVIDENCE.md` §1.
+  the "Overlay never captured" item above. Evidence:
+  [`OPS-002 evidence`](../OPS-002-verification-proof/evidence.md) §1 /
+  `/tmp/opencode/capture-t2/EVIDENCE.md` §1.
 
 ## Spec contradiction
 

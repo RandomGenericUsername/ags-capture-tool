@@ -68,9 +68,10 @@ change; both gate sets exit 0.
   2026-11-04 (pending-selection clip, HUD `hidden` vs `always` clips, additive
   backend flags, and the temporary `eDP-1` 1.25 pick). Evidence:
   `/tmp/opencode/capture-t2/EVIDENCE.md`.
-- **T3 — ticket-state reconciliation:** align frontmatter, INDEX and reality
-  for EPIC-001, REQ-003 and REQ-004; close EPIC-001 only when all children
-  and acceptance genuinely close.
+- **T3 — ticket-state reconciliation (closed 2026-11-04):** EPIC-001,
+  REQ-003 and REQ-004 frontmatter/INDEX/reality now agree; EPIC-001 closed at
+  3/3 children. Recorded in
+  [`OPS-003-reconcile-ticket-state`](../OPS-003-reconcile-ticket-state/ticket.md).
 - **T4/T5** remain as described in the handoff: refinement intake with JD and
   optional cleanup after T1–T3.
 

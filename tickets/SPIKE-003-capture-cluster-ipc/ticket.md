@@ -645,3 +645,105 @@ sed -n '65,72p' /home/inumaki/Development/dotfiles/ags-capture-tool/domain/hover
 - Spike time used: ~1.5 h of the 2 h box (read-only source, contract, runtime,
   AGS CLI/D-Bus and layer API review).
 - No app code, tags, releases, deployed pins or live probe changed.
+
+## Implementation evidence (branch, 2026-11-04)
+
+Status: implemented and live-probed on dedicated branches. No tag, push,
+merge, pin bump, deploy, `tickets/INDEX.md` edit or hover-ticket edit was made.
+
+### Branches and commits
+
+| Repo | Worktree | Branch | HEAD |
+|---|---|---|---|
+| `ags-platform` | `.worktrees/SPIKE-003/` | `ticket/SPIKE-003-capture-cluster-ipc` | `3e3e6e0` |
+| `ags-capture-tool` | `.worktrees/SPIKE-003/` | `ticket/SPIKE-003-capture-cluster-ipc` | commits below |
+| `ags-bar` | `.worktrees/SPIKE-003/` | `ticket/SPIKE-003-capture-cluster-ipc` | `1c1e29b` |
+
+- platform `3e3e6e0` — add `ports/capture-cluster.ts` (v1 validator, parser,
+  response encoder) + `tests/capture-cluster.test.ts`.
+- capture `89e0369` — record worktree/branch.
+- capture `766dcd3` — dispatcher, pure request handler, monitor/geometry
+  resolution, cluster window/controller, CSS, tests.
+- capture `d069d82` — create the cluster JSX inside a gnim `createRoot` so a
+  request-time window has a cleanup scope (removes the `out of tracking
+  context` critical).
+- capture docs commit — record this implementation/gate/live evidence section.
+- bar `308ad48` — request client, slot measurement, visibility adapter,
+  `popup-close` forwarding, deletion of the old cluster/popover/CSS, tests.
+- bar `1c1e29b` — GLib timeout adapter (GJS has no DOM timer) and a 15 s
+  liveness update so a capture restart recovers without a bar state change.
+
+### Gates (final run, exit 0)
+
+Logs: `/tmp/opencode/capture-cluster-b/gates/`.
+
+| Gate | Command | Result |
+|---|---|---|
+| platform | `make test exports typecheck-tests typecheck bundle` | exit 0; 71 tests + 2 export tests; 0 type errors; bundle is the repo's documented TODO stub |
+| capture | `make gates` (`AGS_PLATFORM_DEV=…`) | exit 0; tests, conformance, backend 114 passed, bundle, 0 type errors |
+| bar | `make gates` (`AGS_PLATFORM_DEV=…`) | exit 0; tests, conformance, drift, bundle, 0 type errors |
+
+`AGS_PLATFORM_DEV` pointed at the platform branch worktree; `CONTRACTS_ROOT`
+pointed at the repo's `contracts` checkout. No pin was changed.
+
+### Live evidence
+
+Environment: AGS 3.1.0/3.1.2, GTK 4.22.5, one `eDP-1` 1920×1080 at scale 1 plus
+temporary Hyprland headless outputs. Deployed instances were stopped for the
+probe and restored afterwards (`ags`, `capture`, `notifications`,
+`wallpaper-selector`; headless output removed).
+
+- Transport shape: `ags request capture-cluster '<json>' -i capture` returns
+  exactly one JSON string. Live responses observed:
+  `{"ok":true}`; `{"ok":false,"error":"unsupported-version","retryable":false}`;
+  `{"ok":false,"error":"unknown-monitor","retryable":true}`;
+  `{"ok":true}` for `popover-close`.
+- Bar-driven cluster: `capture.state` recording → bar measured the slot and
+  capture mapped `connector:eDP-1 at {"marginTop":2,"marginLeft":1402,
+  "width":92,"height":44}`. `hyprctl layers` showed the overlay at
+  `1402 2 92 44`; `grim` crop:
+  `/tmp/opencode/capture-cluster-b/shots/cluster-recording-crop.png`.
+- Paused: same window, dot/status switched to paused at `00:42`;
+  `/tmp/opencode/capture-cluster-b/shots/cluster-paused-crop.png`.
+- Hide/idle: `ags request` hide and `capture.state → idle` both removed the
+  overlay; `hyprctl layers` had no `capture-cluster`; screenshot:
+  `/tmp/opencode/capture-cluster-b/shots/cluster-idle-crop.png`.
+- Stale sequence: show seq 100 moved the cluster; hide seq 101 removed it; a
+  later update seq 99 did **not** recreate it (all three returned `{"ok":true}`).
+- Popover: programmatically opened the capture cluster popover on the 92×44
+  layer surface. It rendered unclipped below the slot with Recording / Pause /
+  Stop, then auto-closed after ~5 s because no pointer was over it:
+  `/tmp/opencode/capture-cluster-b/shots/popover2-crop.png`.
+- Negative monitor origin: temporary `HEADLESS-1` at `-1920,0`, scale 1.
+  Capture mapped `connector:HEADLESS-1` at local `1402,2`; the compositor layer
+  was global `-518 2 92 44`, proving monitor-local coordinates are not shifted:
+  `/tmp/opencode/capture-cluster-b/shots/headless-negative-crop.png`.
+- 2× scale: `HEADLESS-1` at `-1920,0`, 3840×2160, scale 2. Capture still mapped
+  local `1402,2`; the layer remained `-518 2 92 44` in logical coordinates and
+  rendered at 2× physical pixels with no scale multiplication:
+  `/tmp/opencode/capture-cluster-b/shots/headless-2x-crop.png`.
+- Capture kill/restart: killed `capture`; the overlay died with it. Restarted
+  capture. The bar's 15 s liveness update retried and capture remapped
+  `connector:eDP-1 at {"marginTop":2,"marginLeft":1402,"width":92,"height":44}`
+  with no bar state change.
+- `popup-close` forwarding: `ags request popup-close -i ags` returned `ok` and
+  the bar invoked capture's `popover-close` client path.
+
+### Blockers / integration notes
+
+1. **Platform pin.** The contract lives on `ags-platform` branch
+   `ticket/SPIKE-003-capture-cluster-ipc`; app `Makefile` pins remain v0.4.0 /
+   v0.3.0. The app branches are not deployable from the pinned tuple until the
+   orchestrator integrates/publishes the platform change. Local gates and probes
+   used `AGS_PLATFORM_DEV` + the branch worktree; no pin was bumped.
+2. **Pointer injection.** No `ydotool`/`wtype`/`xdotool` is installed, so the
+   popover was opened programmatically rather than by a synthetic pointer click.
+   Opening, rendering, auto-close and the request path are verified; real
+   outside-click/Escape delivery to the popover was not directly driven.
+3. **Index/rollup.** `tickets/INDEX.md` and the hover tickets were deliberately
+   not edited. No bar/platform tickets were created; only this lead ticket
+   records the cross-repo refs. The orchestrator owns the rollup and any
+   platform release/pin coordination.
+4. **Liveness semantics.** The bar sends a 15 s keepalive `update` while a
+   cluster is shown. This is the capture-restart recovery path, not a display
+   timer; the capture process remains the only timer/state renderer.

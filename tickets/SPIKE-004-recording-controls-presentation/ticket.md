@@ -273,3 +273,54 @@ capture (instance "capture")
 The bar may also send `popover-close` for the global Esc path. There is no
 callback from capture to a bar controller; the top bar is only a slot provider
 and request client.
+
+## Implementation (branch)
+
+- `ags-capture-tool` `e95eb00` — unified setting and capture wiring:
+  - `domain/settings.ts` now owns `recording_controls: "top-bar" | "hover" | "always"`.
+  - `mergeSettings` reads the new key, migrates legacy `bar.recording_hud`
+    (`hidden → top-bar`), and writes only the new key.
+  - Settings UI: **Top bar / On hover / Always visible**; `Hidden` is gone.
+  - `ClassicWindow` derives `recordingSurfaces(config.recording_controls)`:
+    `top-bar` suppresses the capture S4, refuses launcher override, and stops
+    the hover poll; `hover`/`always` drive the native S4 bar.
+  - `hudVisibility` gained `allowLauncherHud`; top-bar passes `false`.
+- `ags-capture-tool` `9acd8d5` — shared `.rec-cluster.full` minimum width
+  `161px`, so the native full cluster matches the top-bar full card.
+- `ags-bar` `f697e08` — the bar reads
+  `preferences.get("capture-tool", "recording_controls", "top-bar")`; its slot
+  is visible only in `top-bar` mode, and leaving that mode hides the capture
+  cluster immediately. Liveness updates are gated the same way.
+- `ags-capture-tool` `9217ae8` — SPIKE-004 added to `tickets/INDEX.md`.
+- `ags-capture-tool` `c5d1973` — cherry-picked the missing SPIKE-003
+  `sequenceDecision` fix into this baseline (the SPIKE-003 branch now has it as
+  `e0964b3` too).
+
+## Live probes (2026-11-04)
+
+Config was backed up, switched through the modes, then restored byte-for-byte
+(`bar_compact_controls:false`, `bar.position:top`, `bar.recording_hud:hover`).
+
+| Mode | Layers | Result |
+|---|---|---|
+| `top-bar` | `capture-cluster 1329 2 165x54`; no `namespace: capture` | only the top bar surface |
+| `always` | no `capture-cluster`; `capture 868 48 185x54` | only the native S4 surface; visible full card 161 wide |
+| `hover` | no `capture-cluster`; capture S4 unmapped until pointer | only the native S4 surface; pointer-driven reveal not synthetically driven |
+
+Screenshots:
+`/tmp/opencode/recording-controls/topbar-crop.png`,
+`/tmp/opencode/recording-controls/always-final-crop.png`.
+
+Pointer note: this Hyprland build’s Lua dispatcher rejected both
+`hyprctl dispatch movecursor …` and `hl.dispatch("movecursor", …)`, so the hover
+reveal was validated by the pure tests and the unmapped layer, not by a synthetic
+pointer move. The user can verify the reveal by moving the pointer to the
+configured capture bar.
+
+Gates (exit 0):
+
+- `/tmp/opencode/recording-controls/gates/capture-gates-final.log`
+- `/tmp/opencode/recording-controls/gates/bar-gates-final.log`
+
+State after probe: branch apps stopped; deployed `ags`/`capture` restored;
+`capture.state` idle; user config restored to the original legacy key.

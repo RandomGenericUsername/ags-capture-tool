@@ -41,6 +41,7 @@ export interface ClusterWindowHandle {
   render(state: ClusterWindowState): void
   updateLayout(anchor: ClusterAnchor): void
   closePopover(): void
+  openPopover(): void
   destroy(): void
 }
 
@@ -292,6 +293,7 @@ export function ClusterWindow(options: ClusterWindowOptions): ClusterWindowHandl
     closePopover(): void {
       popup?.popdown()
     },
+    openPopover,
     destroy(): void {
       popup?.popdown()
       element.destroy()

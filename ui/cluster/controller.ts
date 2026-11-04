@@ -10,6 +10,7 @@
 // authority rules (capture.state wins over the bar's `observed` hint).
 // ---------------------------------------------------------------------------
 
+import { createRoot } from "ags"
 import type { Gdk, Gtk } from "ags/gtk4"
 import GLib from "gi://GLib?version=2.0"
 import type {
@@ -73,6 +74,7 @@ interface ClusterEntry {
   compact: boolean
   labels: ClusterLabels
   handle: ClusterWindowHandle
+  dispose: () => void
 }
 
 function labelsFor(request: ClusterRequest): ClusterLabels {
@@ -127,6 +129,7 @@ export function createClusterController(
     if (openKey === key) openKey = null
     app.remove_window(entry.handle.window)
     entry.handle.destroy()
+    entry.dispose()
   }
 
   function destroyAll(): void {
@@ -214,38 +217,44 @@ export function createClusterController(
 
     if (existing) destroyEntry(key)
 
-    let entry: ClusterEntry | null = null
-    const handle = ClusterWindow({
-      gdkmonitor: monitor,
-      anchor: request.anchor,
-      onToggle: () => {
-        if (hud.jobId !== null) captureState.control(hud.jobId, pauseAction(hud))
-      },
-      onStop: () => {
-        if (hud.jobId !== null) captureState.control(hud.jobId, "stop")
-      },
-      onPopoverOpen: () => {
-        for (const [otherKey, other] of entries) {
-          if (otherKey !== key) other.handle.closePopover()
-        }
-        openKey = key
-      },
-      onPopoverClose: () => {
-        if (openKey === key) openKey = null
-      },
+    // JSX created from a request handler runs outside `main()`'s reactive
+    // root. Without this scope gnim logs "out of tracking context" and cannot
+    // clean the window's effects up; the scope is disposed with the window.
+    const created = createRoot((dispose) => {
+      const handle = ClusterWindow({
+        gdkmonitor: monitor,
+        anchor: request.anchor,
+        onToggle: () => {
+          if (hud.jobId !== null) captureState.control(hud.jobId, pauseAction(hud))
+        },
+        onStop: () => {
+          if (hud.jobId !== null) captureState.control(hud.jobId, "stop")
+        },
+        onPopoverOpen: () => {
+          for (const [otherKey, other] of entries) {
+            if (otherKey !== key) other.handle.closePopover()
+          }
+          openKey = key
+        },
+        onPopoverClose: () => {
+          if (openKey === key) openKey = null
+        },
+      })
+      return { handle, dispose }
     })
-    entry = {
+    const entry: ClusterEntry = {
       key,
       monitor,
       anchor: request.anchor,
       compact: request.compact,
       labels: labelsFor(request),
-      handle,
+      handle: created.handle,
+      dispose: created.dispose,
     }
     entries.set(key, entry)
-    handle.render({ hud, labels: entry.labels, compact: entry.compact })
-    app.add_window(handle.window)
-    handle.window.visible = true
+    entry.handle.render({ hud, labels: entry.labels, compact: entry.compact })
+    app.add_window(entry.handle.window)
+    entry.handle.window.visible = true
     report(`capture-cluster: mapped ${key} at ${JSON.stringify(clusterPlacement(request.anchor))}`)
   }
 

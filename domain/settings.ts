@@ -162,6 +162,21 @@ export function mergeSettings(raw: unknown): CaptureSettings {
   }
 }
 
+
+/** True when a legacy `bar.recording_hud` still needs a one-time on-disk migration. */
+export function needsRecordingControlsMigration(raw: unknown): boolean {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return false
+  const record = raw as Record<string, unknown>
+  if ("recording_controls" in record) return false
+  const bar = record.bar
+  return (
+    bar !== null &&
+    typeof bar === "object" &&
+    !Array.isArray(bar) &&
+    "recording_hud" in (bar as Record<string, unknown>)
+  )
+}
+
 /** Validate settings before persisting; returns an error string or null. */
 export function validateSettings(settings: CaptureSettings): string | null {
   if (settings.screenshot_dir.trim() === "") return "Screenshot folder cannot be empty."

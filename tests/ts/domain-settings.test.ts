@@ -29,6 +29,7 @@ import {
   defaultSettings,
   expandDir,
   mergeSettings,
+  needsRecordingControlsMigration,
   validateSettings,
   type CaptureSettings,
 } from "../../domain/settings.ts"
@@ -166,6 +167,20 @@ test("mergeSettings: recording_controls defaults to top-bar and every mode round
       mode,
     )
   }
+})
+
+test("needsRecordingControlsMigration detects only a legacy on-disk key", () => {
+  assert.equal(needsRecordingControlsMigration({ bar: { recording_hud: "hover" } }), true)
+  assert.equal(
+    needsRecordingControlsMigration({
+      recording_controls: "hover",
+      bar: { recording_hud: "hover" },
+    }),
+    false,
+  )
+  assert.equal(needsRecordingControlsMigration({ bar: { position: "top" } }), false)
+  assert.equal(needsRecordingControlsMigration(null), false)
+  assert.equal(needsRecordingControlsMigration([]), false)
 })
 
 test("mergeSettings: legacy recording_hud values migrate to the unified mode", () => {

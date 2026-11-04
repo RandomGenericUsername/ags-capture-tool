@@ -24,6 +24,7 @@ import {
   defaultSettings,
   expandDir,
   mergeSettings,
+  needsRecordingControlsMigration,
   validateSettings,
 } from "../domain/settings"
 
@@ -48,7 +49,18 @@ function loadSettings(): CaptureSettings {
     if (!GLib.file_test(CONFIG_PATH, GLib.FileTest.EXISTS)) return defaultSettings()
     const [ok, bytes] = GLib.file_get_contents(CONFIG_PATH)
     if (!ok || bytes === null) return defaultSettings()
-    return mergeSettings(JSON.parse(new TextDecoder().decode(bytes)))
+    const raw = JSON.parse(new TextDecoder().decode(bytes)) as unknown
+    const settings = mergeSettings(raw)
+    // One-time migration: the bar reads the new top-level key through the
+    // Preferences port, so an old `bar.recording_hud` must be written forward
+    // instead of only living in this process's merged copy.
+    if (needsRecordingControlsMigration(raw)) {
+      const error = saveSettings(settings)
+      if (error !== null) {
+        console.error(`capture-tool: cannot migrate recording_controls: ${error}`)
+      }
+    }
+    return settings
   } catch (error) {
     console.error(`capture-tool: cannot read settings config: ${error}`)
     return defaultSettings()

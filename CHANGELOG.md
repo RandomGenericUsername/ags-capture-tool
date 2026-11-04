@@ -1,14 +1,103 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 — 2026-11-01
+
+The capture bar redesign: the centred three-page panel is replaced by a
+state-driven minimalist bar, the capture flow becomes selection-first with a
+separate overlay, recording gains its red accent and live HUD, and the
+stylesheet moves to the `palette.v1` semantic roles. Since `v0.1.0`: 24
+commits across 69 files (+8,981/−1,275).
+
+### REQ-002 — capture bar shell
+
+- Replace the centred panel with the S0–S4 state machine: S0 is an icon-only
+  resting rail (`📷 🎥 ⚙`), S1 opens one mode with a leading `←` back button,
+  1:1 screenshot/recording option pills, and the CTA; settings open from S0
+  only. The resting rail measures 142×54; the old app was a centred panel.
+- Persist placement as `bar.position` (`bottom` default) and `bar.offsetPx`;
+  top placement sits below the compositor reserved zone (`reserved_top` +
+  offset) and the bar stays non-EXCLUSIVE.
+- Keep one live `capture-window` per monitor; focus changes re-map visibility
+  only, and the in-place palette refresh still preserves the open surface,
+  editor state and shared `UiState`.
+- Keep every existing screenshot/recording option, setting and identity
+  contract (`capture-window`, `capture-ui`, `app.manifest.json`) unchanged.
+
+### REQ-003 — selection-first flow + overlay window
+
+- Opening a mode engages a persistent, editable pending selection: region dim
+  + 8-handle rect (drag/move/resize on one monitor), pointer-following window
+  ring + pin, or monitor outline with a `Monitor n` chip when more than one
+  monitor exists. Release and hover never capture.
+- `Capture`/`Record` or `Enter` commits the on-screen selection as a one-way
+  door: selection chrome is hidden synchronously before the backend starts and
+  no post-commit editing state exists.
+- A dedicated per-monitor `capture-overlay` window (layer TOP, exclusivity
+  IGNORE, keymode NONE) holds the selection chrome; the bar remains
+  `capture-window` OVERLAY/ON_DEMAND.
+- Backend commit flags are additive: `--geometry "X,Y WxH"` / `--monitor` /
+  `--window 0x…` for the UI path, legacy argv byte-identical, no slurp
+  fallback, vanished window → typed error.
+- Esc unwinds one level per press: clear pick → close mode → hide bar.
+
+### REQ-004 — recording lifecycle + HUD
+
+- Recording uses the palette red accent (`--rec-accent: @error`) across the
+  active chip, selected pills, CTA and overlay chrome; the CTA label flips
+  `Capture → Record`. No hardcoded hex.
+- The S4 HUD is driven by `capture.state` from the platform event bus, not
+  backend stdout: elapsed time, Pause/Resume and Stop, with paused spans
+  excluded from elapsed time.
+- `bar.recording_hud` controls S4 visibility: `hidden` (default; ags-bar is
+  the sole automatic timer and the capture bar stays out of recordings),
+  `always` (Sheet 3 HUD mapped and therefore recorded), `hover` (chrome on
+  pointer entry). A launcher/keybind mid-recording presents the HUD in
+  `hidden` without altering the capture; Stop stays reachable in every mode.
+- `bar_compact_controls` keeps its meaning: compact moves Pause/Stop into the
+  popup; otherwise the bar carries them. Options are locked while live and
+  the HUD survives `palette-refresh` in place.
+
+### REQ-005 — palette.v1 role CSS
 
 - Migrate `style.css` from legacy `@color_*` carriers to the semantic
-  `palette.v1` roles projected by `ags-platform` v0.4.0 (`@on_surface`,
-  `@surface`, `@primary`/`@on_primary`, `@outline_variant`, `@error`). The
-  mapping is by intent per site; geometry, alpha values, selectors and the
-  palette-refresh path are unchanged.
+  `palette.v1` roles projected by `ags-platform` v0.4.0: `@on_surface`,
+  `@surface`, `@primary`/`@on_primary`, `@on_error`, `@outline_variant` and
+  `@error`. Mapping is by intent per site; geometry, alpha values, selectors
+  and the palette-refresh path are unchanged.
+- Paired ink makes recording controls readable (`@on_error` on `@error`,
+  7.72:1 instead of 1.31:1) and uses `@on_primary` on the primary accent.
 - Pin `ags-platform` v0.4.0 while `contracts` stays v0.3.0, and add a
   validation gate that fails on any returning `@color_*` carrier.
+
+### Known verification limits at release
+
+These were open when `v0.2.0` was tagged. They are tracked for closure in
+`tickets/OPS-001-release-record-v0.2.0/`; no acceptance box is ticked by this
+entry.
+
+- **Overlay never captured (FR-10):** commit ordering and the synchronous
+  hide→launch path are tested, but no manual 2-second clip with a pending
+  selection was produced, so the recorded proof is missing.
+- **Recorded-clip proof for HUD `hidden` vs `always`:** the visibility rule,
+  settings tolerance and wiring are tested, but no recording was produced to
+  show the HUD absent in `hidden` and present in `always`.
+- **Backend commit flags additive proof:** the additive flags, no-slurp path,
+  typed vanished-window error and legacy argv parity are pinned by tests, but
+  a live end-to-end commit through the overlay was not captured as an
+  artifact.
+- **`scale≠1` geometry untested:** the host exposes a single `scale=1`
+  output, so GDK/hyprctl/grim coordinate equality on a scaled or
+  negative-origin output is unmeasured.
+- **HUD in clip:** whether the S4 surface actually lands in recorded frames
+  is reasoned from layer/compositor semantics, not observed in a clip.
+
+### Release record
+
+- Tag: annotated `v0.2.0` at `1897607`, 2026-11-01 23:09:15 -0500. The tag
+  message remains the original `v0.2.0 — CSS on palette.v1 roles (REQ-005)`.
+- This changelog section and the GitHub release notes were corrected on
+  2026-11-04 to describe the full release. Code and the deployed pin did not
+  change; no `v0.2.1` was cut.
 
 ## v0.1.0 — 2026-10-27
 

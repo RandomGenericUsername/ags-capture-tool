@@ -224,3 +224,52 @@ AGS_PLATFORM_DEV=/home/inumaki/Development/dotfiles/ags-platform/.worktrees/SPIK
 
 Not wired yet: `domain/settings.ts`, `SettingsPage.tsx`, `ClassicWindow.tsx`,
 and `ags-bar/bar/widgets/recording.tsx`. Those wait on the open decisions above.
+
+## Decisions (JD, 2026-11-04)
+
+1. **Remove `hidden` from the UI.** The user must choose either the capture
+   native bar (`hover` or `always`) or the top-bar surface (`top-bar`). A
+   legacy `hidden` value migrates to `top-bar` so there is always one control
+   surface and no silent “no controls” state.
+2. **No manual S4 override in `top-bar` mode.** Opening the capture UI while a
+   recording is live does not bring back the capture S4 row; the top-bar cluster
+   is the only control surface.
+3. **`bar_compact_controls` stays separate.** It is a layout choice (compact
+   popover vs full inline controls), not a surface choice.
+4. **Setting ownership:** capture-tool config for now; the bar reads it through
+   the existing Preferences port. Moving the rule to `ags-platform` is deferred
+   until the mode proves stable.
+5. **`top-bar` is always visible while recording**, matching today’s top-bar
+   cluster. It is not a hover-over-the-top-bar mode.
+
+## Baseline integration
+
+This spike now contains the SPIKE-003 architecture baseline (merge commit
+`7518c45`): capture owns the shared `.rec-*` rendering in both the top-bar
+overlay and the capture hover row; the bar owns only the slot measurement and
+the request client. The pure presentation rule remains on top of that baseline.
+
+### Actual flow (important)
+
+The top bar does **not** call a process that makes capture invoke a controller on
+the bar. The flow is one-way:
+
+```text
+ags-bar (instance "ags")
+  capture.state subscription -> visibility only
+  measure its own slot
+  ags request capture-cluster '<json>' -i capture
+        |
+        v
+capture (instance "capture")
+  validate argv + JSON
+  controller resolves the monitor, places a layer-shell window at the slot,
+  renders the shared .rec-* cluster, owns timer/popover/actions
+        |
+        v
+  pause/resume/stop -> hub.control(jobId, action)  (never through the bar)
+```
+
+The bar may also send `popover-close` for the global Esc path. There is no
+callback from capture to a bar controller; the top bar is only a slot provider
+and request client.

@@ -178,7 +178,9 @@ export function SettingsPage(props: SettingsPageProps) {
       toggleRow(
         "Compact bar indicator",
         "Available for Top bar and Always visible. On hover forces the inline controls so Pause/Stop is one click.",
-        () => settingsConfig.bar_compact_controls,
+        () =>
+          settingsConfig.bar_compact_controls &&
+          settingsConfig.recording_controls !== "hover",
         (value) => {
           settingsConfig.bar_compact_controls = value
         },

@@ -183,7 +183,10 @@ test("hover forces the full inline controls and disables the compact setting", (
     /function effectiveCompact\(\): boolean \{\s*return config\.bar_compact_controls && surfaces\(\)\.compactAllowed/,
   )
   assert.match(PRESENTATION, /case "hover":[\s\S]*?compactAllowed: false/)
-  assert.match(SETTINGS_PAGE, /settingsConfig\.recording_controls !== "hover"/)
+  assert.match(
+    SETTINGS_PAGE,
+    /\(\) =>\s*settingsConfig\.bar_compact_controls &&\s*settingsConfig\.recording_controls !== "hover"/,
+  )
   assert.match(SETTINGS_PAGE, /Available for Top bar and Always visible/)
 })
 

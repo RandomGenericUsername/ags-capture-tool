@@ -354,3 +354,8 @@ Live note: the `always` + `bar_compact_controls:true` probe correctly stayed
 compact (133×54), because `always` allows compact. `hover` forces full by the
 pure rule; the synthetic pointer move is unavailable on this Hyprland build, so
 the hover reveal/full-controls appearance remains a manual check.
+
+The compact switch **displays off** while On hover is selected (not just
+disabled in the on position); the stored preference is preserved for the next
+Top bar / Always visible selection. Gate:
+`/tmp/opencode/recording-controls/gates/capture-gates-compact-display.log`.

@@ -56,6 +56,7 @@ T2 evidence and scale caveat are recorded; the capture gates exit 0.
 
 | Claim | Command / artifact | Observed |
 |---|---|---|
+| Reconciliation commit | `git show --stat ee7aab1` | 9 files changed (+172/−38); `OPS-003` created; no code paths touched |
 | No unchecked child acceptance | `grep -rn '^- \[ \]' tickets/REQ-002-capture-bar-shell tickets/REQ-003-selection-first-flow tickets/REQ-004-recording-lifecycle tickets/REQ-005-theme-roles` | no matches |
 | EPIC rollup | `grep -c '^- \[x\] ' tickets/EPIC-001-capture-bar-redesign/ticket.md` | `3` = `children: [REQ-002, REQ-003, REQ-004]` |
 | REQ-003 status | `sed -n '1,12p' tickets/REQ-003-selection-first-flow/ticket.md` | `status: done` |

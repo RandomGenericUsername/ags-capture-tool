@@ -80,4 +80,6 @@ change; both gate sets exit 0.
 Closed 2026-11-04. `ags-capture-tool` `main` carries `6286fc1` (changelog +
 release notes) and `152182d` (freeze superseded + INDEX); the `v0.2.0` GitHub
 Release is published; `dotfiles-v3` carries `c12d9edc` (0.6.21 correction).
-T2 and T3 are open and are not claimed by this closeout.
+T2 and T3 were open at this closeout and are recorded separately in
+[`OPS-002`](../OPS-002-verification-proof/ticket.md) and
+[`OPS-003`](../OPS-003-reconcile-ticket-state/ticket.md).

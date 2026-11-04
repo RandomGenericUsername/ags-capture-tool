@@ -2,14 +2,14 @@
 id: BUG-001
 title: "Settings panel has no card background and is unreadable over the window behind"
 kind: bug
-status: triage
+status: in-progress
 lane: direct
 severity: high
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: main
+worktree: .worktrees/BUG-FIX/
+branch: ticket/BUG-FIX-capture-bugs
 repro: "Open the capture bar (`SUPER+PRINT`, or `ags toggle capture-window -i capture`), put a text-heavy window (terminal/editor) behind it, click the ⚙ rail icon, and read the settings labels."
 observed: "The Settings view paints no card: labels, group titles, rows and the footer float directly over the text of the window behind. There is no background fill, border, radius or shadow, so the panel is effectively transparent and unreadable (JD screenshot, 2026-11-04)."
 expected: "The Settings view paints its own opaque card — the same treatment as `.notif-card` (`background-color: @surface`, border, radius, shadow) or at least the capture bar's `alpha(@surface, 0.92)` plate — while `window#capture-window` stays transparent for the first-frame reason."
@@ -93,6 +93,40 @@ Settings surface itself — most naturally a background/border/radius/padding
 the palette roles (`@surface`, `@on_surface`) so a palette refresh restyles it.
 Regression proof: open Settings over a text-heavy window and confirm the panel
 is opaque/readable; keep the first-frame no-rectangle behaviour.
+
+## Implementation — 2026-11-04
+
+Branch `ticket/BUG-FIX-capture-bugs`, worktree `.worktrees/BUG-FIX/`, code
+commit `2445d44`. Status stays `in-progress` until the orchestrator deploys.
+
+- `.capture-view` now paints its own card: `background-color: @surface`, a
+  1px `alpha(@on_surface, 0.12)` border, 18px radius and 18px padding. The
+  Settings view is still a sibling of the bar rows.
+- `window#capture-window` stays fully transparent, and `.capture-bar` keeps its
+  `alpha(@surface, 0.92)` plate unchanged, so the first-frame no-rectangle rule
+  and the S0–S4 states are intact.
+- No box-shadow: the layer surface is sized to the child, so a shadow would be
+  clipped into square corners (same reason as the old `.capture-panel`).
+- Regression test: `tests/ts/bar-shell.test.ts:58-75`, "the Settings view paints
+  its own opaque card while the window stays transparent".
+- Screenshots (grim, text-heavy kitty behind):
+  `/tmp/opencode/capture-fix-batch/before-settings-over-text.png` shows the
+  transparent labels colliding with the terminal text;
+  `/tmp/opencode/capture-fix-batch/after-settings-over-text.png` shows the
+  opaque card.
+- Gates: `make test` 10/10 unit, 1/1 validation, 300/300 TypeScript, test
+  `tsc` clean; `make conformance` 16/16; `make backend` 114 passed;
+  `make typecheck` 0 in-tree errors.
+- Tradeoff: the card is fully opaque `@surface` rather than the bar's 0.92
+  plate, and adds 18px padding to the Settings surface. The bar's geometry and
+  every selector/state are unchanged.
+
+**Evidence:** `style.css:423-435`; `tests/ts/bar-shell.test.ts:58-75`; commit
+`2445d44`.
+
+**Verify:** open Settings over a text-heavy window; the panel must have an
+opaque fill and a visible card edge, while the S0 bar keeps its translucent
+plate.
 
 ## Evidence
 

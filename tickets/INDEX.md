@@ -21,8 +21,8 @@
 
 ## Bugs
 
-- [BUG-001-settings-transparency/ticket.md](./BUG-001-settings-transparency/ticket.md) — Settings panel has no card background and is unreadable over the window behind (C17) | `triage` | severity high | lane direct, branch main | live pass 2026-11-04
-- [BUG-002-small-region-move/ticket.md](./BUG-002-small-region-move/ticket.md) — Minimal-size region resizes instead of moving when dragged from its centre (C5) | `triage` | severity medium | lane direct, branch main | live pass 2026-11-04
+- [BUG-001-settings-transparency/ticket.md](./BUG-001-settings-transparency/ticket.md) — Settings panel has no card background and is unreadable over the window behind (C17) | `in-progress` | severity high | lane direct, worktree .worktrees/BUG-FIX/, branch ticket/BUG-FIX-capture-bugs | code 2445d44; gates green; awaiting deploy
+- [BUG-002-small-region-move/ticket.md](./BUG-002-small-region-move/ticket.md) — Minimal-size region resizes instead of moving when dragged from its centre (C5) | `in-progress` | severity medium | lane direct, worktree .worktrees/BUG-FIX/, branch ticket/BUG-FIX-capture-bugs | code 2445d44; gates green; awaiting deploy
 
 ## Ops tasks
 

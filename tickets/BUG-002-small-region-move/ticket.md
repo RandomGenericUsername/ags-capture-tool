@@ -2,14 +2,14 @@
 id: BUG-002
 title: "Minimal-size region resizes instead of moving when dragged from its centre"
 kind: bug
-status: triage
+status: in-progress
 lane: direct
 severity: medium
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: main
+worktree: .worktrees/BUG-FIX/
+branch: ticket/BUG-FIX-capture-bugs
 repro: "Open 📷 → Region, draw a minimal-size rectangle (~15×15), release, then drag from the rectangle's centre."
 observed: "The centre drag starts a resize (a handle is hit) instead of a move; the rectangle grows/shrinks from an edge or corner and cannot be repositioned from its middle."
 expected: "A drag from the interior moves the whole rectangle; resize handles take over only near their own edges/corners."
@@ -65,6 +65,38 @@ below `2 × HANDLE_HIT_RADIUS`; or clamp handle hit boxes to the rect. Add a
 domain-level regression test that a centre point of a normalised 15×15 rect
 does not resolve to a handle, and an interaction check that a centre drag
 produces `kind: "move"`.
+
+## Implementation — 2026-11-04
+
+Branch `ticket/BUG-FIX-capture-bugs`, worktree `.worktrees/BUG-FIX/`, code
+commit `2445d44`. Status stays `in-progress` until the orchestrator deploys.
+
+- `handleHitRadius()` now clamps each axis to
+  `min(HANDLE_HIT_RADIUS, max(0, floor((dimension - 1) / 3)))`. For a 15×15
+  rect that is 4px, leaving the centre outside every handle zone; a normal
+  200×100 rect keeps the full 9px pointer radius.
+- `regionPressAt()` classifies one press as `resize` / `move` / `null`
+  (outside), and `SelectionOverlay.beginRegionDrag()` uses it. The centre move
+  branch therefore cannot be pre-empted by a handle in a minimal rect, while
+  corners and edges still own their own neighbourhoods.
+- Tests: `tests/ts/selection.test.ts:152-190` — minimal-rect centre moves,
+  minimal-rect corner/edge resizes, normal-rect centre move, normal corner/edge
+  resizes, and outside → fresh draw. Existing negative-origin, clamping and
+  coordinate tests remain green.
+- Gates: `make test` 10/10 unit, 1/1 validation, 300/300 TypeScript, test
+  `tsc` clean; `make conformance` 16/16; `make backend` 114 passed;
+  `make typecheck` 0 in-tree errors.
+- Tradeoff: on very small rects the handle hit area shrinks with the rect
+  (4px on 15×15) instead of staying a fixed 9px; that is the price of
+  guaranteeing a move zone. Resize remains available at the exact corners and
+  edges.
+
+**Evidence:** `domain/selection.ts:200-245`;
+`ui/overlay/SelectionOverlay.tsx:237-256`;
+`tests/ts/selection.test.ts:152-190`; commit `2445d44`.
+
+**Verify:** draw a ~15×15 rect, drag from its centre, and confirm the whole
+rect translates; then drag a corner/edge and confirm resize still works.
 
 ## Evidence
 

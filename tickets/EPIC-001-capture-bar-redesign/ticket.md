@@ -15,6 +15,8 @@ done-when: "Bar, selection-first flow and recording lifecycle all ship per desig
 
 # Capture bar redesign — state-driven minimalist bar
 
+> **Release-record handoff (2026-11-04):** [release-handoff-2026-11-04.md](./release-handoff-2026-11-04.md) — T1–T5 owned by the refactor agent; the acceptance/ETA response is under §7 of that file.
+
 ## Done-when
 
 All three child requirements are `done` and the composition holds: the capture

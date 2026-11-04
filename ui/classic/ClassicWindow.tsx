@@ -488,13 +488,14 @@ export function ClassicWindow(
   }
 
   /**
-   * Project `bar.recording_hud` (D9/§6) onto the S4 window and row.
+   * Project the resolved recording-controls surface onto the S4 window and row.
    *
-   * The pure rule decides; this only applies it. `opacity` hides the chrome
-   * without collapsing the row, while `visible` maps only a revealed HUD in
-   * `hover` mode (SPIKE-001 C): the hidden surface has no input region, so the
-   * bar area stays click-through. Mapping is only touched while live: S0/S1
-   * visibility stays the focus/window-set contract.
+   * `recording_controls` is resolved to a `CaptureBarMode` by
+   * `recordingSurfaces()`; this only applies the result. `opacity` hides the
+   * chrome without collapsing the row, while `visible` maps only a revealed
+   * HUD in `hover` mode (SPIKE-001 C): the hidden surface has no input region,
+   * so the bar area stays click-through. Mapping is only touched while live:
+   * S0/S1 visibility stays the focus/window-set contract.
    */
   function applyHudVisibility() {
     const live = isLive(barState)
@@ -531,9 +532,10 @@ export function ClassicWindow(
 
   /**
    * S4 entry. Recording commits hide the pending UI first (FR-10), then this
-   * hands the decision to `bar.recording_hud` (D9): `always` maps the HUD,
-   * `hover` stays UNMAPPED until the compositor poll sees the pointer over the
-   * cached S1 footprint, `hidden` stays unmapped unless the user presents it.
+   * hands the decision to `recording_controls` (D9/SPIKE-004): `always` maps
+   * the capture HUD, `hover` stays UNMAPPED until the compositor poll sees the
+   * pointer over the cached S1 footprint, and `top-bar` leaves the capture bar
+   * hidden because the bar's reserved slot owns the controls.
    * The first `capture.state` snapshot fills in the job id and timer.
    * Screenshot never calls it, so its commit still hides the bar.
    */
@@ -743,9 +745,10 @@ export function ClassicWindow(
    * does the launcher receive argv (FR-10). There is no post-commit editing
    * state.
    *
-   * Recording then consults `bar.recording_hud` (D9) after the hides and before
-   * the launcher spawns: `always`/`hover` may map the bar as the S4 HUD, while
-   * `hidden` leaves it unmapped so no capture-bar chrome can reach a frame.
+   * Recording then consults `recording_controls` (D9/SPIKE-004) after the
+   * hides and before the launcher spawns: `always`/`hover` may map the capture
+   * bar as the S4 HUD, while `top-bar` leaves it unmapped so the bar's slot is
+   * the only control surface and no capture-bar chrome can reach a frame.
    * The pending row is gone either way. Screenshot keeps REQ-003's
    * hide-and-stay-hidden behaviour.
    *
@@ -877,9 +880,9 @@ export function ClassicWindow(
     config = settingsStore.load()
     applyGroup(screenshotCursorGroup, config.screenshot.cursor)
     applyGroup(recordingCursorGroup, config.recording.cursor)
-    // `recording_hud` is an S4 decision. If it changed under a live lane, stop
-    // or start the hover poll and re-apply the pure rule without touching the
-    // capture (options stay locked; this is the external-config path).
+    // `recording_controls` is an S4 decision. If it changed under a live lane,
+    // stop or start the hover poll and re-apply the pure rule without touching
+    // the capture (options stay locked; this is the external-config path).
     if (isLive(barState)) {
       if (surfaces().captureBar === "hover") syncHoverPoll()
       else {

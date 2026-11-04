@@ -56,22 +56,25 @@ export function isHudLive(state: RecordingHudState): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// S4 chrome visibility (design.md D9/§6, REQ-004).
+// S4 chrome visibility (design.md D9/§6, REQ-004; SPIKE-004 presentation).
 //
-// `bar.recording_hud` decides what the live S4 surface looks like. This is a
-// pure decision so the three modes can be exercised without GTK:
+// `recording_controls` (`top-bar | hover | always`) is resolved by
+// `recordingSurfaces()` into a `CaptureBarMode`; this pure rule only decides
+// what that resolved mode does to the live S4 surface:
 //
-//   hidden  -> nothing automatic. The bar window stays unmapped while live;
-//              only a launcher/keybind presentation (`presentedByLauncher`)
-//              maps it and reveals the HUD. ags-bar remains the sole automatic
-//              live timer, so recordings carry no capture-bar chrome.
-//   always  -> the bar is mapped and the Sheet 3 HUD is visible (current S4
-//              behaviour); it is therefore part of recorded frames.
-//   hover   -> the bar window is UNMAPPED until a compositor pointer poll says
-//              the pointer is over the normal S1 bar footprint (SPIKE-001 C).
-//              The hidden state is fully click-through; only the revealed
-//              76x38 (or 243x46) HUD is mapped and clickable. Entering/leaving
-//              never touches the running capture.
+//   hidden  -> nothing automatic. The capture bar window stays unmapped while
+//              live; only an allowed launcher/keybind presentation
+//              (`presentedByLauncher`) maps it and reveals the HUD. This is the
+//              `top-bar` path: the bar's reserved slot owns the controls, so
+//              recordings carry no capture-bar chrome.
+//   always  -> the capture bar is mapped and the Sheet 3 HUD is visible
+//              (`recording_controls = always`); it is therefore part of
+//              recorded frames.
+//   hover   -> the capture bar window is UNMAPPED until a compositor pointer
+//              poll says the pointer is over the normal S1 bar footprint
+//              (SPIKE-001 C). The hidden state is fully click-through; only the
+//              revealed 76x38 (or 243x46) HUD is mapped and clickable.
+//              Entering/leaving never touches the running capture.
 //
 // Stop stays reachable in every branch: always shows it, hover reveals it on
 // pointer entry, hidden reveals it when the launcher presents the bar.

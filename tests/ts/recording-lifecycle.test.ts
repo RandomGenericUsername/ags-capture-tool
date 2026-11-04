@@ -55,15 +55,21 @@ const BAR_STATE = read("domain", "bar-state.ts")
 const COMMIT_ORDER = read("lib", "commit-order.ts")
 const ADAPTER = read("adapters", "platform-capture-state-feed.ts")
 
-test("the recording accent is one CSS token mapped to the palette @error", () => {
+test("the recording accent is one CSS token; the cluster keeps its fixed REC red", () => {
   assert.match(
     CSS_NO_COMMENTS,
     /:root\s*\{[^}]*--rec-accent:\s*@error\s*;/,
     "--rec-accent must map to the palette's @error (design.md §11.6)",
   )
-  // No literal colour anywhere: hex in a declaration would break the
-  // palette-refresh promise even if it happened to match today's theme.
-  assert.doesNotMatch(CSS_NO_COMMENTS, /#[0-9a-fA-F]{3,8}\b/)
+  // The S4 lane and overlay chrome must never carry a literal colour. The
+  // capture-drawn bar cluster is the deliberate exception: it reproduces the
+  // bar's accepted design, whose one literal is the pulsing #e0605f REC dot.
+  // Remove that pair of blocks before enforcing the palette-only rule.
+  const paletteOnly = CSS_NO_COMMENTS
+    .replace(/\.rec-dot\s*\{[^}]*\}/g, "")
+    .replace(/@keyframes cluster-rec-pulse\s*\{[\s\S]*?\n\}/g, "")
+  assert.doesNotMatch(paletteOnly, /#[0-9a-fA-F]{3,8}\b/)
+  assert.match(CSS_NO_COMMENTS, /\.rec-dot\s*\{[^}]*background-color:\s*#e0605f/)
 })
 
 test("the recording lane and its overlay chrome read the token", () => {

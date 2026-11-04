@@ -26,6 +26,7 @@ import { monitorKey } from "../../domain/monitor-registry"
 import {
   clusterPlacement,
   resolveClusterMonitor,
+  sequenceDecision,
   validClusterAnchor,
 } from "../../domain/cluster-window"
 import {
@@ -64,7 +65,7 @@ const DEFAULT_LABELS: ClusterLabels = {
   paused: "Recording paused",
   pause: "Pause",
   resume: "Resume",
-  stop: "⏹ Stop",
+  stop: "Stop",
 }
 
 interface ClusterEntry {
@@ -172,8 +173,11 @@ export function createClusterController(
     return { key, monitor }
   }
 
-  function tooStale(key: string, seq: number): boolean {
-    return seq < (sequences.get(key) ?? -1)
+  function acceptSequence(key: string, seq: number): boolean {
+    const decision = sequenceDecision(sequences.get(key), seq)
+    if (decision.stale) return false
+    if (decision.generationReset) sequences.delete(key)
+    return true
   }
 
   function markSequence(key: string, seq: number): void {
@@ -182,7 +186,7 @@ export function createClusterController(
 
   function upsert(request: ClusterRequest & { anchor: ClusterAnchor }): void {
     const { key, monitor } = resolve(request.anchor)
-    if (tooStale(key, request.seq)) {
+    if (!acceptSequence(key, request.seq)) {
       report(`capture-cluster: ignored stale seq ${request.seq} for ${key}`)
       return
     }
@@ -206,12 +210,14 @@ export function createClusterController(
       existing.anchor = request.anchor
       existing.compact = request.compact
       existing.labels = labelsFor(request)
-      existing.handle.updateLayout(request.anchor)
+      // Render first so compact/full visibility has reflowed, then re-assert
+      // the surface size (a mapped layer window does not shrink by itself).
       existing.handle.render({
         hud,
         labels: existing.labels,
         compact: existing.compact,
       })
+      existing.handle.updateLayout(request.anchor)
       return
     }
 
@@ -267,7 +273,7 @@ export function createClusterController(
     const descriptor = resolveClusterMonitor(descriptors, request.anchor)
     if (!descriptor) return
     const key = monitorKey(descriptor)
-    if (tooStale(key, request.seq)) return
+    if (!acceptSequence(key, request.seq)) return
     markSequence(key, request.seq)
     destroyEntry(key)
   }

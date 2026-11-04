@@ -7,6 +7,7 @@ import {
   clusterPlacement,
   popoverPlacement,
   resolveClusterMonitor,
+  sequenceDecision,
   validClusterAnchor,
 } from "../../domain/cluster-window.ts"
 
@@ -159,4 +160,23 @@ test("a zero-size or off-monitor slot is rejected", () => {
   assert.equal(validClusterAnchor(anchor({ x: -1 })), false)
   assert.equal(validClusterAnchor(anchor({ x: 1920 })), false)
   assert.equal(validClusterAnchor(anchor({ y: 1080 })), false)
+})
+
+test("a bar restart resets the per-connector sequence generation", () => {
+  assert.deepEqual(sequenceDecision(undefined, 1), {
+    stale: false,
+    generationReset: false,
+  })
+  assert.deepEqual(sequenceDecision(7, 6), {
+    stale: true,
+    generationReset: false,
+  })
+  assert.deepEqual(sequenceDecision(7, 7), {
+    stale: false,
+    generationReset: false,
+  })
+  assert.deepEqual(sequenceDecision(7, 1), {
+    stale: false,
+    generationReset: true,
+  })
 })

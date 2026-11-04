@@ -285,33 +285,116 @@ window.capture-cluster-window {
   background-color: transparent;
 }
 
-.capture-cluster {
+/* Recording indicator — exactly the bar's accepted design. The capture
+   process now owns this surface, but the visual vocabulary is the bar's old
+   `.rec-*` set: rounded translucent card, pulsing #e0605f dot, 13px tabular
+   timer, icon-only Pause/Play/Stop buttons, and the same popover card. */
+.rec-cluster {
   background-color: alpha(@surface, 0.55);
   border: 1px solid alpha(@on_surface, 0.12);
   border-radius: 10px;
-  padding: 0 4px;
+  padding: 4px 8px 4px 10px;
+  margin-right: 4px;
 }
 
-.capture-cluster.paused {
+.rec-cluster.paused {
   border-color: alpha(@tertiary, 0.45);
 }
 
-.capture-cluster .hud-status {
-  padding: 0 2px;
-  min-height: 0;
+.rec-dot {
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 999px;
+  background-color: #e0605f;
+  animation: cluster-rec-pulse 1.6s ease-out infinite;
 }
 
-.capture-cluster .hud-timer {
+@keyframes cluster-rec-pulse {
+  0% {
+    box-shadow: 0 0 0 0 alpha(#e0605f, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px alpha(#e0605f, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 alpha(#e0605f, 0);
+  }
+}
+
+.rec-dot.paused {
+  background-color: @tertiary;
+  animation: none;
+  box-shadow: none;
+}
+
+.rec-status {
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
   padding: 0 2px;
-  min-width: 0;
+  color: @on_surface;
+}
+
+.rec-timer {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: bold;
   font-variant-numeric: tabular-nums;
+  min-width: 46px;
+  color: @on_surface;
 }
 
-.cluster-popup-actions {
+.rec-btn {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: 7px;
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+  color: @on_surface;
+}
+
+.rec-btn:hover,
+.rec-btn:active,
+.rec-btn:checked,
+.rec-btn:focus {
+  background-color: alpha(@on_surface, 0.1);
+  background-image: none;
+  border: none;
+  box-shadow: none;
+}
+
+.rec-btn.stop:hover {
+  background-color: alpha(@tertiary, 0.22);
+  color: @tertiary;
+}
+
+.rec-popup {
   min-width: 216px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background-color: alpha(@surface, 0.92);
+  border: 1px solid alpha(@on_surface, 0.12);
 }
 
-.cluster-popup-action {
+.rec-popup.paused {
+  border-color: alpha(@tertiary, 0.45);
+}
+
+.rec-popup-row {
+  font-size: 13px;
+  font-weight: 600;
+  color: @on_surface;
+}
+
+.rec-popup-actions {
+  margin-top: 8px;
+}
+
+.rec-popup-action {
   min-height: 38px;
   padding: 0 8px;
   border-radius: 9px;
@@ -324,11 +407,11 @@ window.capture-cluster-window {
   font-weight: 600;
 }
 
-.cluster-popup-action:hover {
+.rec-popup-action:hover {
   border-color: alpha(@on_surface, 0.22);
 }
 
-.cluster-popup-action.danger:hover {
+.rec-popup-action.danger:hover {
   background-color: alpha(@tertiary, 0.2);
   border-color: @tertiary;
   color: @tertiary;

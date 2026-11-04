@@ -67,9 +67,11 @@ for (const role of requiredRoles) {
 }
 
 // No page-background ink on a solid accent: inverted text uses the paired
-// on-primary role (never @surface / the old @color_background).
+// on-primary role (never @surface / the old @color_background). Match `color:`
+// at a declaration boundary so a legitimate `background-color: @surface`
+// surface does not trip the ink gate.
 assert.doesNotMatch(
   css,
-  /color:\s*@surface\b/,
+  /(?:^|[;{]\s*)color:\s*@surface\b/m,
   "text on a solid accent must use @on_primary, never @surface",
 );

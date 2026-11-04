@@ -55,6 +55,24 @@ test("the S0 rail stays under 210px by construction", () => {
   assert.doesNotMatch(CSS, /max-width\s*:/)
 })
 
+test("the Settings view paints its own opaque card while the window stays transparent", () => {
+  const rule = /\.capture-view\s*\{([^}]*)\}/.exec(CSS)
+  assert.ok(rule, "the .capture-view card rule is missing")
+  const body = rule[1]
+  // BUG-001: the Settings view is a sibling of the bar rows, so nothing else
+  // paints a surface for it. @surface (not an alpha plate) is required for
+  // readable labels over arbitrary windows.
+  assert.match(body, /background-color:\s*@surface\s*;/)
+  assert.doesNotMatch(body, /background-color:\s*transparent/)
+  assert.match(body, /border:\s*1px solid alpha\(@on_surface,\s*0\.12\)/)
+  assert.match(body, /border-radius:\s*18px/)
+  assert.match(body, /padding:\s*18px/)
+  // The first-frame fix stays intact: only the child paints chrome.
+  assert.match(CSS, /window#capture-window\s*\{[^}]*background-color:\s*transparent/)
+  // The resting bar's own plate is unchanged.
+  assert.match(CSS, /\.capture-bar\s*\{[^}]*background-color:\s*alpha\(@surface,\s*0\.92\)/)
+})
+
 test("S1 screenshot keeps every existing screenshot option", () => {
   for (const label of [
     "Region",

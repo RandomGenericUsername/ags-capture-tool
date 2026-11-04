@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.2.1 — 2026-11-04
+
+Two confirmed capture behaviour fixes. No identity, palette-role, tag-history or
+deployed-pin changes.
+
+### BUG-001 — Settings panel card
+
+- Paint the Settings view on `.capture-view` with an opaque `@surface` card:
+  `@on_surface` hairline border, 18px radius and 18px padding. The Settings
+  page is a sibling of the bar rows, so it previously had no plate at all and
+  its labels floated over whatever window was behind.
+- `window#capture-window` stays fully transparent and the bar's own
+  `alpha(@surface, 0.92)` plate is unchanged, preserving the first-frame
+  no-rectangle behaviour.
+- Regression test asserts the opaque Settings surface, border/radius/padding,
+  the transparent window, and the unchanged bar plate.
+
+### BUG-002 — minimal region move
+
+- Handle hit-testing now clamps its radius per axis to `(dimension - 1) / 3`,
+  capped at the existing 9px pointer radius. A ~15×15 rect therefore keeps a
+  centre move zone instead of being covered by eight handle zones; corner and
+  edge drags still resize, and normal rects keep the full 9px target.
+- `regionPressAt` classifies a press once (resize / move / outside) and the
+  overlay uses it, replacing the handle-first branch.
+- Tests cover a minimal rect's centre move and corner resize, a normal rect's
+  centre move and corner/edge resizes, and the existing negative-origin,
+  clamping and coordinate cases remain green.
+
+### Test coverage
+
+- `make test`: 10/10 unit, 1/1 validation, 300/300 TypeScript, test `tsc`
+  clean.
+- `make conformance`: 16/16. `make backend`: 114 passed. `make typecheck`: 0
+  errors in the ags-capture-tool tree.
+
 ## v0.2.0 — 2026-11-01
 
 The capture bar redesign: the centred three-page panel is replaced by a

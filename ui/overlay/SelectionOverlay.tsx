@@ -25,16 +25,15 @@ import {
   badgeAnchor,
   clampRect,
   clientByAddress,
-  containsPoint,
   globalToLocal,
   handlePositions,
-  hitHandle,
   intersectRect,
   localToGlobal,
   monitorBadge,
   moveRect,
   rectFromPoints,
   regionBadge,
+  regionPressAt,
   resizeRect,
   windowBadge,
   type Rect,
@@ -239,18 +238,17 @@ export function SelectionOverlay(
     const pending = current.pending
     const existing = pending.target === "region" ? pending.rect : null
     if (existing !== null) {
-      const handle = hitHandle(existing, globalX, globalY)
-      if (handle !== null) {
-        drag = {
-          kind: "resize",
-          handle,
-          start: { x: globalX, y: globalY },
-          origin: existing,
-        }
-        return
-      }
-      if (containsPoint(existing, globalX, globalY)) {
-        drag = { kind: "move", start: { x: globalX, y: globalY }, origin: existing }
+      const press = regionPressAt(existing, globalX, globalY)
+      if (press !== null) {
+        drag =
+          press.kind === "resize"
+            ? {
+                kind: "resize",
+                handle: press.handle,
+                start: { x: globalX, y: globalY },
+                origin: existing,
+              }
+            : { kind: "move", start: { x: globalX, y: globalY }, origin: existing }
         return
       }
     }

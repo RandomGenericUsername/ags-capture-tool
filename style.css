@@ -421,6 +421,16 @@ window#capture-overlay {
 /* ---------------------------------------------------------------- Layout */
 
 .capture-view {
+  /* Settings is a sibling of the bar rows, so it must paint its own card. The
+     window is transparent on purpose (first-frame rect), and the bar's plate is
+     hidden while Settings is open. @surface is fully opaque here rather than
+     the bar's 0.92 plate: the purpose is readable labels over arbitrary windows.
+     Border carries the edge; no box-shadow because the layer surface is sized
+     to the child, so a shadow would be clipped into square corners. */
+  background-color: @surface;
+  border: 1px solid alpha(@on_surface, 0.12);
+  border-radius: 18px;
+  padding: 18px;
   min-height: 130px;
 }
 

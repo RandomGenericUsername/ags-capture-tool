@@ -26,6 +26,7 @@ import {
   normalizeRect,
   rectFromPoints,
   regionBadge,
+  regionPressAt,
   resizeRect,
   windowBadge,
   type ClientRect,
@@ -146,6 +147,37 @@ test("hitHandle prefers the corner, then the edge, and ignores the interior", ()
   assert.equal(hitHandle(rect, 300, 150), "e")
   assert.equal(hitHandle(rect, 200, 100), "n")
   assert.equal(hitHandle(rect, 200, 150), null)
+})
+
+test("a minimal region keeps a centre move zone while its corners still resize", () => {
+  // 15×15 is the live repro (BUG-002): a fixed 9px hit radius made every point
+  // a handle. The clamped radius leaves the centre outside all eight handles.
+  const minimal = { x: 100, y: 100, width: 15, height: 15 }
+  const centre = { x: 107, y: 107 }
+  assert.equal(hitHandle(minimal, centre.x, centre.y), null)
+  assert.deepEqual(regionPressAt(minimal, centre.x, centre.y), { kind: "move" })
+  assert.deepEqual(regionPressAt(minimal, 100, 100), {
+    kind: "resize",
+    handle: "nw",
+  })
+  assert.deepEqual(regionPressAt(minimal, 115, 107), {
+    kind: "resize",
+    handle: "e",
+  })
+})
+
+test("a normal region still moves from its centre and resizes from corner/edge", () => {
+  const rect = { x: 100, y: 100, width: 200, height: 100 }
+  assert.deepEqual(regionPressAt(rect, 200, 150), { kind: "move" })
+  assert.deepEqual(regionPressAt(rect, 100, 100), {
+    kind: "resize",
+    handle: "nw",
+  })
+  assert.deepEqual(regionPressAt(rect, 300, 150), {
+    kind: "resize",
+    handle: "e",
+  })
+  assert.equal(regionPressAt(rect, 900, 900), null, "outside starts a fresh draw")
 })
 
 test("containsPoint and intersectRect agree on edges", () => {

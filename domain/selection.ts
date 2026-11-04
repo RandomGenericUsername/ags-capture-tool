@@ -195,16 +195,51 @@ export function handlePositions(rect: Rect): Array<{ handle: ResizeHandle; x: nu
   }))
 }
 
+/**
+ * The hit radius a rect's handles may occupy, per axis.
+ *
+ * A fixed 9px radius is right for a normal rect, but a ~15×15 rect has eight
+ * handle zones that would cover its whole interior, leaving no place to grab
+ * and move it. Clamp the radius to the rect's own size so the middle of the
+ * rect is always a move surface: `(dimension - 1) / 3` leaves at least the
+ * central third outside every handle, while corners/edges still own their own
+ * neighbourhood. Normal rects keep the full 9px pointer target.
+ */
+function handleHitRadius(rect: Rect): { x: number; y: number } {
+  const r = normalizeRect(rect)
+  return {
+    x: Math.min(HANDLE_HIT_RADIUS, Math.max(0, Math.floor((r.width - 1) / 3))),
+    y: Math.min(HANDLE_HIT_RADIUS, Math.max(0, Math.floor((r.height - 1) / 3))),
+  }
+}
+
 /** The handle under a point, or null. Corners win over edges. */
 export function hitHandle(rect: Rect, x: number, y: number): ResizeHandle | null {
+  const radius = handleHitRadius(rect)
   for (const point of handlePoints(rect)) {
-    if (
-      Math.abs(x - point.x) <= HANDLE_HIT_RADIUS &&
-      Math.abs(y - point.y) <= HANDLE_HIT_RADIUS
-    ) {
+    if (Math.abs(x - point.x) <= radius.x && Math.abs(y - point.y) <= radius.y) {
       return point.handle
     }
   }
+  return null
+}
+
+/**
+ * Classify a press on an existing region before a drag starts.
+ *
+ * Resize handles own only their own neighbourhood (see `handleHitRadius`), so
+ * a minimal rect still has a move zone at its centre. A press outside every
+ * handle and inside the rect moves the whole selection; a press outside the
+ * rect returns null so the overlay can begin a fresh draw instead.
+ */
+export type RegionPress =
+  | { kind: "resize"; handle: ResizeHandle }
+  | { kind: "move" }
+
+export function regionPressAt(rect: Rect, x: number, y: number): RegionPress | null {
+  const handle = hitHandle(rect, x, y)
+  if (handle !== null) return { kind: "resize", handle }
+  if (containsPoint(rect, x, y)) return { kind: "move" }
   return null
 }
 

@@ -324,3 +324,33 @@ Gates (exit 0):
 
 State after probe: branch apps stopped; deployed `ags`/`capture` restored;
 `capture.state` idle; user config restored to the original legacy key.
+
+### Compact-controls policy (JD, 2026-11-04)
+
+Compact (popover) controls are not appropriate for `hover`: they would force
+hover → click → click. The rule is now explicit:
+
+- `top-bar` → `compactAllowed: true`
+- `always` → `compactAllowed: true`
+- `hover` → `compactAllowed: false`; the native S4 bar always renders the full
+  inline Pause/Stop controls.
+
+Capture uses `effectiveCompact() = bar_compact_controls && compactAllowed`.
+The settings page leaves the stored compact switch disabled while `on hover` is
+selected, with copy explaining that hover forces inline controls. Changing the
+mode re-renders the settings rows so the switch enables/disables immediately.
+
+Evidence:
+
+- `domain/recording-presentation.ts`: `compactAllowed`
+- `ui/classic/ClassicWindow.tsx`: `effectiveCompact()`
+- `ui/classic/SettingsPage.tsx`: disabled compact row in hover
+- `tests/ts/recording-presentation.test.ts`: per-mode `compactAllowed`
+- `tests/ts/recording-lifecycle.test.ts`: source guards for the effective rule
+- gates: `/tmp/opencode/recording-controls/gates/capture-gates-compact-policy.log`
+  (exit 0)
+
+Live note: the `always` + `bar_compact_controls:true` probe correctly stayed
+compact (133×54), because `always` allows compact. `hover` forces full by the
+pure rule; the synthetic pointer move is unavailable on this Hyprland build, so
+the hover reveal/full-controls appearance remains a manual check.

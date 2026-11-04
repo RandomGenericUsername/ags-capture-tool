@@ -175,6 +175,11 @@ probe all agree on what actually happens:
   `hyprctl dispatch 'hl.dsp.cursor.move({x=960,y=1058})'` revealed the
   dot + `00:03` HUD; the `leave` handler applies the same rule in reverse.
   Screenshot: `/tmp/opencode/hover-probe/s4-hover-enter.png` (revealed HUD).
+  Probe caveat: the synthetic event bypasses `enterLiveHud`, so the first
+  attempt still had the previously loaded `hidden` value and did not map; a
+  real commit reloads the setting (`ui/classic/ClassicWindow.tsx:298-309`), so
+  the probe needed a bar remap first. That is an artifact of the probe, not a
+  product difference.
 - **Why JD saw "no hover".** The S4 hit area is only the HUD row
   (76×38 here), centred at the bottom. The S1 bar is much wider (142 px at
   rest, ~1123 px in a lane); the Record CTA sits near its right edge. Moving

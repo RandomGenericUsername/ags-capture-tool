@@ -67,9 +67,11 @@ export function isHudLive(state: RecordingHudState): boolean {
 //              live timer, so recordings carry no capture-bar chrome.
 //   always  -> the bar is mapped and the Sheet 3 HUD is visible (current S4
 //              behaviour); it is therefore part of recorded frames.
-//   hover   -> the bar is mapped for its hit area, but the chrome is hidden
-//              until the pointer is inside it. Entering/leaving never touches
-//              the running capture.
+//   hover   -> the bar window is UNMAPPED until a compositor pointer poll says
+//              the pointer is over the normal S1 bar footprint (SPIKE-001 C).
+//              The hidden state is fully click-through; only the revealed
+//              76x38 (or 243x46) HUD is mapped and clickable. Entering/leaving
+//              never touches the running capture.
 //
 // Stop stays reachable in every branch: always shows it, hover reveals it on
 // pointer entry, hidden reveals it when the launcher presents the bar.
@@ -98,7 +100,10 @@ export function hudVisibility(input: HudVisibilityInput): HudVisibility {
     case "always":
       return { mapWindow: true, showChrome: true }
     case "hover":
-      return { mapWindow: true, showChrome: input.pointerInside }
+      // SPIKE-001 C: the hidden window has no input region at all. The poll
+      // decides `pointerInside` from the cached S1 footprint; only a revealed
+      // HUD is mapped, so clicks over the rest of the bar pass through.
+      return { mapWindow: input.pointerInside, showChrome: input.pointerInside }
     case "hidden":
     default:
       // An unknown/corrupt value behaves like the default, never like `always`.

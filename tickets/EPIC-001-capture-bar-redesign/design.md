@@ -170,8 +170,15 @@ it only during interaction).
 Stop MUST remain reachable in every mode: in `hidden`, the user stops through
 the ags-bar indicator, and invoking the capture launcher/keybind presents the
 bar in its S4 state (HUD visible, Stop available) even mid-recording; presenting
-it does not alter the running capture. In `hover`, the bar window stays mapped
-(hit-area present, chrome hidden) so pointer entry reveals Pause/Stop.
+it does not alter the running capture. In `hover`, the bar window is **unmapped**
+while chrome is hidden (REQ-006 supersedes the original "stays mapped for its
+hit area" wording): a 10–20 Hz compositor pointer poll compares the cursor with
+the S1 footprint cached at commit, maps the normal HUD on entry and unmaps it on
+exit, so hidden state is fully click-through. Reveal is armed only after the
+pointer leaves once, keeping a commit from the Record CTA out of the first
+frame. When the recording ends in `hover`, the surface stays unmapped and the
+poll/footprint state is cleared; `always`/on-demand presentation still returns
+to S0.
 
 Existing settings keep their meaning and surface — including
 `bar_compact_controls`, which decides **who carries Pause/Stop during S4**:

@@ -3,6 +3,7 @@ id: SPIKE-001
 title: "Widen the S4 hover reveal region during recording"
 kind: spike
 status: reported
+implemented: REQ-006
 lane: bmad-advisory
 timebox: "2h"
 questions:
@@ -15,7 +16,8 @@ answered:
   - "A pointer-position poll (hyprctl cursorpos / Hyprland command socket) can drive a full-footprint reveal while the window stays unmapped, so hidden state is fully click-through. 10–20 Hz is enough; measured cost is negligible on the socket path."
   - "A revealed HUD is recorded if the capture includes the bar; design D9 explicitly accepts this for hover ('recordings contain it only during interaction'). The first frame needs an arm-after-leave guard when the trigger includes the Record CTA."
 open:
-  - "Live proof that mapping/unmapping the 76×38 S4 HUD at 10–20 Hz feels stable (no flicker, no focus stealing) is not run; budget ~30 min before implementation."
+  - "Resolved by REQ-006 on 2026-11-04: the live 20 Hz map/unmap probe measured 20.3 ms move-to-map, clean first frames and click-through (`/tmp/opencode/capture-hover-c/EVIDENCE.md`)."
+  - "Scale≠1 (and multi-monitor mixed-scale) footprint/cursor coordinate equality was not live-probed; both sides use logical layout pixels on the reference host."
   - "Exact S1 footprint varies with target/options; measure the live lane before hard-coding the poll region. T2 measured 1546×54 for Region+MP4; S0 is 142×54 and the compact S4 HUD is 76×38."
 links:
   openspec: none
@@ -28,6 +30,13 @@ branch: main
 
 > **Status: reported 2026-11-04.** Design/evidence only; no app code, tag,
 > release or deployed-pin change. Spike stopped at the box.
+>
+> **Implemented 2026-11-04 by [REQ-006](../REQ-006-hover-region-reveal/ticket.md)
+> (option C).** The follow-up measured the live S1 lane at 1506×54, polled the
+> Hyprland command socket at 20 Hz, and proved clean first frames, reveal/hide,
+> click-through and a 20.3 ms move-to-map latency. See the REQ ticket evidence
+> directory `/tmp/opencode/capture-hover-c/`. This spike remains `reported` per
+> the spike lifecycle; the build lives in REQ-006.
 
 ## Questions
 

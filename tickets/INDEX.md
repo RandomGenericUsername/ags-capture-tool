@@ -18,6 +18,7 @@
 - [REQ-003-selection-first-flow/ticket.md](./REQ-003-selection-first-flow/ticket.md) — Selection-first capture flow: pending protocol + irreversible commit | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
 - [REQ-004-recording-lifecycle/ticket.md](./REQ-004-recording-lifecycle/ticket.md) — Recording lifecycle: red accent + live HUD | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
 - [REQ-005-theme-roles/ticket.md](./REQ-005-theme-roles/ticket.md) — Migrate capture CSS to semantic palette.v1 roles | `done` | links: worktree none, branch main (merged; worktree/branch removed 2026-11-04)
+- [REQ-006-hover-region-reveal/ticket.md](./REQ-006-hover-region-reveal/ticket.md) — Widen S4 hover reveal to the full S1 footprint without click interception | `done` | links: worktree .worktrees/REQ-006/, branch ticket/REQ-006-hover-region-reveal | live probe `/tmp/opencode/capture-hover-c/`
 
 ## Bugs
 
@@ -34,7 +35,7 @@
 
 ## Spikes
 
-- [SPIKE-001-hover-region/ticket.md](./SPIKE-001-hover-region/ticket.md) — Widen the S4 hover reveal region during recording | `reported` | timebox 2h | recommendation: pointer-poll reveal (C); JD decision pending
+- [SPIKE-001-hover-region/ticket.md](./SPIKE-001-hover-region/ticket.md) — Widen the S4 hover reveal region during recording | `reported` | timebox 2h | recommendation: pointer-poll reveal (C); JD decision pending | implemented by REQ-006 (2026-11-04)
 
 ## Tasks
 

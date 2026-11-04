@@ -13,6 +13,7 @@ import { glibUiStateStore } from "./adapters/glib-ui-state-store"
 import { gdkMonitorTopology } from "./adapters/gdk-monitor-topology"
 import { hyprlandMonitorFocus } from "./adapters/hyprland-monitor-focus"
 import { hyprlandMonitorReservedTop } from "./adapters/hyprland-monitor-reserved"
+import { hyprlandPointerPosition } from "./adapters/hyprland-pointer-position"
 import { hyprlandWindowClients } from "./adapters/hyprland-window-clients"
 import {
   createMonitorWindowSet,
@@ -68,6 +69,7 @@ function buildPorts(): CapturePorts {
     captureState: platformCaptureStateFeed(),
     backendProbe: execBackendProbe(),
     monitorReservedTop: hyprlandMonitorReservedTop(),
+    pointerPosition: hyprlandPointerPosition(),
   }
 }
 

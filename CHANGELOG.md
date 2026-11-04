@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.2.2 — 2026-11-04
+
+Hover-region reveal for the live recording HUD (SPIKE-001 option C, REQ-006).
+No identity, palette-role, tag-history or deployed-pin changes.
+
+### REQ-006 — full S1 hover reveal without click interception
+
+- In `bar.recording_hud = "hover"`, the S4 window now stays **unmapped** while
+  chrome is hidden. The hidden bar area has no input surface, so clicks pass
+  through to the application below; only the revealed 76×38 (compact) or
+  243×46 (full controls) HUD is mapped and clickable.
+- The reveal trigger is the normal S1 bar footprint, captured from the window's
+  real allocation and monitor geometry at commit (not a hardcoded
+  `1546×54`), so width, target/options and top/bottom placement follow the
+  config.
+- One 20 Hz poll reads the Hyprland command socket (`j/cursorpos`, one reused
+  `Gio.SocketClient`), with `hyprctl -j cursorpos` as fallback. Missing
+  Hyprland/socket is a no-op, never a crash. Measured move-to-map latency:
+  **20.3 ms** on the reference host.
+- Arm-after-leave keeps the first frame clean when the pointer is still on the
+  Record CTA at commit: nothing reveals until it leaves the footprint once.
+  A revealed HUD is in the clip only while the user is interacting with it,
+  matching D9.
+- Stop/error/idle, leaving `hover`, window destroy and shutdown stop the poll,
+  clear the cached footprint/armed state and unmap the revealed HUD. The GTK
+  motion controller defers to the poll so moving within the S1 lane does not
+  flicker the HUD.
+- Tests add 18 pure units for footprint arithmetic, hit-testing, arm/reveal
+  state, malformed cursor replies and the poll/lifecycle wiring. Live probe:
+  clean first frames, enter/leave reveal, click-through, stop unmap and
+  `hyprctl layers` map/unmap evidence at `/tmp/opencode/capture-hover-c/`.
+
+### Test coverage
+
+- `make test`: 10/10 unit, 1/1 validation, 318/318 TypeScript, test `tsc`
+  clean.
+- `make conformance`: 16/16. `make backend`: 114 passed. `make typecheck`: 0
+  errors in the ags-capture-tool tree. `make bundle`: 1,559,444 bytes.
+
 ## v0.2.1 — 2026-11-04
 
 Two confirmed capture behaviour fixes. No identity, palette-role, tag-history or

@@ -223,7 +223,7 @@ test("recording_hud always: maps and shows the HUD automatically", () => {
   }
 })
 
-test("recording_hud hover: mapped for its hit area, chrome follows the pointer", () => {
+test("recording_hud hover: hidden means unmapped, entry maps the revealed HUD", () => {
   for (const presentedByLauncher of [false, true]) {
     assert.deepEqual(
       hudVisibility({
@@ -232,8 +232,8 @@ test("recording_hud hover: mapped for its hit area, chrome follows the pointer",
         pointerInside: false,
         presentedByLauncher,
       }),
-      { mapWindow: true, showChrome: false },
-      "hover keeps the window mapped with chrome hidden",
+      { mapWindow: false, showChrome: false },
+      "hidden hover has no input surface (clicks pass through)",
     )
     assert.deepEqual(
       hudVisibility({
@@ -243,7 +243,7 @@ test("recording_hud hover: mapped for its hit area, chrome follows the pointer",
         presentedByLauncher,
       }),
       { mapWindow: true, showChrome: true },
-      "pointer entry reveals Pause/Stop without changing the job",
+      "pointer entry maps only the normal HUD and reveals Pause/Stop",
     )
   }
 })
@@ -273,7 +273,9 @@ test("the full live/pointer/presentation matrix is total and stop-reachable", ()
             assert.equal(result.showChrome, reachable, `${mode} stop reachability`)
             assert.equal(
               result.mapWindow,
-              mode !== "hidden" || presentedByLauncher,
+              mode === "always" ||
+                (mode === "hover" && pointerInside) ||
+                (mode === "hidden" && presentedByLauncher),
               `${mode} mapping`,
             )
           }

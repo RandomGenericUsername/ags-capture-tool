@@ -16,6 +16,7 @@ import type { BackendProbe } from "./backend-probe"
 import type { CaptureLauncher } from "./capture-launcher"
 import type { CaptureStateFeed } from "./capture-state-feed"
 import type { MonitorReservedTop } from "./monitor-reserved"
+import type { PointerPosition } from "./pointer-position"
 import type { SettingsStore } from "./settings-store"
 import type { UiStateStore } from "./ui-state-store"
 
@@ -32,4 +33,6 @@ export interface CapturePorts {
   backendProbe: BackendProbe
   /** Reads the compositor's top reserved zone for top-placed bar margins. */
   monitorReservedTop: MonitorReservedTop
+  /** Reads the global pointer for the S4 hover region (REQ-006). */
+  pointerPosition: PointerPosition
 }

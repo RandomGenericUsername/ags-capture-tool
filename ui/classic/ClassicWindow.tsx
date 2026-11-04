@@ -18,6 +18,13 @@ import { Astal, Gdk, Gtk } from "ags/gtk4"
 import GLib from "gi://GLib?version=2.0"
 import { barMarginTop } from "../../domain/bar-placement"
 import {
+  barFootprint,
+  createHoverRevealState,
+  updateHoverReveal,
+  type HoverRect,
+  type HoverRevealState,
+} from "../../domain/hover-region"
+import {
   back,
   enterAction,
   enterLive,
@@ -71,6 +78,9 @@ import { SettingsPage, type SettingsPageHandle } from "./SettingsPage"
 // `tests/ts/window-identity.test.ts` for the full consumer list.
 const WINDOW_NAME = "capture-window"
 
+/** 20 Hz: ≤50 ms reveal latency on the measured sub-ms socket query. */
+const HOVER_POLL_MS = 50
+
 export function ClassicWindow(
   gdkmonitor: Gdk.Monitor,
   ports: CapturePorts,
@@ -108,6 +118,12 @@ export function ClassicWindow(
   // as the first snapshot names it instead of leaving it running unobserved.
   let hudStopPending = false
   let hudTicker: number | null = null
+  // SPIKE-001 C / REQ-006: while `hover` is live the S4 window is unmapped
+  // until the compositor pointer enters the cached S1 footprint. `hoverReveal`
+  // is the pure arm-after-leave state; `hoverPoll` is the one shared timer.
+  let hoverFootprint: HoverRect | null = null
+  let hoverReveal: HoverRevealState = createHoverRevealState()
+  let hoverPoll: number | null = null
   let unsubscribeFeed: (() => void) | null = null
   let unsubscribeRestart: (() => void) | null = null
 
@@ -139,6 +155,91 @@ export function ClassicWindow(
     const [, width] = panel.measure(Gtk.Orientation.HORIZONTAL, -1)
     const [, height] = panel.measure(Gtk.Orientation.VERTICAL, width)
     window.set_default_size(width, height)
+  }
+
+  /**
+   * Snapshot the CURRENT S1 surface as the hover trigger (REQ-006, SPIKE-001 C).
+   *
+   * Called from `hideBar` while the bar is still S1 and before
+   * `applyBarState()` re-measures it to S0. The window's actual allocation and
+   * margins are used, so a wider/narrower lane (target/format pills) and top
+   * vs bottom placement follow the config; nothing is hardcoded.
+   */
+  function captureHoverFootprint(): HoverRect | null {
+    const window = captureWindow
+    if (window === null) return null
+    const geometry = gdkmonitor.get_geometry()
+    return barFootprint(
+      {
+        x: geometry.x,
+        y: geometry.y,
+        width: geometry.width,
+        height: geometry.height,
+      },
+      { width: window.get_width(), height: window.get_height() },
+      {
+        position: config.bar.position,
+        marginTop: window.margin_top,
+        marginBottom: window.margin_bottom,
+      },
+    )
+  }
+
+  /** Stop the poll but keep the cached footprint (e.g. a mode switch). */
+  function stopHoverPoll() {
+    if (hoverPoll !== null) {
+      GLib.source_remove(hoverPoll)
+      hoverPoll = null
+    }
+  }
+
+  /** Forget the trigger entirely: recording ended, window is going away. */
+  function clearHoverReveal() {
+    stopHoverPoll()
+    hoverFootprint = null
+    hoverReveal = createHoverRevealState()
+    pointerInside = false
+  }
+
+  /**
+   * Poll the compositor pointer while `hover` is live.
+   *
+   * A null read (no Hyprland/socket) leaves the HUD hidden; it never throws.
+   * The first sample cannot reveal when the pointer is already inside (the
+   * Record-CTA case): `updateHoverReveal` stays unarmed until an outside
+   * sample, so the opening frames stay clean.
+   */
+  function syncHoverPoll() {
+    stopHoverPoll()
+    hoverReveal = createHoverRevealState()
+    pointerInside = false
+    if (
+      !isLive(barState) ||
+      config.bar.recording_hud !== "hover" ||
+      hoverFootprint === null
+    ) {
+      return
+    }
+    hoverPoll = GLib.timeout_add(GLib.PRIORITY_DEFAULT, HOVER_POLL_MS, () => {
+      if (!isLive(barState) || config.bar.recording_hud !== "hover") {
+        stopHoverPoll()
+        pointerInside = false
+        if (isLive(barState)) applyHudVisibility()
+        return false
+      }
+      const next = updateHoverReveal(
+        hoverReveal,
+        ports.pointerPosition.current(),
+        hoverFootprint,
+      )
+      const revealed = next.revealed
+      hoverReveal = next
+      if (revealed !== pointerInside) {
+        pointerInside = revealed
+        applyHudVisibility()
+      }
+      return true
+    })
   }
 
   /**
@@ -243,9 +344,10 @@ export function ClassicWindow(
    * Project `bar.recording_hud` (D9/§6) onto the S4 window and row.
    *
    * The pure rule decides; this only applies it. `opacity` hides the chrome
-   * without collapsing the row, so hover keeps a hit area and hidden/on-demand
-   * presentation does not have to recreate the widget tree. Mapping is only
-   * touched while live: S0/S1 visibility stays the focus/window-set contract.
+   * without collapsing the row, while `visible` maps only a revealed HUD in
+   * `hover` mode (SPIKE-001 C): the hidden surface has no input region, so the
+   * bar area stays click-through. Mapping is only touched while live: S0/S1
+   * visibility stays the focus/window-set contract.
    */
   function applyHudVisibility() {
     const live = isLive(barState)
@@ -266,7 +368,8 @@ export function ClassicWindow(
         captureWindow.present()
       }
     } else if (captureWindow.visible) {
-      // hidden mode with no on-demand presentation: nothing may reach a frame.
+      // `hover` hidden or `hidden` with no on-demand presentation: nothing may
+      // reach a frame and no input region may remain.
       hideCaptureWindow()
     }
   }
@@ -291,9 +394,10 @@ export function ClassicWindow(
   /**
    * S4 entry. Recording commits hide the pending UI first (FR-10), then this
    * hands the decision to `bar.recording_hud` (D9): `always` maps the HUD,
-   * `hover` maps it with hidden chrome, `hidden` stays unmapped unless the user
-   * presents it. The first `capture.state` snapshot fills in the job id and
-   * timer. Screenshot never calls it, so its commit still hides the bar.
+   * `hover` stays UNMAPPED until the compositor poll sees the pointer over the
+   * cached S1 footprint, `hidden` stays unmapped unless the user presents it.
+   * The first `capture.state` snapshot fills in the job id and timer.
+   * Screenshot never calls it, so its commit still hides the bar.
    */
   function enterLiveHud() {
     hud = idleHud()
@@ -305,21 +409,27 @@ export function ClassicWindow(
     config = settingsStore.load()
     barState = enterLive(barState)
     // `applyBarState` ends in `applyHudVisibility`: always maps/presents, hover
-    // maps with hidden chrome, hidden stays unmapped (no automatic HUD).
+    // stays hidden (no input region), hidden stays unmapped. The poll starts
+    // only after that first clean frame.
     applyBarState()
+    syncHoverPoll()
   }
 
   /** Back to S0 without destroying anything: Stop's documented exit. */
   function leaveLiveHud() {
+    // No poll may outlive S4; the surface also drops any revealed HUD state.
+    clearHoverReveal()
     hudPopup?.popdown()
-    // `hidden` had no automatic surface. A HUD the user presented through the
-    // launcher goes away again on stop, leaving no S0 bar behind.
+    // `hover` owns no surface when recording ends: the revealed HUD unmaps
+    // (REQ-006 lifecycle). `hidden` had no automatic surface either, but a
+    // launcher-presented HUD goes away on stop. `always` returns to S0.
+    const hoverMode = config.bar.recording_hud === "hover"
     const hideAfterStop =
       config.bar.recording_hud === "hidden" && hudPresentedByLauncher
     barState = homeBar()
     hudPresentedByLauncher = false
     applyBarState()
-    if (hideAfterStop) hideCaptureWindow()
+    if (hideAfterStop || hoverMode) hideCaptureWindow()
     else if (captureWindow?.visible) captureWindow.present()
   }
 
@@ -346,6 +456,10 @@ export function ClassicWindow(
       if (!isLive(barState)) {
         barState = enterLive(barState)
         applyBarState()
+        // A recording started outside this window's commit has no cached S1
+        // footprint; `syncHoverPoll` is a no-op in that case and never invents
+        // a trigger region.
+        syncHoverPoll()
       } else {
         updateHudUi()
         applyHudVisibility()
@@ -518,6 +632,10 @@ export function ClassicWindow(
         selection.hideNow()
       },
       hideBar: () => {
+        // The bar is still S1 here: this is the one moment its real allocation
+        // is the full recording lane. Cache it before `applyBarState` shrinks
+        // the window to S0 (REQ-006).
+        if (committingRecording) hoverFootprint = captureHoverFootprint()
         barState = homeBar()
         applyBarState()
         hideCaptureWindow()
@@ -598,6 +716,17 @@ export function ClassicWindow(
     config = settingsStore.load()
     applyGroup(screenshotCursorGroup, config.screenshot.cursor)
     applyGroup(recordingCursorGroup, config.recording.cursor)
+    // `recording_hud` is an S4 decision. If it changed under a live lane, stop
+    // or start the hover poll and re-apply the pure rule without touching the
+    // capture (options stay locked; this is the external-config path).
+    if (isLive(barState)) {
+      if (config.bar.recording_hud === "hover") syncHoverPoll()
+      else {
+        stopHoverPoll()
+        pointerInside = false
+      }
+      applyHudVisibility()
+    }
   }
 
   return (
@@ -649,6 +778,8 @@ export function ClassicWindow(
           return true
         })
         self.connect("destroy", () => {
+          // No poll, cached footprint or armed state survives the window.
+          clearHoverReveal()
           if (unsubscribeSelection !== null) {
             unsubscribeSelection()
             unsubscribeSelection = null
@@ -675,21 +806,25 @@ export function ClassicWindow(
         keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", (_controller, keyval, _keycode, _state) => onKey(keyval))
         self.add_controller(keys)
-        // Hover mode (D9): the window is mapped with its chrome at opacity 0,
-        // so it remains a real hit area. Pointer entry/leave only re-applies
-        // the pure visibility rule; it never touches the running capture.
+        // Hover mode (D9/REQ-006): the poll owns the reveal; the motion
+        // controller must not hide the HUD as soon as the pointer moves off the
+        // small 76x38 surface but is still inside the S1 footprint. In other
+        // modes it stays the harmless hit-area tracker it always was.
         const motion = new Gtk.EventControllerMotion()
         motion.connect("enter", () => {
+          if (hoverPoll !== null) return
           pointerInside = true
           if (isLive(barState)) applyHudVisibility()
         })
         motion.connect("motion", () => {
+          if (hoverPoll !== null) return
           if (!pointerInside) {
             pointerInside = true
             if (isLive(barState)) applyHudVisibility()
           }
         })
         motion.connect("leave", () => {
+          if (hoverPoll !== null) return
           pointerInside = false
           if (isLive(barState)) applyHudVisibility()
         })

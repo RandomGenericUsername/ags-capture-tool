@@ -3,6 +3,7 @@ id: SPIKE-002
 title: "One recording cluster: capture-owned component vs a capture-drawn window"
 kind: spike
 status: reported
+decision: "B — the capture instance draws the cluster; the bar only sends show/update/hide (JD, 2026-11-04)"
 lane: bmad-advisory
 timebox: "2h"
 questions:
@@ -33,6 +34,15 @@ branch: main
 > own the recording cluster/popup as the single component, and the top bar
 > should only draw that cluster at a given size and position instead of
 > maintaining its own copy.
+>
+> **Decision update 2026-11-04: JD chose option B.** The audit below, including
+> the option A recommendation and its evaluation, is preserved as the baseline.
+> JD's rationale is that the capture tool should own the runtime
+> window/rendering and the bar should only ask it to draw the cluster at a given
+> size/position. The B-specific design, transport contract, file plan and
+> handoff are in
+> [SPIKE-003](../SPIKE-003-capture-cluster-ipc/ticket.md) and
+> `~/.opencode/plan/handoff-capture-cluster-ipc.md`.
 
 ## Questions
 
@@ -374,7 +384,7 @@ after a stop.
 A follow-up is needed either way to retire the identical
 `ags-apps/bar/bar/widgets/recording.tsx` copy; the ticket does not change it.
 
-## Exact decision for JD
+## Exact decision for JD (recommendation at report time)
 
 **Approve option A (A1): one recording cluster + popover + indicator state,
 owned by the capture tool and shipped as an `ags-platform` UI module; the bar
@@ -385,6 +395,36 @@ topic.**
 If you reject A, the fallback is **B**, and it requires approving a new
 bar→capture contract topic plus the capture instance being required for the bar
 indicator. That is a larger, riskier project for the same pixels.
+
+**JD's answer (2026-11-04): B — see the decision section below.**
+
+## JD decision: B (2026-11-04)
+
+**JD chose option B over the audit's A recommendation.** The decision is a
+different ownership boundary, not a rejection of the A analysis:
+
+- **Rationale (JD):** the capture tool should own the runtime
+  window/rendering; the bar should only ask it to draw the cluster at a given
+  size/position.
+- **What B means:** the bar keeps only a small request client, the visibility
+  decision and an empty slot reservation. The capture instance creates the
+  layer window, renders the cluster, owns the timer/state projection and the
+  popover, and keeps Pause/Stop inside its own process.
+- **What is explicitly accepted:** the bar no longer has an independent
+  indicator when the capture instance is down; a recording started outside the
+  capture tool (for example from the CLI) will have no bar cluster. There is
+  **no fallback copy** of the old `recording.tsx`; the accepted fallback is "no
+  cluster" plus a logged failure.
+- **What is not chosen:** the A1 shared `ags-platform` UI module, the inline
+  host, and the no-IPC path. They remain documented above as the baseline and
+  as the alternate design if B fails its live probe.
+- **Transport decision:** B uses the existing AGS request transport
+  (`ags request <handler> -i capture`), not a new runtime event topic. The full
+  evidence and the B contract are in
+  [SPIKE-003](../SPIKE-003-capture-cluster-ipc/ticket.md).
+
+This ticket remains `reported` per the spike lifecycle; the B build lives in a
+separate implementation session, not here.
 
 ## Open / not verified
 

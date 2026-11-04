@@ -38,7 +38,8 @@
 ## Spikes
 
 - [SPIKE-001-hover-region/ticket.md](./SPIKE-001-hover-region/ticket.md) — Widen the S4 hover reveal region during recording | `reported` | timebox 2h | recommendation: pointer-poll reveal (C); JD decision pending | implemented by REQ-006 (2026-11-04)
-- [SPIKE-002-capture-ui-reuse/ticket.md](./SPIKE-002-capture-ui-reuse/ticket.md) — One recording cluster: capture-owned component vs a capture-drawn window | `reported` | timebox 2h | recommendation: shared capture-owned component hosted inline (A, ags-platform UI module); no IPC; JD decision pending
+- [SPIKE-002-capture-ui-reuse/ticket.md](./SPIKE-002-capture-ui-reuse/ticket.md) — One recording cluster: capture-owned component vs a capture-drawn window | `reported` | timebox 2h | recommendation was A (shared capture-owned component hosted inline, ags-platform UI module, no IPC); **JD chose B 2026-11-04** — capture instance draws the cluster, bar only sends show/update/hide; B design in SPIKE-003
+- [SPIKE-003-capture-cluster-ipc/ticket.md](./SPIKE-003-capture-cluster-ipc/ticket.md) — Capture-drawn recording cluster over the AGS request channel (option B) | `reported` | timebox 2h | transport: `ags request capture-cluster '<json>' -i capture` (no new topic); contract, window/stacking, migration, tests, effort 4.5–5.5d; handoff `~/.opencode/plan/handoff-capture-cluster-ipc.md`
 
 ## Tasks
 

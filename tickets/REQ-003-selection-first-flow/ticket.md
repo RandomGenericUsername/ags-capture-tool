@@ -55,14 +55,20 @@ the backend a finished commit.
       test asserts the transition table rejects it.
       — S4 HUD itself is REQ-004; this ticket proves the selection session locks
       and clears (Evidence D1–D2).
-- [ ] **Overlay never captured (FR-10):** the dim + selection chrome are
+- [x] **Overlay never captured (FR-10):** the dim + selection chrome are
       hidden synchronously with the commit and before the backend captures /
       recording starts. Verify: unit test ordering hide→launch; manual grep
       of commit path for no async gap; a recorded 2s clip contains no
       selection UI (manual evidence in ticket).
-      — Automated ordering + source grep are green (Evidence F1–F3). The
-      **manual 2s clip was not recorded** in this session, so this item is not
-      ticked.
+      — Automated ordering + source grep are green (Evidence F1–F3). T2
+      recorded the real Region + MP4 commit on 2026-11-04. Pending chrome was
+      visible before commit (`/tmp/opencode/capture-t2/screens/pending-selection-chrome.png`);
+      an independent wf-recorder control clip shows that same chrome
+      (`/tmp/opencode/capture-t2/clips/pending-chrome-external.mp4`); the app's
+      own clip has no dim/outline/handles in any sampled frame from **0.05s**
+      through 7s (`clips/pending-selection-app-region.mp4`, 2s copy
+      `pending-selection-app-region-2s.mp4`, frames `pending-app-*.png`).
+      Commands/timestamps: `EVIDENCE.md` §1.
 - [x] **Overlay surface (design.md §11.2):** selection chrome lives in a
       separate per-monitor `capture-overlay` window (layer TOP,
       exclusivity IGNORE, keymode NONE) — never named `capture-window`; the
@@ -70,16 +76,26 @@ the backend a finished commit.
       S1–S3 only, absent S0/S4; unregistered on destroy (no dead-widget
       refresh).
       — S4 is REQ-004; absence outside an open session is pinned (Evidence O1–O3).
-- [ ] **Backend commit flags only additive (design.md §11.3):** legacy argv
+- [x] **Backend commit flags only additive (design.md §11.3):** legacy argv
       arrays stay byte-identical and the legacy slurp path still works for
       CLI users; the UI path builds `--geometry "X,Y WxH"` / `--monitor` /
       `--window 0x…` and never triggers `slurp` (test: monkeypatched
       `resolve_target` must not be called; vanished window → typed error,
       no slurp fallback). Coordinate-space caution verified: rect correctness
       on one `scale≠1` output and negative monitor origins (§11.2).
-      — Every sub-claim except the `scale≠1` hardware measurement is verified
-      (Evidence B1–B6). This host exposes one scale=1 output, so the item stays
-      unticked rather than claiming an unmeasured property.
+      — B1–B6 remain green, and T2 exercised the deployed backend on
+      2026-11-04: legacy `screenshot --target screen` and the interactive
+      `slurp` region path both succeeded; the additive
+      `--geometry`/`--monitor`/`--window` screenshot flags produced
+      320x200 / 1920x1080 / 1898x1014 images; `start` produced clips for
+      `--geometry` (320x200), `--monitor` (1920x1080) and legacy screen
+      (1920x1080). The `scale≠1` check was then measured: with `eDP-1` at
+      scale **1.25**, a logical 640x440 pending pick was passed as
+      `-region 640x440+280+160` and the resulting clip was 800x550 (×1.25),
+      content-aligned with the selection; scale was restored to 1.0.
+      Transcripts/shots: `EVIDENCE.md` §3–§4; `backend/*.log`,
+      `monitors-{before,scale125,after}.json`,
+      `clips/scale125-region-pick.mp4`.
 - [x] **Backend contract pivot (D8/§8.1):** commit passes finished geometry
       (region/screen) or a window reference (window) to `bin/capture-tool`;
       domain/argv updated and pure; `domain/`, `ports/` stay GTK-free;
@@ -289,11 +305,12 @@ asserts the controller has no runtime platform import.
 - No interactive compositor session was used: live pointer drag/hover, actual
   overlay stacking over `ags-bar`, and keyboard focus after mapping are
   **not measured** here.
-- The host exposes one scale=1 output; `scale≠1` coordinate equality between
-  GDK/hyprctl/slurp/grim is **unmeasured** (the logical translation is unit
-  tested, the hardware claim is not).
-- The manual 2-second recording artifact requested by the FR-10 checklist was
-  not produced.
+- The `scale≠1` coordinate check that was originally unmeasured is now closed
+  by T2: `eDP-1` was temporarily set to scale 1.25, one region pick produced
+  `-region 640x440+280+160` → an 800x550 clip, and the display was restored to
+  scale 1.0. Evidence: `/tmp/opencode/capture-t2/EVIDENCE.md` §4.
+- The manual 2-second FR-10 recording artifact is now produced and linked in
+  the "Overlay never captured" item above. Evidence: `EVIDENCE.md` §1.
 
 ## Spec contradiction
 

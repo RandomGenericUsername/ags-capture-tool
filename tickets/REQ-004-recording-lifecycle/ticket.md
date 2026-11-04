@@ -263,11 +263,11 @@ commit with identical results.
   `Control(job_id, action)` round trip and the live `capture.state` cadence
   were **not exercised end-to-end**; the binding is tested against a mocked
   hub and the contract is cited.
-- No recording was produced, so the "is the HUD in the file?" observation is
-  reasoning from compositor/layer semantics, not an artifact. The **default
-  `hidden`** now means the capture-bar surface is unmapped while live, so the
-  expected artifact has no capture-bar chrome; that still needs a real clip
-  (see the unchecked follow-up below).
+- The "is the HUD in the file?" observation was reasoning from
+  compositor/layer semantics at implementation time. T2 has now produced the
+  real clips: `hidden` → no capture-bar HUD in the clip; `always` → the S4 HUD
+  is in the clip. Evidence: `/tmp/opencode/capture-t2/EVIDENCE.md` §2 and the
+  checked follow-up below.
 
 ## Resolved: D9 (2026-10-30) — HUD modes and the ags-bar indicator
 
@@ -298,12 +298,25 @@ the same `capture.state` `elapsed_seconds` topic, so they cannot disagree about
 the timer. This is the "single indicator or explicit duplication, documented"
 resolution the bus acceptance asked for (Evidence E1–E3, H9).
 
-### Follow-up (unverified — needs hardware)
+### Follow-up (hardware verification — closed by T2, 2026-11-04)
 
-- [ ] Recorded-clip proof: with the default `hidden`, a full-screen recording
+- [x] Recorded-clip proof: with the default `hidden`, a full-screen recording
       contains no capture-bar HUD; with `always` it does. Requires a real
       compositor session and a produced clip, neither available in this
       harness.
+      — T2 recorded both on the live compositor on 2026-11-04. `hidden`
+      (2026-11-04T11:17:11-05:00 commit → 11:17:14 stop):
+      `/tmp/opencode/capture-t2/clips/hud-hidden-screen-2s.mp4` (full
+      28.15s source `hud-hidden-screen.mp4`) — no `capture` layer after commit
+      and no capture-bar HUD in `frames/hud-hidden-*.png`; only the ags-bar
+      top indicator is present. `always` (after the real Settings UI wrote
+      `"always"`; commit 11:20:57 → stop 11:21:11):
+      `clips/hud-always-screen-2s.mp4` (full 11.71s `hud-always-screen.mp4`) —
+      the bottom S4 HUD is visible in `frames/hud-always-*.png` and in
+      `screens/hud-always-mid2.png`. See
+      `frames/hud-hidden-vs-always-bottom.png` for the side-by-side crop.
+      `bar.recording_hud` was restored to `hidden` and verified. Commands /
+      timestamps: `/tmp/opencode/capture-t2/EVIDENCE.md` §2.
 
 ## Design notes / deviations
 

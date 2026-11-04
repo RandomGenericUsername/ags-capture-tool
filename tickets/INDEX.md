@@ -26,6 +26,7 @@
 ## Ops tasks
 
 - [OPS-001-release-record-v0.2.0/ticket.md](./OPS-001-release-record-v0.2.0/ticket.md) — Correct the v0.2.0 release record (T1) | `done` | worktree none, branch main | release: v0.2.0 notes corrected 2026-11-04
+- [OPS-002-verification-proof/ticket.md](./OPS-002-verification-proof/ticket.md) — Close capture v0.2.0 verification debt (T2): overlay/HUD clips, additive flags, scale≠1 | `done` | worktree none, branch main | evidence: `/tmp/opencode/capture-t2/EVIDENCE.md`
 
 ## Spikes
 

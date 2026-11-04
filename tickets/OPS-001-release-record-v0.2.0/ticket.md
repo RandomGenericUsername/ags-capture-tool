@@ -63,10 +63,11 @@ change; both gate sets exit 0.
 
 ## Follow-ups (not done by T1)
 
-- **T2 — verification debt:** produce the pending-selection clip (FR-10), the
-  HUD `hidden` vs `always` clips, and the `scale≠1` geometry evidence (JD
-  decision: temporarily set `eDP-1` to 1.25, one region pick, restore 1.0);
-  tick the corresponding boxes only with artifacts.
+- **T2 — verification debt:** produced and closed by
+  [`OPS-002-verification-proof`](../OPS-002-verification-proof/ticket.md) on
+  2026-11-04 (pending-selection clip, HUD `hidden` vs `always` clips, additive
+  backend flags, and the temporary `eDP-1` 1.25 pick). Evidence:
+  `/tmp/opencode/capture-t2/EVIDENCE.md`.
 - **T3 — ticket-state reconciliation:** align frontmatter, INDEX and reality
   for EPIC-001, REQ-003 and REQ-004; close EPIC-001 only when all children
   and acceptance genuinely close.

@@ -277,6 +277,63 @@ window#capture-overlay {
   font-weight: 700;
 }
 
+/* --------------------------------------------------- capture-drawn cluster
+ * SPIKE-003 option B: the bar reserves a slot and the capture process draws
+ * this surface at the same monitor-local rectangle. The window itself must be
+ * transparent; only the cluster card paints. */
+window.capture-cluster-window {
+  background-color: transparent;
+}
+
+.capture-cluster {
+  background-color: alpha(@surface, 0.55);
+  border: 1px solid alpha(@on_surface, 0.12);
+  border-radius: 10px;
+  padding: 0 4px;
+}
+
+.capture-cluster.paused {
+  border-color: alpha(@tertiary, 0.45);
+}
+
+.capture-cluster .hud-status {
+  padding: 0 2px;
+  min-height: 0;
+}
+
+.capture-cluster .hud-timer {
+  padding: 0 2px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cluster-popup-actions {
+  min-width: 216px;
+}
+
+.cluster-popup-action {
+  min-height: 38px;
+  padding: 0 8px;
+  border-radius: 9px;
+  border: 1px solid alpha(@on_surface, 0.12);
+  background-color: alpha(@surface, 0.45);
+  background-image: none;
+  box-shadow: none;
+  color: @on_surface;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cluster-popup-action:hover {
+  border-color: alpha(@on_surface, 0.22);
+}
+
+.cluster-popup-action.danger:hover {
+  background-color: alpha(@tertiary, 0.2);
+  border-color: @tertiary;
+  color: @tertiary;
+}
+
 /* ------------------------------------------------------------ S4 live HUD
  * Recording-live is dot + timer + Pause/Stop, never options (design.md §5,
  * Sheet 3). The dot is the ONE pulsing element; the recording accent comes

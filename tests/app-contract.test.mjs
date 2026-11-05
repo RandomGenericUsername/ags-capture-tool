@@ -315,7 +315,12 @@ test("every live window registers an icon-rebuilding, size-reasserting surface",
   assert.match(window, /refreshWindow:\s*syncWindowSize/)
   assert.match(window, /self\.connect\("destroy"/, "a removed monitor's surface must unregister")
   assert.match(window, /unregisterAppearance\(\)/)
-  assert.match(window, /icons=\{iconSlots\}/, "the pages receive the window's icon slots")
+  // EPIC-002: the field pages use symbolic icons from the shared dropdown
+  // primitive, so they no longer take the window's image slots. The window's
+  // own rail tabs still do, and that is what the appearance surface rebuilds.
+  assert.match(window, /withIcon\("camera", 18, iconSlots\)/, "the window's rail icons use the shared slots")
+  assert.match(window, /<ScreenshotPage/)
+  assert.match(window, /<RecordingPage/)
 })
 
 test("the icon refresh replaces only the image child", () => {

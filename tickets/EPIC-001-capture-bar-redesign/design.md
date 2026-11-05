@@ -1,6 +1,14 @@
 # design.md — Capture bar redesign (normative)
 
-Status: **normative for EPIC-001.** The implementing agent implements *this*
+> **HISTORICAL (v0.2.x).** This document is the normative record for EPIC-001
+> and still uses the old `bar.recording_hud` / `hidden` vocabulary. It was
+> superseded by `recording_controls` in v0.3.0 (SPIKE-004) and by the EPIC-002
+> dropdown design. **Do not implement from this file.**
+> Current design: [EPIC-002 design.md](../EPIC-002-monitor-catalog-dropdowns/design.md).
+> Current mockup:
+> [EPIC-002 mockup](../EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html).
+
+Status: **historical for EPIC-001.** The implementing agent implements *this*
 document. Every frame mentioned here is drawn in
 [mockups/capture-bar-mockups.html](./mockups/capture-bar-mockups.html):
 

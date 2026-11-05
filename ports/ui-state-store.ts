@@ -21,9 +21,9 @@ import type {
 /** Read/persist the last-used mode-view selections. */
 export interface UiStateStore {
   /**
-   * Overlay the last-used values on the settings-derived defaults, falling
-   * back per field. A missing state file is first run and is silent; an
-   * unparseable one logs loudly and still yields the defaults. Never throws.
+   * Overlay the last-used values on the code first-run defaults, falling back
+   * per field. A missing state file is first run and is silent; an unparseable
+   * one logs loudly and still yields the defaults. Never throws.
    */
   load(base: UiState): UiState
 

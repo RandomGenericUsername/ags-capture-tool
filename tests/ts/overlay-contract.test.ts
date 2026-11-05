@@ -106,14 +106,25 @@ test("window hover data comes from compositor client rects, not a GDK pointer", 
   assert.match(OVERLAY, /controller\.pinAt\(/)
 })
 
-test("screen shows a monitor outline and the bar carries a Monitor n chip", () => {
+test("screen shows a monitor outline and the bar offers the Monitor dropdown", () => {
   assert.match(OVERLAY, /view\.target === "screen"/)
   assert.match(OVERLAY, /outline\.add_css_class\("selected"\)/)
   assert.match(OVERLAY, /monitorBadge\(/)
   assert.match(CSS, /\.mon-outline\.selected\s*\{/)
-  assert.match(BAR, /class="bar-pill monitor-chip"/)
-  assert.match(BAR, /selection\.cycleMonitor\(\)/)
-  assert.match(BAR, /count > 1/, "single-monitor stays a confirmation frame; no dead chip")
+  // REQ-011: one dropdown row per targetable output; no cycle button remains.
+  assert.match(BAR, /mergeMonitors\(/)
+  assert.match(BAR, /selection\.selectMonitor\(value\)/)
+  assert.match(BAR, /monitors\.length > 1/, "single-monitor stays a confirmation frame; no dead field")
+  // Both lanes show the same conditional field under the same D11 rule.
+  assert.match(
+    BAR,
+    /screenshotFields\.monitor\.setVisible\(barState\.view === "screenshot" && showMonitor\)/,
+  )
+  assert.match(
+    BAR,
+    /recordingFields\.monitor\.setVisible\(barState\.view === "recording" && showMonitor\)/,
+  )
+  assert.doesNotMatch(BAR, /monitor-chip|monitorChip|cycleMonitor/)
 })
 
 test("releasing a drag never reaches the launcher", () => {

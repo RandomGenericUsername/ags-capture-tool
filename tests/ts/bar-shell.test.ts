@@ -13,6 +13,12 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
+import {
+  SETTINGS_GROUPS,
+  SETTINGS_GROUP_TITLES,
+  SETTINGS_ROW_NAMES,
+} from "../../ui/shared/settings-defs.ts"
+
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 
 function read(...parts: string[]): string {
@@ -31,6 +37,7 @@ const WINDOW = code(read("ui", "classic", "ClassicWindow.tsx"))
 const SCREENSHOT = code(read("ui", "classic", "ScreenshotPage.tsx"))
 const RECORDING = code(read("ui", "classic", "RecordingPage.tsx"))
 const SETTINGS = code(read("ui", "classic", "SettingsPage.tsx"))
+const UI_STATE = code(read("domain", "ui-state.ts"))
 const CSS = read("style.css")
 
 test("S0 is the icon-only rail: camera, video, gear; no text labels", () => {
@@ -73,7 +80,21 @@ test("the Settings view paints its own opaque card while the window stays transp
   assert.match(CSS, /\.capture-bar\s*\{[^}]*background-color:\s*alpha\(@surface,\s*0\.92\)/)
 })
 
-test("S1 screenshot keeps every existing screenshot option", () => {
+test("S1 screenshot renders one dropdown trigger per field, not option groups", () => {
+  // EPIC-002 REQ-009: the screenshot lane's alternatives moved into field
+  // popovers. The page owns only the order; ClassicWindow builds the handles.
+  for (const field of ["target", "monitor", "delay", "format", "output", "cursor"]) {
+    assert.match(
+      SCREENSHOT,
+      new RegExp(`fields\\.${field}\\.root`),
+      `missing screenshot field ${field}`,
+    )
+  }
+  assert.doesNotMatch(SCREENSHOT, /bar-group|bar-pill/, "no side-by-side option group remains")
+  assert.match(SCREENSHOT, /fields\.target\.root[\s\S]*fields\.monitor\.root[\s\S]*fields\.delay\.root[\s\S]*fields\.format\.root[\s\S]*fields\.output\.root[\s\S]*fields\.cursor\.root/)
+
+  // Every old screenshot option survives in the pure contract, not in the page.
+  const defs = read("ui", "shared", "field-defs.ts")
   for (const label of [
     "Region",
     "Screen",
@@ -86,39 +107,101 @@ test("S1 screenshot keeps every existing screenshot option", () => {
     "JPEG",
     "Clipboard",
     "Save",
-    "Cursor",
+    "On",
     "Off",
   ]) {
-    assert.match(SCREENSHOT, new RegExp(`label="${label}"`), `missing screenshot pill ${label}`)
+    assert.match(defs, new RegExp(`label: "${label}"`), `missing screenshot option ${label}`)
+  }
+
+  // The active value reaches every trigger from the one state-to-UI path.
+  for (const field of ["target", "delay", "format", "output", "cursor"]) {
+    assert.match(
+      WINDOW,
+      new RegExp(`screenshotFields\\.${field}\\.setValue\\(`),
+      `applyStateToUi does not set ${field}`,
+    )
   }
 })
 
-test("S1 recording keeps the capture vocabulary and the GIF/duration extras", () => {
+test("S1 recording renders one dropdown trigger per field, not option groups", () => {
+  // EPIC-002 REQ-010: the recording lane's alternatives moved into the shared
+  // field popovers. The page owns only the order; ClassicWindow builds the
+  // handles. Field order is asserted against the mockup in
+  // `dropdown-field.test.ts`.
+  for (const field of [
+    "target",
+    "monitor",
+    "fps",
+    "format",
+    "quality",
+    "audio",
+    "size",
+    "duration",
+    "cursor",
+  ]) {
+    assert.match(
+      RECORDING,
+      new RegExp(`fields\\.${field}\\.root`),
+      `missing recording field ${field}`,
+    )
+  }
+  assert.doesNotMatch(RECORDING, /bar-group|bar-pill/, "no side-by-side option group remains")
+  assert.match(
+    RECORDING,
+    /fields\.target\.root[\s\S]*fields\.monitor\.root[\s\S]*fields\.fps\.root[\s\S]*fields\.format\.root[\s\S]*fields\.quality\.root[\s\S]*fields\.audio\.root[\s\S]*fields\.size\.root[\s\S]*fields\.duration\.root[\s\S]*fields\.cursor\.root/,
+  )
+
+  // Every old recording option survives in the pure contract, not in the page.
+  const defs = read("ui", "shared", "field-defs.ts")
   for (const label of [
     "Region",
     "Screen",
     "Window",
-    "24",
-    "30",
-    "60",
+    "24 fps",
+    "30 fps",
+    "60 fps",
+    "10 fps",
+    "15 fps",
+    "20 fps",
     "Low",
-    "Med",
+    "Medium",
     "High",
-    "Sys",
+    "System",
     "Mic",
     "None",
     "MP4",
     "WebM",
     "GIF",
+    "Original",
+    "75%",
+    "50%",
     "∞",
     "10s",
     "30s",
     "60s",
     "Custom",
-    "Cursor",
+    "On",
     "Off",
   ]) {
-    assert.match(RECORDING, new RegExp(`label="${label}"`), `missing recording pill ${label}`)
+    assert.match(defs, new RegExp(`label: "${label}"`), `missing recording option ${label}`)
+  }
+
+  // The active value reaches every trigger from the one state-to-UI path.
+  for (const field of [
+    "target",
+    "fps",
+    "format",
+    "quality",
+    "audio",
+    "size",
+    "duration",
+    "cursor",
+  ]) {
+    assert.match(
+      WINDOW,
+      new RegExp(`recordingFields\\.${field}\\.setValue\\(`),
+      `applyStateToUi does not set ${field}`,
+    )
   }
 })
 
@@ -132,7 +215,7 @@ test("the back chevron leads the opened row and the CTA closes it", () => {
   assert.match(WINDOW, /label="←"/)
 })
 
-test("settings is entered from S0 only (INV-3), and keeps its existing groups", () => {
+test("settings is entered from S0 only (INV-3), and shows Files/Behaviour/Placement/Runtime", () => {
   assert.equal(
     (WINDOW.match(/onClicked=\{openSettingsView\}/g) ?? []).length,
     1,
@@ -144,17 +227,74 @@ test("settings is entered from S0 only (INV-3), and keeps its existing groups", 
   const open = WINDOW.indexOf('class="capture-bar open"')
   assert.ok(gear > rail && gear < open, "settings must not be reachable from S1")
 
-  for (const label of [
-    "Screenshot folder",
-    "Recording folder",
-    "Filename pattern",
-    "Show notifications",
-    "Compact bar indicator",
-    "Bar position",
-    "Top offset",
-  ]) {
-    assert.match(SETTINGS, new RegExp(`"${label}"`), `missing settings row ${label}`)
+  // REQ-012: the panel has exactly these four groups in this order. The list
+  // is the pure settings-defs table the page consumes.
+  assert.deepEqual(
+    SETTINGS_GROUPS.map((group) => group.title),
+    ["Files", "Behaviour", "Placement", "Runtime"],
+  )
+  assert.deepEqual(Object.values(SETTINGS_GROUP_TITLES), [
+    "Files",
+    "Behaviour",
+    "Placement",
+    "Runtime",
+  ])
+  assert.match(SETTINGS, /settingsGroups\(\{\s*barFields: true,?\s*\}\)/, "the page consumes the settings-defs order")
+  for (const def of ["filesDef", "behaviourDef", "placementDef", "runtimeDef"]) {
+    assert.match(SETTINGS, new RegExp(`settingsGroup\\(${def}\\.title`), `missing group ${def}`)
   }
+
+  for (const [key, label] of [
+    ["screenshotFolder", "Screenshot folder"],
+    ["recordingFolder", "Recording folder"],
+    ["filenamePattern", "Filename pattern"],
+    ["showNotifications", "Show notifications"],
+    ["compactBarIndicator", "Compact bar indicator"],
+    ["barFields", "Bar fields"],
+    ["barPosition", "Bar position"],
+    ["topOffset", "Top offset"],
+    ["recordingControls", "Recording controls"],
+    ["recorderBackend", "Recorder backend"],
+    ["laneMemory", "Lane memory"],
+  ] as const) {
+    assert.equal(SETTINGS_ROW_NAMES[key], label)
+    assert.match(
+      SETTINGS,
+      new RegExp(`SETTINGS_ROW_NAMES\\.${key}`),
+      `missing settings row ${label}`,
+    )
+  }
+})
+
+test("settings no longer carries the duplicate Screenshot/Recording defaults", () => {
+  // The bar dropdowns own these now; only cursor stays in config.json.
+  for (const removed of [
+    "Default format",
+    "Default output",
+    "Default frame rate",
+    "Default quality",
+    "Default audio",
+    "Include cursor",
+  ]) {
+    assert.doesNotMatch(SETTINGS, new RegExp(`"${removed}"`), `removed row still present: ${removed}`)
+  }
+  assert.doesNotMatch(SETTINGS, /settingsConfig\.screenshot\.(format|output)/)
+  assert.doesNotMatch(SETTINGS, /settingsConfig\.recording\.(fps|quality|audio)/)
+  assert.doesNotMatch(SETTINGS, /"General"|"Screenshot"|"Recording"/)
+  // The header and footer contract.
+  assert.match(SETTINGS, /class="settings-subtitle"/)
+  assert.match(SETTINGS, /class="settings-save-chip"/)
+  assert.match(SETTINGS, /label="Saved as you go"/)
+  assert.match(SETTINGS, /label="done"/)
+  assert.match(SETTINGS, /The bar remembers every lane choice/)
+  assert.match(CSS, /\.settings-subtitle\s*\{/)
+  assert.match(CSS, /\.settings-save-chip\s*\{/)
+})
+
+test("first run loads code defaults, not settings defaults", () => {
+  assert.match(WINDOW, /uiStateStore\.load\(createUiState\(\)\)/)
+  assert.doesNotMatch(WINDOW, /configDefaults/)
+  assert.doesNotMatch(UI_STATE, /export function configDefaults/)
 })
 
 test("the bar is never EXCLUSIVE and reads placement from settings", () => {

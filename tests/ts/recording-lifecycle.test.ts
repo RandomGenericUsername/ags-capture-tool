@@ -14,6 +14,11 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
+import {
+  SETTINGS_RECORDING_CONTROL_OPTIONS,
+  SETTINGS_ROW_NAMES,
+} from "../../ui/shared/settings-defs.ts"
+
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 
 function read(...parts: string[]): string {
@@ -57,21 +62,16 @@ const BAR_STATE = read("domain", "bar-state.ts")
 const COMMIT_ORDER = read("lib", "commit-order.ts")
 const ADAPTER = read("adapters", "platform-capture-state-feed.ts")
 
-test("the recording accent is one CSS token; the cluster keeps its fixed REC red", () => {
+test("the recording accent is one CSS token; the cluster uses it too", () => {
   assert.match(
     CSS_NO_COMMENTS,
     /:root\s*\{[^}]*--rec-accent:\s*@error\s*;/,
     "--rec-accent must map to the palette's @error (design.md §11.6)",
   )
-  // The S4 lane and overlay chrome must never carry a literal colour. The
-  // capture-drawn bar cluster is the deliberate exception: it reproduces the
-  // bar's accepted design, whose one literal is the pulsing #e0605f REC dot.
-  // Remove that pair of blocks before enforcing the palette-only rule.
-  const paletteOnly = CSS_NO_COMMENTS
-    .replace(/\.rec-dot\s*\{[^}]*\}/g, "")
-    .replace(/@keyframes cluster-rec-pulse\s*\{[\s\S]*?\n\}/g, "")
-  assert.doesNotMatch(paletteOnly, /#[0-9a-fA-F]{3,8}\b/)
-  assert.match(CSS_NO_COMMENTS, /\.rec-dot\s*\{[^}]*background-color:\s*#e0605f/)
+  // No literal colours anywhere: the capture-drawn cluster dot/pulse reads
+  // the same --rec-accent token as the S4 lane and overlay chrome.
+  assert.doesNotMatch(CSS_NO_COMMENTS, /#[0-9a-fA-F]{3,8}\b/)
+  assert.match(CSS_NO_COMMENTS, /\.rec-dot\s*\{[^}]*background-color:\s*var\(--rec-accent\)/)
 })
 
 test("the recording lane and its overlay chrome read the token", () => {
@@ -233,18 +233,22 @@ test("recording_controls is tolerant and defaults to the top bar", () => {
 })
 
 test("the settings page exposes the three unified modes and persists them", () => {
-  assert.match(SETTINGS_PAGE, /pillRow<RecordingControlsMode>\(\s*"Recording controls"/)
-  for (const [label, value] of [
-    ["Top bar", "top-bar"],
-    ["On hover", "hover"],
-    ["Always visible", "always"],
-  ] as const) {
-    assert.match(
-      SETTINGS_PAGE,
-      new RegExp(`\\{ label: "${label}", value: "${value}" \\}`),
-      `missing recording-controls mode ${label}`,
-    )
-  }
+  // REQ-012: the row keeps its name in Placement; the option table moved to
+  // the pure settings-defs contract the page now consumes.
+  assert.equal(SETTINGS_ROW_NAMES.recordingControls, "Recording controls")
+  assert.match(
+    SETTINGS_PAGE,
+    /pillRow<RecordingControlsMode>\(\s*SETTINGS_ROW_NAMES\.recordingControls/,
+  )
+  assert.deepEqual(
+    SETTINGS_RECORDING_CONTROL_OPTIONS.map(({ label, value }) => [label, value]),
+    [
+      ["Top bar", "top-bar"],
+      ["On hover", "hover"],
+      ["Always visible", "always"],
+    ],
+  )
+  assert.match(SETTINGS_PAGE, /\.\.\.SETTINGS_RECORDING_CONTROL_OPTIONS/)
   assert.doesNotMatch(SETTINGS_PAGE, /\{ label: "Hidden", value: "hidden" \}/)
   assert.match(SETTINGS_PAGE, /settingsConfig\.recording_controls = value/)
   // The row builder persists via RowContext, the same chain as bar placement.

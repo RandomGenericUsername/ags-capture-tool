@@ -17,7 +17,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
-import { defaultSettings, mergeSettings, type ConfigRecordingAudio } from "../../domain/settings.ts"
+import type { ConfigRecordingAudio } from "../../domain/settings.ts"
 import {
   AUDIO_SOURCES,
   DEFAULT_RECORDING,
@@ -25,7 +25,7 @@ import {
   GIF_SIZES,
   GIF_SIZE_ARG,
   audioToUi,
-  configDefaults,
+  createUiState,
   durationSelection,
   isGif,
   mergeUiState,
@@ -34,13 +34,24 @@ import {
   type UiState,
 } from "../../domain/ui-state.ts"
 
-// A settings object with every knob off its default, so a test that asserts a
-// field came from the SETTINGS proves the precedence rule rather than agreeing
-// with the hardcoded constant by coincidence.
-const MAX_SETTINGS = mergeSettings({
-  screenshot: { format: "jpeg", output: "save", cursor: true },
-  recording: { fps: 24, quality: "low", audio: "mic", cursor: false },
-})
+// A base with every field off its code default, so a test that asserts a
+// fallback came from the BASE proves `mergeUiState` honours its argument rather
+// than agreeing with the hardcoded constant by coincidence. REQ-012 removed the
+// settings-derived base; the merge itself still takes any `UiState` base.
+const CUSTOM_BASE: UiState = {
+  screenshot: { target: "window", delay: 5, format: "jpeg", save: true },
+  recording: {
+    target: "screen",
+    fps: 24,
+    format: "gif",
+    audio: "microphone",
+    quality: "low",
+    duration: 0,
+    gifFps: 20,
+    size: "50%",
+    customDuration: 120,
+  },
+}
 
 // ---------------------------------------------------------------------------
 // audioToUi — task 4.6
@@ -94,72 +105,27 @@ test("GIF_SIZE_ARG: the table is keyed by every UI scale and nothing else", () =
 })
 
 // ---------------------------------------------------------------------------
-// configDefaults — task 4.4, the precedence rule
+// First run — REQ-012: code constants, never settings defaults
 // ---------------------------------------------------------------------------
 
-test("configDefaults: with default settings it is exactly the hardcoded first-run state", () => {
-  const ui = configDefaults(defaultSettings())
+test("first run: mergeUiState over createUiState() is exactly the code defaults", () => {
+  // A missing capture-ui.json makes the adapter call `mergeUiState(base, {})`.
+  // With REQ-012 the base is `createUiState()`, so the lane starts from code
+  // constants regardless of what legacy settings.json still contains.
+  const ui = mergeUiState(createUiState(), {})
   assert.deepEqual(ui.screenshot, DEFAULT_SCREENSHOT)
   assert.deepEqual(ui.recording, DEFAULT_RECORDING)
 })
 
-test("configDefaults: settings beat the hardcoded constants per field", () => {
-  const ui = configDefaults(MAX_SETTINGS)
-  // From settings:
-  assert.equal(ui.screenshot.format, "jpeg")
-  assert.equal(ui.screenshot.save, true)
-  assert.equal(ui.recording.fps, 24)
-  assert.equal(ui.recording.quality, "low")
-  // ...through audioToUi, which is where the second vocabulary lives.
-  assert.equal(ui.recording.audio, "microphone")
-  // Not in settings at all, so the hardcoded constants win:
-  assert.equal(ui.screenshot.target, "region")
-  assert.equal(ui.screenshot.delay, 0)
-  assert.equal(ui.recording.target, "region")
-  assert.equal(ui.recording.format, "mp4")
-  assert.equal(ui.recording.duration, 0)
-  assert.equal(ui.recording.gifFps, 15)
-  assert.equal(ui.recording.size, "original")
-  assert.equal(ui.recording.customDuration, 120)
-})
-
-test("configDefaults: output clipboard means do not save", () => {
-  const ui = configDefaults(mergeSettings({ screenshot: { output: "clipboard" } }))
-  assert.equal(ui.screenshot.save, false)
-  const uiSave = configDefaults(mergeSettings({ screenshot: { output: "save" } }))
-  assert.equal(uiSave.screenshot.save, true)
-})
-
-test("configDefaults: audio none and system pass through, mic does not", () => {
-  assert.equal(configDefaults(mergeSettings({ recording: { audio: "none" } })).recording.audio, "none")
-  assert.equal(
-    configDefaults(mergeSettings({ recording: { audio: "system" } })).recording.audio,
-    "system",
-  )
-  assert.equal(configDefaults(mergeSettings({ recording: { audio: "mic" } })).recording.audio, "microphone")
-})
-
-test("configDefaults: every settings fps and quality reaches the UI state", () => {
-  for (const fps of [24, 30, 60] as const) {
-    assert.equal(configDefaults(mergeSettings({ recording: { fps } })).recording.fps, fps)
-  }
-  for (const quality of ["low", "medium", "high"] as const) {
-    assert.equal(configDefaults(mergeSettings({ recording: { quality } })).recording.quality, quality)
-  }
-  for (const format of ["png", "jpeg"] as const) {
-    assert.equal(configDefaults(mergeSettings({ screenshot: { format } })).screenshot.format, format)
-  }
-})
-
-test("configDefaults: returns fresh objects and mutates no constant", () => {
-  const a = configDefaults(MAX_SETTINGS)
-  const b = configDefaults(MAX_SETTINGS)
+test("createUiState: returns fresh objects and mutates no constant", () => {
+  const a = createUiState()
+  const b = createUiState()
   assert.notEqual(a.screenshot, b.screenshot)
   assert.notEqual(a.recording, b.recording)
-  a.screenshot.format = "png"
-  a.recording.fps = 60
-  assert.equal(b.screenshot.format, "jpeg")
-  assert.equal(b.recording.fps, 24)
+  a.screenshot.format = "jpeg"
+  a.recording.fps = 24
+  assert.equal(b.screenshot.format, "png")
+  assert.equal(b.recording.fps, 60)
   assert.equal(DEFAULT_SCREENSHOT.format, "png")
   assert.equal(DEFAULT_RECORDING.fps, 60)
 })
@@ -169,12 +135,12 @@ test("configDefaults: returns fresh objects and mutates no constant", () => {
 // ---------------------------------------------------------------------------
 
 test("mergeUiState: an absent persisted file leaves the base untouched", () => {
-  const base = configDefaults(MAX_SETTINGS)
+  const base = CUSTOM_BASE
   assert.deepEqual(mergeUiState(base, {}), base)
 })
 
 test("mergeUiState: last-used values override the base per field", () => {
-  const base = configDefaults(MAX_SETTINGS)
+  const base = CUSTOM_BASE
   const merged = mergeUiState(base, {
     screenshot: { target: "window", delay: 10, format: "png", save: false },
     recording: {
@@ -214,7 +180,7 @@ test("mergeUiState: last-used values override the base per field", () => {
 })
 
 test("mergeUiState: every accepted enum member round-trips", () => {
-  const base = configDefaults(defaultSettings())
+  const base = createUiState()
   for (const target of ["region", "screen", "window"] as const) {
     assert.equal(mergeUiState(base, { screenshot: { target } }).screenshot.target, target)
   }
@@ -233,7 +199,7 @@ test("mergeUiState: every accepted enum member round-trips", () => {
 })
 
 test("mergeUiState: an out-of-range enum falls back to the base value", () => {
-  const base = configDefaults(MAX_SETTINGS) // jpeg/save, 24fps/low/microphone
+  const base = CUSTOM_BASE // jpeg/save, 24fps/low/microphone
   // The `as unknown as PersistedUiState` cast is the POINT of this test, not a
   // shortcut: the on-disk `capture-ui.json` is untrusted input, so the values
   // here are ones `PersistedUiState` forbids but a real file can contain (a
@@ -256,24 +222,23 @@ test("mergeUiState: an out-of-range enum falls back to the base value", () => {
     },
   } as unknown as PersistedUiState
   const merged = mergeUiState(base, persisted)
-  // `target`/`delay` are not in the settings at all, so their base value is the
-  // hardcoded constant; `format`/`save`/`fps`/`quality`/`audio` come from the
-  // settings, so falling back proves the BASE is honoured rather than a constant.
-  assert.equal(merged.screenshot.target, "region") // base, not "desktop"
-  assert.equal(merged.screenshot.delay, 0) // base, not 7
+  // Every bad value falls back to CUSTOM_BASE, not to the code constants: the
+  // base argument is still the per-field authority after REQ-012.
+  assert.equal(merged.screenshot.target, "window") // base, not "desktop"
+  assert.equal(merged.screenshot.delay, 5) // base, not 7
   assert.equal(merged.screenshot.format, "jpeg") // base, not "webp"
   assert.equal(merged.screenshot.save, true) // base, "true" is not a boolean
-  assert.equal(merged.recording.target, "region") // base, not "monitor"
+  assert.equal(merged.recording.target, "screen") // base, not "monitor"
   assert.equal(merged.recording.fps, 24)
-  assert.equal(merged.recording.format, "mp4")
+  assert.equal(merged.recording.format, "gif")
   assert.equal(merged.recording.audio, "microphone") // base, "mic" is not a UI word
   assert.equal(merged.recording.quality, "low")
-  assert.equal(merged.recording.gifFps, 15)
-  assert.equal(merged.recording.size, "original")
+  assert.equal(merged.recording.gifFps, 20)
+  assert.equal(merged.recording.size, "50%")
 })
 
 test("mergeUiState: null and undefined field values fall back", () => {
-  const base = configDefaults(MAX_SETTINGS)
+  const base = CUSTOM_BASE
   const merged = mergeUiState(base, {
     screenshot: { target: null, delay: undefined, format: null, save: null },
     recording: {
@@ -294,7 +259,7 @@ test("mergeUiState: null and undefined field values fall back", () => {
 test("mergeUiState: a null half is the same as an absent half", () => {
   // The adapter hands over whatever JSON.parse produced. `{"screenshot": null}`
   // must degrade to the base rather than throw on the spread.
-  const base = configDefaults(MAX_SETTINGS)
+  const base = CUSTOM_BASE
   assert.deepEqual(mergeUiState(base, { screenshot: null } as unknown as PersistedUiState), base)
   assert.deepEqual(mergeUiState(base, { recording: null } as unknown as PersistedUiState), base)
   assert.deepEqual(
@@ -315,7 +280,7 @@ test("mergeUiState: a null half is the same as an absent half", () => {
 })
 
 test("mergeUiState: duration accepts 0 as infinite and rejects negatives", () => {
-  const base = configDefaults(MAX_SETTINGS) // duration 0
+  const base = CUSTOM_BASE // duration 0
   // 0 is falsy: the classic `|| base` fallback would silently drop the
   // "infinite" selection. It must survive.
   assert.equal(mergeUiState(base, { recording: { duration: 0 } }).recording.duration, 0)
@@ -334,7 +299,7 @@ test("mergeUiState: duration accepts 0 as infinite and rejects negatives", () =>
 })
 
 test("mergeUiState: save accepts false as a value, not as absence", () => {
-  const base = configDefaults(MAX_SETTINGS) // save: true
+  const base = CUSTOM_BASE // save: true
   assert.equal(mergeUiState(base, { screenshot: { save: false } }).screenshot.save, false)
   assert.equal(mergeUiState(base, { screenshot: { save: true } }).screenshot.save, true)
   assert.equal(
@@ -346,7 +311,7 @@ test("mergeUiState: save accepts false as a value, not as absence", () => {
 test("mergeUiState: customDuration below 5 falls back to the base", () => {
   // The spin editor's range starts at 5s; a persisted 1 or 0 (e.g. a value left
   // over from an older format, or a 0 meaning "not set") must not survive.
-  const base = configDefaults(MAX_SETTINGS) // customDuration 120
+  const base = CUSTOM_BASE // customDuration 120
   for (const tooSmall of [4, 1, 0, -1, 4.9]) {
     assert.equal(
       mergeUiState(base, { recording: { customDuration: tooSmall } }).recording.customDuration,
@@ -357,7 +322,7 @@ test("mergeUiState: customDuration below 5 falls back to the base", () => {
 })
 
 test("mergeUiState: customDuration above 3600 clamps to 3600", () => {
-  const base = configDefaults(MAX_SETTINGS)
+  const base = CUSTOM_BASE
   // The spec's scenario: 99999 clamps rather than falling back, so the user's
   // "as long as possible" survives instead of resetting to 120.
   assert.equal(
@@ -369,7 +334,7 @@ test("mergeUiState: customDuration above 3600 clamps to 3600", () => {
 })
 
 test("mergeUiState: customDuration in range is rounded to whole seconds", () => {
-  const base = configDefaults(MAX_SETTINGS)
+  const base = CUSTOM_BASE
   const merged = (customDuration: number) =>
     mergeUiState(base, { recording: { customDuration } }).recording.customDuration
   assert.equal(merged(5), 5)
@@ -382,7 +347,7 @@ test("mergeUiState: customDuration in range is rounded to whole seconds", () => 
 })
 
 test("mergeUiState: a non-numeric customDuration falls back", () => {
-  const base = configDefaults(MAX_SETTINGS)
+  const base = CUSTOM_BASE
   for (const notANumber of ["300", null, true, {}]) {
     assert.equal(
       mergeUiState(base, { recording: { customDuration: notANumber } } as unknown as PersistedUiState)
@@ -392,24 +357,24 @@ test("mergeUiState: a non-numeric customDuration falls back", () => {
   }
 })
 
-test("mergeUiState: the whole precedence chain behaves as documented", () => {
-  // last-used UI state > settings defaults > hardcoded constants, end to end,
-  // for one field per layer.
-  const chain = (
-    persisted: PersistedUiState,
-    settings: Parameters<typeof mergeSettings>[0],
-  ): UiState => mergeUiState(configDefaults(mergeSettings(settings)), persisted)
+test("mergeUiState: first run and reload both start from code defaults", () => {
+  // REQ-012 precedence: last-used UI state > code constants. Settings are NOT
+  // a layer; a legacy config with old defaults cannot seed the lane.
+  const chain = (persisted: PersistedUiState): UiState =>
+    mergeUiState(createUiState(), persisted)
 
-  // 1. nothing anywhere -> the hardcoded constant
-  assert.equal(chain({}, undefined).recording.fps, 60)
-  // 2. settings beat the constant
-  assert.equal(chain({}, { recording: { fps: 24 } }).recording.fps, 24)
-  // 3. last-used beats settings
-  assert.equal(chain({ recording: { fps: 30 } }, { recording: { fps: 24 } }).recording.fps, 30)
-  // 4. ...but a nonsense last-used value falls back to SETTINGS, not to the
-  //    constant — the base is the settings-sourced value, which is the whole
-  //    reason the merge takes a base at all.
-  assert.equal(chain({ recording: { fps: 120 } }, { recording: { fps: 24 } }).recording.fps, 24)
+  // 1. no capture-ui.json -> the code constant
+  assert.equal(chain({}).recording.fps, 60)
+  assert.equal(chain({}).screenshot.format, "png")
+  // 2. a saved lane choice wins
+  assert.equal(chain({ recording: { fps: 30 } }).recording.fps, 30)
+  assert.equal(chain({ screenshot: { format: "jpeg" } }).screenshot.format, "jpeg")
+  // 3. ...but a nonsense saved value falls back to the code constant.
+  assert.equal(chain({ recording: { fps: 120 } }).recording.fps, 60)
+  assert.equal(
+    chain({ screenshot: { format: "webp" } } as unknown as PersistedUiState).screenshot.format,
+    "png",
+  )
 })
 
 // ---------------------------------------------------------------------------

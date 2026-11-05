@@ -17,6 +17,7 @@
 import { Astal, Gdk, Gtk } from "ags/gtk4"
 import GLib from "gi://GLib?version=2.0"
 import { barMarginTop } from "../../domain/bar-placement"
+import { mergeMonitors } from "../../domain/monitor-catalog"
 import {
   applyHoverLeaveGrace,
   barFootprint,
@@ -60,25 +61,63 @@ import { recordingSurfaces } from "../../domain/recording-presentation"
 import { runCommit } from "../../lib/commit-order"
 import type { CaptureStatePayload } from "../../ports/capture-state-feed"
 import type { SelectionController } from "../overlay/controller"
-import { configDefaults, durationSelection, type UiState } from "../../domain/ui-state"
+import { createUiState, durationSelection, isGif, type UiState } from "../../domain/ui-state"
 import type { CapturePorts } from "../../ports/capture-ports"
-import type {
-  AudioSource,
-  CaptureTarget,
-  GifScale,
-  RecordingFormat,
-  RecordingQuality,
-  ScreenshotFormat,
-} from "../../types"
-import { applyGroup } from "../shared/groups"
+import type { CaptureTarget } from "../../types"
+import {
+  dropdownField,
+  durationField,
+  type DropdownFieldHandle,
+} from "../shared/dropdown"
+import {
+  RECORDING_FIELDS,
+  SCREENSHOT_FIELDS,
+  recordingAudioFromValue,
+  recordingAudioValue,
+  recordingCursorFromValue,
+  recordingCursorValue,
+  recordingDurationFromValue,
+  recordingDurationValue,
+  recordingFormatFromValue,
+  recordingFormatValue,
+  recordingFpsDef,
+  recordingFpsFromValue,
+  recordingFpsValue,
+  recordingQualityFromValue,
+  recordingQualityValue,
+  recordingSizeFromValue,
+  recordingSizeValue,
+  recordingTargetFromValue,
+  recordingTargetValue,
+  screenshotCursorFromValue,
+  screenshotCursorValue,
+  screenshotDelayFromValue,
+  screenshotDelayValue,
+  screenshotFormatFromValue,
+  screenshotFormatValue,
+  screenshotOutputFromValue,
+  screenshotOutputValue,
+  screenshotTargetFromValue,
+  screenshotTargetValue,
+  type BarFieldPresentation,
+  type FieldOptionDef,
+} from "../shared/field-defs"
 import { createIconSlots, withIcon } from "../shared/icons"
 import {
   RecordingCluster,
   type RecordingClusterHandle,
 } from "../shared/recording-cluster"
 import { appearanceRegistry } from "../appearance"
-import { RecordingPage, type RecordingPageHandle } from "./RecordingPage"
-import { ScreenshotPage, type ScreenshotPageHandle } from "./ScreenshotPage"
+import {
+  RecordingPage,
+  type RecordingFields,
+  type RecordingPageHandle,
+} from "./RecordingPage"
+import {
+  ScreenshotPage,
+  type ScreenshotFields,
+  type ScreenshotPageHandle,
+} from "./ScreenshotPage"
 import { SettingsPage, type SettingsPageHandle } from "./SettingsPage"
 
 // The name is the window's PUBLIC identity, and it is deliberately NOT unique:
@@ -125,6 +164,9 @@ export function ClassicWindow(
   // live HUD whose *display* state lives in `domain/recording-hud.ts`.
   let barState: BarState = homeBar()
   let config: CaptureSettings = initialSettings
+  // REQ-014: the current bar field density. Fields are built with this value
+  // and switched in place when Settings → Behaviour changes it.
+  let barFields: BarFieldPresentation = initialSettings.bar_fields
 
   // S4 feed. `hud` is the pure snapshot; the shared recording-cluster row is a
   // projection of it. `bar_compact_controls` is locked while live, so it
@@ -395,7 +437,7 @@ export function ClassicWindow(
    * The window is never EXCLUSIVE, so this value cannot feed back into the
    * compositor's own reserved zone (design.md §11.4).
    */
-  function applyPlacement() {
+  function applyPlacement(resize = true) {
     const window = captureWindow
     if (!window) return
     config = settingsStore.load()
@@ -406,7 +448,7 @@ export function ClassicWindow(
     window.valign = top ? Gtk.Align.START : Gtk.Align.END
     window.margin_top = margin
     window.margin_bottom = 0
-    syncWindowSize()
+    if (resize) syncWindowSize()
   }
 
   // Widget handles. The three S0 rail buttons, the S1 row and the settings page
@@ -421,50 +463,504 @@ export function ClassicWindow(
   let hudRow: Gtk.Box | null = null
   let hudPopup: Gtk.Popover | null = null
   let hudCluster: RecordingClusterHandle | null = null
-  let monitorChip: Gtk.Button | null = null
-  let monitorChipLabel: Gtk.Label | null = null
   let screenshotPage: ScreenshotPageHandle | null = null
   let recordingPage: RecordingPageHandle | null = null
   let settingsPage: SettingsPageHandle | null = null
 
   const { screenshot, recording } = state
 
-  const screenshotTargetGroup: Array<{ value: CaptureTarget; button: Gtk.Button }> = []
-  const screenshotDelayGroup: Array<{ value: number; button: Gtk.Button }> = []
-  const screenshotFormatGroup: Array<{ value: ScreenshotFormat; button: Gtk.Button }> = []
-  const screenshotOutputGroup: Array<{ value: boolean; button: Gtk.Button }> = []
-  const screenshotCursorGroup: Array<{ value: boolean; button: Gtk.Button }> = []
-  const recordingTargetGroup: Array<{ value: CaptureTarget; button: Gtk.Button }> = []
-  const recordingFpsGroup: Array<{ value: number; button: Gtk.Button }> = []
-  const recordingGifFpsGroup: Array<{ value: number; button: Gtk.Button }> = []
-  const recordingFormatGroup: Array<{ value: RecordingFormat; button: Gtk.Button }> = []
-  const recordingAudioGroup: Array<{ value: AudioSource; button: Gtk.Button }> = []
-  const recordingQualityGroup: Array<{ value: RecordingQuality; button: Gtk.Button }> = []
-  const recordingDurationGroup: Array<{ value: number; button: Gtk.Button }> = []
-  const recordingSizeGroup: Array<{ value: GifScale; button: Gtk.Button }> = []
-  const recordingCursorGroup: Array<{ value: boolean; button: Gtk.Button }> = []
+  // EPIC-002: the screenshot lane is one trigger per field. The handles live
+  // here (not in the page) so `applyStateToUi`, `settingsChanged`,
+  // `commitCurrentMode` and the capture-phase key controller all address the
+  // same objects. The recording lane still uses the old group arrays until
+  // REQ-010 converts it.
+  let activePopover: DropdownFieldHandle | null = null
+
+  // REQ-011: the GDK topology is the trigger for a catalog re-read. The
+  // signature changes only when the targetable set or its geometry changes, so
+  // a selection repaint does not spawn the CLI again (the adapter also caches
+  // for 2 s, but this keeps even the cache lookup off the hot path).
+  let monitorSignature = ""
+  let refreshingMonitors = false
+  let windowDestroyed = false
+
+  function monitorSignatureOf(
+    monitors: readonly { connector: string | null; geometry: { x: number; y: number; width: number; height: number } }[],
+  ): string {
+    return monitors
+      .map(
+        (monitor) =>
+          `${monitor.connector ?? ""}@${monitor.geometry.x},${monitor.geometry.y},${monitor.geometry.width},${monitor.geometry.height}`,
+      )
+      .join("|")
+  }
+
+  function popoverPosition(): Gtk.PositionType {
+    return config.bar.position === "top" ? Gtk.PositionType.BOTTOM : Gtk.PositionType.TOP
+  }
+
+  const screenshotFields: ScreenshotFields = {
+    target: dropdownField({
+      key: SCREENSHOT_FIELDS.target.key,
+      description: SCREENSHOT_FIELDS.target.description,
+      options: SCREENSHOT_FIELDS.target.options,
+      value: screenshotTargetValue(screenshot.target),
+      lead: true,
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = screenshotFields.target
+      },
+      onClose: () => {
+        if (activePopover === screenshotFields.target) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = screenshotTargetFromValue(value)
+        if (next === null) return
+        screenshot.target = next
+        screenshotFields.target.setValue(value)
+        targetChanged()
+      },
+    }),
+    monitor: dropdownField({
+      key: SCREENSHOT_FIELDS.monitor.key,
+      description: SCREENSHOT_FIELDS.monitor.description,
+      options: [],
+      value: "",
+      lead: true,
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = screenshotFields.monitor
+        void refreshMonitorFields()
+      },
+      onClose: () => {
+        if (activePopover === screenshotFields.monitor) activePopover = null
+      },
+      onSelect: (value) => {
+        selection.selectMonitor(value)
+        screenshotFields.monitor.setValue(value)
+      },
+    }),
+    delay: dropdownField({
+      key: SCREENSHOT_FIELDS.delay.key,
+      description: SCREENSHOT_FIELDS.delay.description,
+      options: SCREENSHOT_FIELDS.delay.options,
+      value: screenshotDelayValue(screenshot.delay),
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = screenshotFields.delay
+      },
+      onClose: () => {
+        if (activePopover === screenshotFields.delay) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = screenshotDelayFromValue(value)
+        if (next === null) return
+        screenshot.delay = next
+        screenshotFields.delay.setValue(value)
+      },
+    }),
+    format: dropdownField({
+      key: SCREENSHOT_FIELDS.format.key,
+      description: SCREENSHOT_FIELDS.format.description,
+      options: SCREENSHOT_FIELDS.format.options,
+      value: screenshotFormatValue(screenshot.format),
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = screenshotFields.format
+      },
+      onClose: () => {
+        if (activePopover === screenshotFields.format) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = screenshotFormatFromValue(value)
+        if (next === null) return
+        screenshot.format = next
+        screenshotFields.format.setValue(value)
+      },
+    }),
+    output: dropdownField({
+      key: SCREENSHOT_FIELDS.output.key,
+      description: SCREENSHOT_FIELDS.output.description,
+      options: SCREENSHOT_FIELDS.output.options,
+      value: screenshotOutputValue(screenshot.save),
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = screenshotFields.output
+      },
+      onClose: () => {
+        if (activePopover === screenshotFields.output) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = screenshotOutputFromValue(value)
+        if (next === null) return
+        screenshot.save = next
+        screenshotFields.output.setValue(value)
+      },
+    }),
+    cursor: dropdownField({
+      key: SCREENSHOT_FIELDS.cursor.key,
+      description: SCREENSHOT_FIELDS.cursor.description,
+      options: SCREENSHOT_FIELDS.cursor.options,
+      value: screenshotCursorValue(config.screenshot.cursor),
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = screenshotFields.cursor
+      },
+      onClose: () => {
+        if (activePopover === screenshotFields.cursor) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = screenshotCursorFromValue(value)
+        if (next === null) return
+        setScreenshotCursor(next)
+      },
+    }),
+  }
+
+  // REQ-010: the recording lane uses the same primitive. `fps` swaps its
+  // definition between std and GIF; `audio`/`size` share one slot and only one
+  // is visible at a time. No handle is rebuilt on popover open/close.
+  const recordingFields: RecordingFields = {
+    target: dropdownField({
+      key: RECORDING_FIELDS.target.key,
+      description: RECORDING_FIELDS.target.description,
+      options: RECORDING_FIELDS.target.options,
+      value: recordingTargetValue(recording.target),
+      lead: true,
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.target
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.target) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = recordingTargetFromValue(value)
+        if (next === null) return
+        recording.target = next
+        recordingFields.target.setValue(value)
+        targetChanged()
+      },
+    }),
+    monitor: dropdownField({
+      key: RECORDING_FIELDS.monitor.key,
+      description: RECORDING_FIELDS.monitor.description,
+      options: [],
+      value: "",
+      lead: true,
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.monitor
+        void refreshMonitorFields()
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.monitor) activePopover = null
+      },
+      onSelect: (value) => {
+        selection.selectMonitor(value)
+        recordingFields.monitor.setValue(value)
+      },
+    }),
+    fps: dropdownField({
+      key: recordingFpsDef(recording.format).key,
+      description: recordingFpsDef(recording.format).description,
+      options: recordingFpsDef(recording.format).options,
+      value: recordingFpsValue(recording),
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.fps
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.fps) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = recordingFpsFromValue(value)
+        if (next === null) return
+        if (isGif(recording)) recording.gifFps = next
+        else recording.fps = next
+        recordingFields.fps.setValue(value)
+      },
+    }),
+    format: dropdownField({
+      key: RECORDING_FIELDS.format.key,
+      description: RECORDING_FIELDS.format.description,
+      options: RECORDING_FIELDS.format.options,
+      value: recordingFormatValue(recording.format),
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.format
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.format) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = recordingFormatFromValue(value)
+        if (next === null) return
+        recording.format = next
+        recordingFields.format.setValue(value)
+        applyRecordingMode()
+        // The GIF vocabulary changes the row's natural width; this is the one
+        // format-driven resize. Popover open/close never resizes.
+        syncWindowSize()
+      },
+    }),
+    quality: dropdownField({
+      key: RECORDING_FIELDS.quality.key,
+      description: RECORDING_FIELDS.quality.description,
+      options: RECORDING_FIELDS.quality.options,
+      value: recordingQualityValue(recording.quality),
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.quality
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.quality) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = recordingQualityFromValue(value)
+        if (next === null) return
+        recording.quality = next
+        recordingFields.quality.setValue(value)
+      },
+    }),
+    audio: dropdownField({
+      key: RECORDING_FIELDS.audio.key,
+      description: RECORDING_FIELDS.audio.description,
+      options: RECORDING_FIELDS.audio.options,
+      value: recordingAudioValue(recording.audio),
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.audio
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.audio) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = recordingAudioFromValue(value)
+        if (next === null) return
+        recording.audio = next
+        recordingFields.audio.setValue(value)
+      },
+    }),
+    size: dropdownField({
+      key: RECORDING_FIELDS.size.key,
+      description: RECORDING_FIELDS.size.description,
+      options: RECORDING_FIELDS.size.options,
+      value: recordingSizeValue(recording.size),
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.size
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.size) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = recordingSizeFromValue(value)
+        if (next === null) return
+        recording.size = next
+        recordingFields.size.setValue(value)
+      },
+    }),
+    duration: durationField({
+      key: RECORDING_FIELDS.duration.key,
+      description: RECORDING_FIELDS.duration.description,
+      options: RECORDING_FIELDS.duration.options,
+      value: recordingDurationValue(recording.duration),
+      selectedValue: durationSelection(recording) === -1 ? "Custom" : recordingDurationValue(recording.duration),
+      customSeconds: () => recording.customDuration,
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.duration
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.duration) activePopover = null
+      },
+      onPreset: (value) => {
+        const next = recordingDurationFromValue(value)
+        if (next === null) return
+        recording.duration = next
+        recordingFields.duration.setValue(value)
+      },
+      onCustom: (seconds) => {
+        recording.customDuration = seconds
+        recording.duration = seconds
+        recordingFields.duration.setValue(`${seconds}s`, "Custom")
+      },
+    }),
+    cursor: dropdownField({
+      key: RECORDING_FIELDS.cursor.key,
+      description: RECORDING_FIELDS.cursor.description,
+      options: RECORDING_FIELDS.cursor.options,
+      value: recordingCursorValue(config.recording.cursor),
+      accent: "recording",
+      presentation: barFields,
+      popoverPosition,
+      onOpen: () => {
+        activePopover = recordingFields.cursor
+      },
+      onClose: () => {
+        if (activePopover === recordingFields.cursor) activePopover = null
+      },
+      onSelect: (value) => {
+        const next = recordingCursorFromValue(value)
+        if (next === null) return
+        setRecordingCursor(next)
+      },
+    }),
+  }
+
+  /** Swap the FPS definition and the Audio/Size slot without touching state. */
+  function applyRecordingMode() {
+    const gif = isGif(recording)
+    const fps = recordingFpsDef(recording.format)
+    recordingFields.fps.setKey(fps.key)
+    recordingFields.fps.setDescription(fps.description)
+    recordingFields.fps.setOptions(fps.options)
+    recordingFields.fps.setValue(recordingFpsValue(recording))
+    recordingFields.audio.setVisible(!gif)
+    recordingFields.size.setVisible(gif)
+  }
+
+  function closeAllFields() {
+    for (const field of Object.values(screenshotFields)) field.close()
+    for (const field of Object.values(recordingFields)) field.close()
+    activePopover = null
+  }
+
+  function allFields(): DropdownFieldHandle[] {
+    return [...Object.values(screenshotFields), ...Object.values(recordingFields)]
+  }
+
+  /**
+   * REQ-014: switch the bar's field density in place.
+   *
+   * The SAME handles are reused; only `setPresentation` changes their renderer.
+   * `closeAllFields()` first so no popover surface can outlive the compact
+   * presentation, and no `UiState` is read or written here: the current lane
+   * choices are preserved exactly. Returns true when the value actually changed
+   * so the caller can run exactly one `syncWindowSize()`.
+   */
+  function applyBarFields(presentation: BarFieldPresentation): boolean {
+    if (presentation === barFields) return false
+    barFields = presentation
+    closeAllFields()
+    for (const field of allFields()) field.setPresentation(presentation)
+    return true
+  }
+
+  /**
+   * Re-read the runtime catalog and rebuild both Monitor popovers (REQ-011).
+   *
+   * GDK stays authoritative: `mergeMonitors()` drops catalog-only connectors
+   * and keeps a GDK-only monitor with a connector+geometry fallback. The
+   * current pick is preserved when it is still connected; otherwise it falls
+   * back to the focused output, then the first canonical row.
+   *
+   * Never rejects: the adapter turns every CLI failure into `[]`.
+   */
+  async function refreshMonitorFields(): Promise<void> {
+    const catalog = await ports.monitorCatalog.list()
+    if (windowDestroyed) return
+    const monitors = selection.monitors()
+    const merged = mergeMonitors(monitors, catalog, selection.focused())
+    const options: FieldOptionDef[] = merged.map((monitor) => ({
+      value: monitor.connector,
+      label: monitor.label,
+      description: monitor.detail,
+      icon: "i-screen",
+    }))
+    const connected = new Set(merged.map((monitor) => monitor.connector))
+    const pending = selection.pending()
+    const wanted =
+      pending.target === "screen"
+        ? (pending.monitor ?? selection.focused())
+        : selection.focused()
+    const focused = merged.find((monitor) => monitor.focused)?.connector ?? null
+    const picked =
+      wanted !== null && connected.has(wanted)
+        ? wanted
+        : (focused ?? merged[0]?.connector ?? null)
+
+    for (const field of [screenshotFields.monitor, recordingFields.monitor]) {
+      field.setOptions(options)
+      if (picked !== null) field.setValue(picked)
+    }
+
+    // Hotplug: an explicit pick that disappeared must not survive into the
+    // pending outline or the commit argv. Move it to the same fallback the
+    // trigger now shows.
+    if (
+      pending.target === "screen" &&
+      pending.monitor !== null &&
+      !connected.has(pending.monitor) &&
+      picked !== null &&
+      !refreshingMonitors
+    ) {
+      refreshingMonitors = true
+      selection.selectMonitor(picked)
+      refreshingMonitors = false
+    }
+  }
 
   function currentTarget(): CaptureTarget {
     return barState.view === "recording" ? recording.target : screenshot.target
   }
 
   /**
-   * Keep the bar's commit affordance and `Monitor n` chip in step with the
+   * Keep the bar's commit affordance and `Monitor n` badge in step with the
    * pending selection. The overlay itself is rendered by the controller; this
    * only mirrors "can commit?" and the screen target's monitor identity.
    */
   function syncSelectionUi() {
     const modeOpen = isModeOpen(barState)
     if (cta) cta.sensitive = modeOpen && selection.canCommit()
-    if (monitorChip && monitorChipLabel) {
-      const screen = modeOpen && currentTarget() === "screen"
-      const count = selection.monitors().length
-      monitorChip.visible = screen && count > 1
-      if (screen && count > 1) {
-        const pending = selection.pending()
-        const picked = pending.target === "screen" ? (pending.monitor ?? selection.focused()) : selection.focused()
-        monitorChipLabel.set_label(`Monitor ${selection.monitorIndex(picked) || 1}`)
+    const screen = modeOpen && currentTarget() === "screen"
+    const monitors = selection.monitors()
+    // D11: the Monitor field appears for Screen when more than one output is
+    // targetable. Both lanes use the same field; there is no cycle button.
+    const showMonitor = screen && monitors.length > 1
+    screenshotFields.monitor.setVisible(barState.view === "screenshot" && showMonitor)
+    recordingFields.monitor.setVisible(barState.view === "recording" && showMonitor)
+    if (showMonitor) {
+      const pending = selection.pending()
+      const picked =
+        pending.target === "screen"
+          ? (pending.monitor ?? selection.focused())
+          : selection.focused()
+      if (picked !== null) {
+        if (barState.view === "screenshot") screenshotFields.monitor.setValue(picked)
+        if (barState.view === "recording") recordingFields.monitor.setValue(picked)
       }
+    }
+    // The controller re-reads GDK topology on the existing hotplug signal and
+    // notifies its subscribers. A changed targetable set/geometry is the one
+    // trigger that re-reads the catalog while the lane is open.
+    const signature = monitorSignatureOf(monitors)
+    if (signature !== monitorSignature) {
+      monitorSignature = signature
+      void refreshMonitorFields()
     }
   }
 
@@ -488,13 +984,14 @@ export function ClassicWindow(
   }
 
   /**
-   * Project `bar.recording_hud` (D9/§6) onto the S4 window and row.
+   * Project the resolved recording-controls surface onto the S4 window and row.
    *
-   * The pure rule decides; this only applies it. `opacity` hides the chrome
-   * without collapsing the row, while `visible` maps only a revealed HUD in
-   * `hover` mode (SPIKE-001 C): the hidden surface has no input region, so the
-   * bar area stays click-through. Mapping is only touched while live: S0/S1
-   * visibility stays the focus/window-set contract.
+   * `recording_controls` is resolved to a `CaptureBarMode` by
+   * `recordingSurfaces()`; this only applies the result. `opacity` hides the
+   * chrome without collapsing the row, while `visible` maps only a revealed
+   * HUD in `hover` mode (SPIKE-001 C): the hidden surface has no input region,
+   * so the bar area stays click-through. Mapping is only touched while live:
+   * S0/S1 visibility stays the focus/window-set contract.
    */
   function applyHudVisibility() {
     const live = isLive(barState)
@@ -531,9 +1028,10 @@ export function ClassicWindow(
 
   /**
    * S4 entry. Recording commits hide the pending UI first (FR-10), then this
-   * hands the decision to `bar.recording_hud` (D9): `always` maps the HUD,
-   * `hover` stays UNMAPPED until the compositor poll sees the pointer over the
-   * cached S1 footprint, `hidden` stays unmapped unless the user presents it.
+   * hands the decision to `recording_controls` (D9/SPIKE-004): `always` maps
+   * the capture HUD, `hover` stays UNMAPPED until the compositor poll sees the
+   * pointer over the cached S1 footprint, and `top-bar` leaves the capture bar
+   * hidden because the bar's reserved slot owns the controls.
    * The first `capture.state` snapshot fills in the job id and timer.
    * Screenshot never calls it, so its commit still hides the bar.
    */
@@ -682,6 +1180,8 @@ export function ClassicWindow(
       ctaLabel.set_label(recordingMode ? "Record" : "Capture")
       if (recordingMode) cta.add_css_class("record")
       else cta.remove_css_class("record")
+      if (recordingMode) cta.remove_css_class("screenshot")
+      else cta.add_css_class("screenshot")
     }
     syncSelectionUi()
     updateHudUi()
@@ -727,14 +1227,14 @@ export function ClassicWindow(
     config = { ...config, screenshot: { ...config.screenshot, cursor: value } }
     const error = settingsStore.save(config)
     if (error !== null) console.error(`capture-tool: cannot save cursor setting: ${error}`)
-    applyGroup(screenshotCursorGroup, value)
+    screenshotFields.cursor.setValue(screenshotCursorValue(value))
   }
 
   function setRecordingCursor(value: boolean) {
     config = { ...config, recording: { ...config.recording, cursor: value } }
     const error = settingsStore.save(config)
     if (error !== null) console.error(`capture-tool: cannot save cursor setting: ${error}`)
-    applyGroup(recordingCursorGroup, value)
+    recordingFields.cursor.setValue(recordingCursorValue(value))
   }
 
   /**
@@ -743,9 +1243,10 @@ export function ClassicWindow(
    * does the launcher receive argv (FR-10). There is no post-commit editing
    * state.
    *
-   * Recording then consults `bar.recording_hud` (D9) after the hides and before
-   * the launcher spawns: `always`/`hover` may map the bar as the S4 HUD, while
-   * `hidden` leaves it unmapped so no capture-bar chrome can reach a frame.
+   * Recording then consults `recording_controls` (D9/SPIKE-004) after the
+   * hides and before the launcher spawns: `always`/`hover` may map the capture
+   * bar as the S4 HUD, while `top-bar` leaves it unmapped so the bar's slot is
+   * the only control surface and no capture-bar chrome can reach a frame.
    * The pending row is gone either way. Screenshot keeps REQ-003's
    * hide-and-stay-hidden behaviour.
    *
@@ -757,6 +1258,9 @@ export function ClassicWindow(
     const finished = selection.selection()
     if (finished === null) return
     if (finished.kind !== currentTarget()) return
+    // EPIC-002: no popup surface may outlive the bar or leak into a recording.
+    // Close synchronously before the one-way commit door starts.
+    closeAllFields()
     const committingRecording = barState.view === "recording"
     uiStateStore.save(screenshot, recording)
     const current = settingsStore.load()
@@ -813,6 +1317,29 @@ export function ClassicWindow(
     // S4 has no keyboard exit: INV-2 suppresses the back chevron, Enter must
     // not start a second recording, and Stop is the only exit (mockup Sheet 3).
     if (isLive(barState)) return true
+    // REQ-014: a focused detailed duration editor owns Enter/Esc. Returning
+    // false lets its capture-phase controller set or restore the seconds
+    // instead of committing the capture.
+    for (const field of allFields()) {
+      if (field.isEditing?.() === true) return false
+    }
+    // An open field owns Enter/Esc/Space/arrows. Returning false is deliberate:
+    // the popover's own controller closes it or activates the highlighted row,
+    // so Esc cannot also walk the bar ladder in the same event.
+    if (activePopover !== null && activePopover.isOpen()) {
+      if (
+        keyval === Gdk.KEY_Escape ||
+        keyval === Gdk.KEY_Return ||
+        keyval === Gdk.KEY_KP_Enter ||
+        keyval === Gdk.KEY_space ||
+        keyval === Gdk.KEY_Up ||
+        keyval === Gdk.KEY_Down ||
+        keyval === Gdk.KEY_Left ||
+        keyval === Gdk.KEY_Right
+      ) {
+        return false
+      }
+    }
     if (keyval === Gdk.KEY_Escape) {
       // An open inline path editor owns Escape (cancel the edit).
       if (isSettingsOpen(barState) && settingsPage !== null && settingsPage.cancelPathEditor()) {
@@ -848,38 +1375,51 @@ export function ClassicWindow(
   }
 
   function applyStateToUi() {
-    // Last-used UI state > settings defaults > hardcoded constants.
-    const loaded = uiStateStore.load(configDefaults(settingsStore.load()))
+    // REQ-012: first run is the code constants; after that capture-ui.json
+    // overlays every saved lane choice. Settings no longer seed the lane.
+    const loaded = uiStateStore.load(createUiState())
     Object.assign(screenshot, loaded.screenshot)
     Object.assign(recording, loaded.recording)
     config = settingsStore.load()
-    applyGroup(screenshotTargetGroup, screenshot.target)
-    applyGroup(screenshotDelayGroup, screenshot.delay)
-    applyGroup(screenshotFormatGroup, screenshot.format)
-    applyGroup(screenshotOutputGroup, screenshot.save)
-    applyGroup(screenshotCursorGroup, config.screenshot.cursor)
-    applyGroup(recordingTargetGroup, recording.target)
-    applyGroup(recordingFpsGroup, recording.fps)
-    applyGroup(recordingGifFpsGroup, recording.gifFps)
-    applyGroup(recordingFormatGroup, recording.format)
-    applyGroup(recordingAudioGroup, recording.audio)
-    applyGroup(recordingQualityGroup, recording.quality)
-    applyGroup(recordingDurationGroup, durationSelection(recording))
-    applyGroup(recordingSizeGroup, recording.size)
-    applyGroup(recordingCursorGroup, config.recording.cursor)
-    // Groups, then the spin, then the conditional rows — the recording page's
-    // own order, unchanged from the old panel.
-    if (recordingPage) recordingPage.applyState()
+    applyBarFields(config.bar_fields)
+    screenshotFields.target.setValue(screenshotTargetValue(screenshot.target))
+    screenshotFields.delay.setValue(screenshotDelayValue(screenshot.delay))
+    screenshotFields.format.setValue(screenshotFormatValue(screenshot.format))
+    screenshotFields.output.setValue(screenshotOutputValue(screenshot.save))
+    screenshotFields.cursor.setValue(screenshotCursorValue(config.screenshot.cursor))
+    monitorSignature = monitorSignatureOf(selection.monitors())
+    void refreshMonitorFields()
+    recordingFields.target.setValue(recordingTargetValue(recording.target))
+    applyRecordingMode()
+    recordingFields.format.setValue(recordingFormatValue(recording.format))
+    recordingFields.quality.setValue(recordingQualityValue(recording.quality))
+    recordingFields.audio.setValue(recordingAudioValue(recording.audio))
+    recordingFields.size.setValue(recordingSizeValue(recording.size))
+    recordingFields.duration.setValue(
+      recordingDurationValue(recording.duration),
+      durationSelection(recording) === -1 ? "Custom" : recordingDurationValue(recording.duration),
+    )
+    recordingFields.cursor.setValue(recordingCursorValue(config.recording.cursor))
   }
 
   function settingsChanged() {
-    applyPlacement()
-    config = settingsStore.load()
-    applyGroup(screenshotCursorGroup, config.screenshot.cursor)
-    applyGroup(recordingCursorGroup, config.recording.cursor)
-    // `recording_hud` is an S4 decision. If it changed under a live lane, stop
-    // or start the hover poll and re-apply the pure rule without touching the
-    // capture (options stay locked; this is the external-config path).
+    const previous = config
+    const next = settingsStore.load()
+    const switched = next.bar_fields !== previous.bar_fields
+    const placementChanged =
+      next.bar.position !== previous.bar.position ||
+      next.bar.offsetPx !== previous.bar.offsetPx
+    config = next
+    // REQ-014: apply the density switch in place; the size is re-measured once
+    // below, never on every unrelated settings save.
+    if (switched) applyBarFields(next.bar_fields)
+    if (placementChanged) applyPlacement(false)
+    if (switched || placementChanged) syncWindowSize()
+    screenshotFields.cursor.setValue(screenshotCursorValue(config.screenshot.cursor))
+    recordingFields.cursor.setValue(recordingCursorValue(config.recording.cursor))
+    // `recording_controls` is an S4 decision. If it changed under a live lane,
+    // stop or start the hover poll and re-apply the pure rule without touching
+    // the capture (options stay locked; this is the external-config path).
     if (isLive(barState)) {
       if (surfaces().captureBar === "hover") syncHoverPoll()
       else {
@@ -953,6 +1493,10 @@ export function ClassicWindow(
         })
         self.connect("destroy", () => {
           // No poll, cached footprint or armed state survives the window.
+          windowDestroyed = true
+          closeAllFields()
+          for (const field of Object.values(screenshotFields)) field.destroy()
+          for (const field of Object.values(recordingFields)) field.destroy()
           hudCluster?.destroy()
           hudCluster = null
           clearHoverReveal()
@@ -1145,59 +1689,18 @@ export function ClassicWindow(
             </button>
 
             <ScreenshotPage
-              screenshot={screenshot}
-              screenshotTargetGroup={screenshotTargetGroup}
-              screenshotDelayGroup={screenshotDelayGroup}
-              screenshotFormatGroup={screenshotFormatGroup}
-              screenshotOutputGroup={screenshotOutputGroup}
-              screenshotCursorGroup={screenshotCursorGroup}
-              setScreenshotCursor={setScreenshotCursor}
-              onTargetChanged={targetChanged}
-              icons={iconSlots}
+              fields={screenshotFields}
               setHandle={(handle) => {
                 screenshotPage = handle
               }}
             />
 
             <RecordingPage
-              recording={recording}
-              recordingTargetGroup={recordingTargetGroup}
-              recordingFpsGroup={recordingFpsGroup}
-              recordingGifFpsGroup={recordingGifFpsGroup}
-              recordingFormatGroup={recordingFormatGroup}
-              recordingAudioGroup={recordingAudioGroup}
-              recordingQualityGroup={recordingQualityGroup}
-              recordingDurationGroup={recordingDurationGroup}
-              recordingSizeGroup={recordingSizeGroup}
-              recordingCursorGroup={recordingCursorGroup}
-              setRecordingCursor={setRecordingCursor}
-              onTargetChanged={targetChanged}
-              icons={iconSlots}
-              syncWindowSize={syncWindowSize}
+              fields={recordingFields}
               setHandle={(handle) => {
                 recordingPage = handle
               }}
             />
-
-            <button
-              visible={false}
-              class="bar-pill monitor-chip"
-              tooltipText="Switch the pending screen pick"
-              onClicked={() => {
-                selection.cycleMonitor()
-                applyBarState()
-              }}
-              $={(self) => {
-                monitorChip = self
-              }}
-            >
-              <label
-                label="Monitor 1"
-                $={(self) => {
-                  monitorChipLabel = self
-                }}
-              />
-            </button>
 
             <button
               class="bar-cta"

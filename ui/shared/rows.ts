@@ -174,6 +174,8 @@ export function numberRow(
   ctx: RowContext,
   minimum = 0,
   maximum = 2000,
+  /** Optional sensitivity rule; e.g. Top offset is only active at Top. */
+  isEnabled?: () => boolean,
 ): Gtk.Box {
   const adjustment = new Gtk.Adjustment({
     lower: minimum,
@@ -186,6 +188,7 @@ export function numberRow(
   control.add_css_class("bar-offset-spin")
   control.set_halign(Gtk.Align.END)
   control.set_valign(Gtk.Align.CENTER)
+  control.set_sensitive(isEnabled ? isEnabled() : true)
   control.connect("value-changed", () => {
     setValue(control.get_value_as_int())
     ctx.persistSettings()

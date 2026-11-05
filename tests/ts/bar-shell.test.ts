@@ -13,6 +13,12 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
+import {
+  SETTINGS_GROUPS,
+  SETTINGS_GROUP_TITLES,
+  SETTINGS_ROW_NAMES,
+} from "../../ui/shared/settings-defs.ts"
+
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 
 function read(...parts: string[]): string {
@@ -31,6 +37,7 @@ const WINDOW = code(read("ui", "classic", "ClassicWindow.tsx"))
 const SCREENSHOT = code(read("ui", "classic", "ScreenshotPage.tsx"))
 const RECORDING = code(read("ui", "classic", "RecordingPage.tsx"))
 const SETTINGS = code(read("ui", "classic", "SettingsPage.tsx"))
+const UI_STATE = code(read("domain", "ui-state.ts"))
 const CSS = read("style.css")
 
 test("S0 is the icon-only rail: camera, video, gear; no text labels", () => {
@@ -208,7 +215,7 @@ test("the back chevron leads the opened row and the CTA closes it", () => {
   assert.match(WINDOW, /label="←"/)
 })
 
-test("settings is entered from S0 only (INV-3), and keeps its existing groups", () => {
+test("settings is entered from S0 only (INV-3), and shows Files/Behaviour/Placement/Runtime", () => {
   assert.equal(
     (WINDOW.match(/onClicked=\{openSettingsView\}/g) ?? []).length,
     1,
@@ -220,17 +227,73 @@ test("settings is entered from S0 only (INV-3), and keeps its existing groups", 
   const open = WINDOW.indexOf('class="capture-bar open"')
   assert.ok(gear > rail && gear < open, "settings must not be reachable from S1")
 
-  for (const label of [
-    "Screenshot folder",
-    "Recording folder",
-    "Filename pattern",
-    "Show notifications",
-    "Compact bar indicator",
-    "Bar position",
-    "Top offset",
-  ]) {
-    assert.match(SETTINGS, new RegExp(`"${label}"`), `missing settings row ${label}`)
+  // REQ-012: the panel has exactly these four groups in this order. The list
+  // is the pure settings-defs table the page consumes.
+  assert.deepEqual(
+    SETTINGS_GROUPS.map((group) => group.title),
+    ["Files", "Behaviour", "Placement", "Runtime"],
+  )
+  assert.deepEqual(Object.values(SETTINGS_GROUP_TITLES), [
+    "Files",
+    "Behaviour",
+    "Placement",
+    "Runtime",
+  ])
+  assert.match(SETTINGS, /settingsGroups\(\)/, "the page consumes the settings-defs order")
+  for (const def of ["filesDef", "behaviourDef", "placementDef", "runtimeDef"]) {
+    assert.match(SETTINGS, new RegExp(`settingsGroup\\(${def}\\.title`), `missing group ${def}`)
   }
+
+  for (const [key, label] of [
+    ["screenshotFolder", "Screenshot folder"],
+    ["recordingFolder", "Recording folder"],
+    ["filenamePattern", "Filename pattern"],
+    ["showNotifications", "Show notifications"],
+    ["compactBarIndicator", "Compact bar indicator"],
+    ["barPosition", "Bar position"],
+    ["topOffset", "Top offset"],
+    ["recordingControls", "Recording controls"],
+    ["recorderBackend", "Recorder backend"],
+    ["laneMemory", "Lane memory"],
+  ] as const) {
+    assert.equal(SETTINGS_ROW_NAMES[key], label)
+    assert.match(
+      SETTINGS,
+      new RegExp(`SETTINGS_ROW_NAMES\\.${key}`),
+      `missing settings row ${label}`,
+    )
+  }
+})
+
+test("settings no longer carries the duplicate Screenshot/Recording defaults", () => {
+  // The bar dropdowns own these now; only cursor stays in config.json.
+  for (const removed of [
+    "Default format",
+    "Default output",
+    "Default frame rate",
+    "Default quality",
+    "Default audio",
+    "Include cursor",
+  ]) {
+    assert.doesNotMatch(SETTINGS, new RegExp(`"${removed}"`), `removed row still present: ${removed}`)
+  }
+  assert.doesNotMatch(SETTINGS, /settingsConfig\.screenshot\.(format|output)/)
+  assert.doesNotMatch(SETTINGS, /settingsConfig\.recording\.(fps|quality|audio)/)
+  assert.doesNotMatch(SETTINGS, /"General"|"Screenshot"|"Recording"/)
+  // The header and footer contract.
+  assert.match(SETTINGS, /class="settings-subtitle"/)
+  assert.match(SETTINGS, /class="settings-save-chip"/)
+  assert.match(SETTINGS, /label="Saved as you go"/)
+  assert.match(SETTINGS, /label="done"/)
+  assert.match(SETTINGS, /The bar remembers every lane choice/)
+  assert.match(CSS, /\.settings-subtitle\s*\{/)
+  assert.match(CSS, /\.settings-save-chip\s*\{/)
+})
+
+test("first run loads code defaults, not settings defaults", () => {
+  assert.match(WINDOW, /uiStateStore\.load\(createUiState\(\)\)/)
+  assert.doesNotMatch(WINDOW, /configDefaults/)
+  assert.doesNotMatch(UI_STATE, /export function configDefaults/)
 })
 
 test("the bar is never EXCLUSIVE and reads placement from settings", () => {

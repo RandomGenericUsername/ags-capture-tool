@@ -109,7 +109,8 @@ app.start({
     // ONE live UI state for the whole app, built here and handed to every
     // window (fix-capture-per-monitor-state). The persisted selections belong
     // to the application — there is a single `capture-ui.json` and a single
-    // settings→defaults→last-used precedence chain — so the loop must NOT give
+    // capture-ui.json over the code first-run defaults (REQ-012) — so the
+    // loop must NOT give
     // each monitor's window its own copy: two copies diverge on first
     // mutation, and whichever window saves last silently discards the other
     // one's selection. `createUiState()` stays a factory (not a module-level

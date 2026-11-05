@@ -61,7 +61,7 @@ import { recordingSurfaces } from "../../domain/recording-presentation"
 import { runCommit } from "../../lib/commit-order"
 import type { CaptureStatePayload } from "../../ports/capture-state-feed"
 import type { SelectionController } from "../overlay/controller"
-import { configDefaults, durationSelection, isGif, type UiState } from "../../domain/ui-state"
+import { createUiState, durationSelection, isGif, type UiState } from "../../domain/ui-state"
 import type { CapturePorts } from "../../ports/capture-ports"
 import type { CaptureTarget } from "../../types"
 import {
@@ -1329,8 +1329,9 @@ export function ClassicWindow(
   }
 
   function applyStateToUi() {
-    // Last-used UI state > settings defaults > hardcoded constants.
-    const loaded = uiStateStore.load(configDefaults(settingsStore.load()))
+    // REQ-012: first run is the code constants; after that capture-ui.json
+    // overlays every saved lane choice. Settings no longer seed the lane.
+    const loaded = uiStateStore.load(createUiState())
     Object.assign(screenshot, loaded.screenshot)
     Object.assign(recording, loaded.recording)
     config = settingsStore.load()

@@ -51,14 +51,41 @@ export interface CaptureSettings {
     offsetPx: number
   }
   screenshot: {
+    /**
+     * @deprecated REQ-012: the bar's Format dropdown is the control and
+     * `capture-ui.json` is the authority. Kept parseable and written unchanged
+     * for the backend/older configs; do not use it to seed a first run.
+     */
     format: ConfigScreenshotFormat
+    /**
+     * @deprecated REQ-012: the bar's Output dropdown is the control and
+     * `capture-ui.json` is the authority. Kept parseable and written unchanged
+     * for the backend/older configs; do not use it to seed a first run.
+     */
     output: ConfigScreenshotOutput
+    /** Cursor stays in config.json (D4); the bar dropdown is its only UI. */
     cursor: boolean
   }
   recording: {
+    /**
+     * @deprecated REQ-012: the bar's FPS dropdown is the control and
+     * `capture-ui.json` is the authority. Kept parseable and written unchanged
+     * for the backend/older configs; do not use it to seed a first run.
+     */
     fps: ConfigRecordingFps
+    /**
+     * @deprecated REQ-012: the bar's Quality dropdown is the control and
+     * `capture-ui.json` is the authority. Kept parseable and written unchanged
+     * for the backend/older configs; do not use it to seed a first run.
+     */
     quality: ConfigRecordingQuality
+    /**
+     * @deprecated REQ-012: the bar's Audio dropdown is the control and
+     * `capture-ui.json` is the authority. Kept parseable and written unchanged
+     * for the backend/older configs; do not use it to seed a first run.
+     */
     audio: ConfigRecordingAudio
+    /** Cursor stays in config.json (D4); the bar dropdown is its only UI. */
     cursor: boolean
   }
 }

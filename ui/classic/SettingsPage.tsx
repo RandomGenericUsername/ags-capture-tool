@@ -6,11 +6,12 @@
 // leading indentation included, so the rendered widget tree is unchanged and
 // `git diff -M` shows a move rather than an edit. Do not re-indent it.
 //
-// The page owns the settings draft (`settingsConfig`), the three groups
-// (`renderSettings`), the inline path editor the window's key controller has to
-// defer to, and the backend readout. It is REBUILT from disk each time it
-// opens so it always reflects the current config; edits mutate the draft and
-// are persisted on leave and immediately after every change.
+// The page owns the settings draft (`settingsConfig`), the four groups
+// (`renderSettings`: Files, Behaviour, Placement, Runtime), the inline path
+// editor the window's key controller has to defer to, and the backend readout.
+// It is REBUILT from disk each time it opens so it always reflects the current
+// config; edits mutate the draft and are persisted on leave and immediately
+// after every change.
 //
 // The row builders come from `ui/shared/rows.ts` (A7) — they were extracted
 // from this very code and are shared with every future layout. `RowContext` is
@@ -35,13 +36,13 @@ import type { SettingsStore } from "../../ports/settings-store"
 import type {
   CaptureSettings,
   ConfigBarPosition,
-  ConfigRecordingAudio,
-  ConfigRecordingFps,
-  ConfigRecordingQuality,
-  ConfigScreenshotFormat,
-  ConfigScreenshotOutput,
 } from "../../domain/settings"
 import type { RecordingControlsMode } from "../../domain/recording-presentation"
+import {
+  SETTINGS_RECORDING_CONTROL_OPTIONS,
+  SETTINGS_ROW_NAMES,
+  settingsGroups,
+} from "../shared/settings-defs"
 
 /**
  * What the window needs back from this page.
@@ -53,7 +54,7 @@ import type { RecordingControlsMode } from "../../domain/recording-presentation"
  */
 export interface SettingsPageHandle {
   setVisible: (visible: boolean) => void
-  /** Rebuild the three groups from the config on disk. */
+  /** Rebuild the four groups from the config on disk. */
   render: () => void
   /** Persist the draft; `false` means the save failed and the view stays open. */
   close: () => boolean
@@ -138,9 +139,11 @@ export function SettingsPage(props: SettingsPageProps) {
       settingsError.visible = false
     }
 
-    const general = settingsGroup("General", [
+    const [filesDef, behaviourDef, placementDef, runtimeDef] = settingsGroups()
+
+    const filesGroup = settingsGroup(filesDef.title, [
       pathRow(
-        "Screenshot folder",
+        SETTINGS_ROW_NAMES.screenshotFolder,
         "Where saved screenshots go",
         () => settingsConfig.screenshot_dir,
         (value) => {
@@ -149,7 +152,7 @@ export function SettingsPage(props: SettingsPageProps) {
         rowContext,
       ),
       pathRow(
-        "Recording folder",
+        SETTINGS_ROW_NAMES.recordingFolder,
         "Where finished recordings go",
         () => settingsConfig.recording_dir,
         (value) => {
@@ -158,7 +161,7 @@ export function SettingsPage(props: SettingsPageProps) {
         rowContext,
       ),
       pathRow(
-        "Filename pattern",
+        SETTINGS_ROW_NAMES.filenamePattern,
         "Timestamp tokens are expanded at capture time",
         () => settingsConfig.filename_pattern,
         (value) => {
@@ -166,8 +169,11 @@ export function SettingsPage(props: SettingsPageProps) {
         },
         rowContext,
       ),
+    ])
+
+    const behaviourGroup = settingsGroup(behaviourDef.title, [
       toggleRow(
-        "Show notifications",
+        SETTINGS_ROW_NAMES.showNotifications,
         null,
         () => settingsConfig.notifications,
         (value) => {
@@ -176,7 +182,7 @@ export function SettingsPage(props: SettingsPageProps) {
         rowContext,
       ),
       toggleRow(
-        "Compact bar indicator",
+        SETTINGS_ROW_NAMES.compactBarIndicator,
         "Available for Top bar and Always visible. On hover forces the inline controls so Pause/Stop is one click.",
         () =>
           settingsConfig.bar_compact_controls &&
@@ -187,8 +193,11 @@ export function SettingsPage(props: SettingsPageProps) {
         rowContext,
         () => settingsConfig.recording_controls !== "hover",
       ),
+    ])
+
+    const placementGroup = settingsGroup(placementDef.title, [
       pillRow<ConfigBarPosition>(
-        "Bar position",
+        SETTINGS_ROW_NAMES.barPosition,
         [
           { label: "Bottom", value: "bottom" },
           { label: "Top", value: "top" },
@@ -198,23 +207,24 @@ export function SettingsPage(props: SettingsPageProps) {
           settingsConfig.bar.position = value
         },
         rowContext,
+        // Re-render so Top offset's sensitivity follows the new position.
+        () => renderSettings(),
       ),
       numberRow(
-        "Top offset",
+        SETTINGS_ROW_NAMES.topOffset,
         "Pixels below the reserved top zone (0 clears the ags-bar zone)",
         () => settingsConfig.bar.offsetPx,
         (value) => {
           settingsConfig.bar.offsetPx = value
         },
         rowContext,
+        0,
+        2000,
+        () => settingsConfig.bar.position === "top",
       ),
       pillRow<RecordingControlsMode>(
-        "Recording controls",
-        [
-          { label: "Top bar", value: "top-bar" },
-          { label: "On hover", value: "hover" },
-          { label: "Always visible", value: "always" },
-        ],
+        SETTINGS_ROW_NAMES.recordingControls,
+        [...SETTINGS_RECORDING_CONTROL_OPTIONS],
         () => settingsConfig.recording_controls,
         (value) => {
           settingsConfig.recording_controls = value
@@ -224,103 +234,30 @@ export function SettingsPage(props: SettingsPageProps) {
       ),
     ])
 
-    const screenshotGroup = settingsGroup("Screenshot", [
-      pillRow<ConfigScreenshotFormat>(
-        "Default format",
-        [
-          { label: "PNG", value: "png" },
-          { label: "JPEG", value: "jpeg" },
-        ],
-        () => settingsConfig.screenshot.format,
-        (value) => {
-          settingsConfig.screenshot.format = value
-        },
-        rowContext,
-      ),
-      pillRow<ConfigScreenshotOutput>(
-        "Default output",
-        [
-          { label: "Clipboard", value: "clipboard" },
-          { label: "Save", value: "save" },
-        ],
-        () => settingsConfig.screenshot.output,
-        (value) => {
-          settingsConfig.screenshot.output = value
-        },
-        rowContext,
-      ),
-      toggleRow(
-        "Include cursor",
-        "Draw the pointer into the shot",
-        () => settingsConfig.screenshot.cursor,
-        (value) => {
-          settingsConfig.screenshot.cursor = value
-        },
-        rowContext,
-      ),
-    ])
-
     backendReadout = new Gtk.Label({ label: "Automatic", halign: Gtk.Align.END })
     backendReadout.add_css_class("settings-readout")
-    const recordingGroup = settingsGroup("Recording", [
-      pillRow<ConfigRecordingFps>(
-        "Default frame rate",
-        [
-          { label: "24", value: 24 },
-          { label: "30", value: 30 },
-          { label: "60", value: 60 },
-        ],
-        () => settingsConfig.recording.fps,
-        (value) => {
-          settingsConfig.recording.fps = value
-        },
-        rowContext,
-      ),
-      pillRow<ConfigRecordingQuality>(
-        "Default quality",
-        [
-          { label: "Low", value: "low" },
-          { label: "Medium", value: "medium" },
-          { label: "High", value: "high" },
-        ],
-        () => settingsConfig.recording.quality,
-        (value) => {
-          settingsConfig.recording.quality = value
-        },
-        rowContext,
-      ),
-      pillRow<ConfigRecordingAudio>(
-        "Default audio",
-        [
-          { label: "None", value: "none" },
-          { label: "System", value: "system" },
-          { label: "Mic", value: "mic" },
-        ],
-        () => settingsConfig.recording.audio,
-        (value) => {
-          settingsConfig.recording.audio = value
-        },
-        rowContext,
-      ),
-      toggleRow(
-        "Include cursor",
-        "Draw the pointer into the recording",
-        () => settingsConfig.recording.cursor,
-        (value) => {
-          settingsConfig.recording.cursor = value
-        },
-        rowContext,
-      ),
+    const laneMemoryReadout = new Gtk.Label({
+      label: "Restored (UI state)",
+      halign: Gtk.Align.END,
+    })
+    laneMemoryReadout.add_css_class("settings-readout")
+    const runtimeGroup = settingsGroup(runtimeDef.title, [
       settingsItem(
-        "Recorder backend",
+        SETTINGS_ROW_NAMES.recorderBackend,
         "Chosen automatically after detection",
         backendReadout,
       ),
+      settingsItem(
+        SETTINGS_ROW_NAMES.laneMemory,
+        "Every field's last choice is restored on launch",
+        laneMemoryReadout,
+      ),
     ])
 
-    settingsBody.append(general)
-    settingsBody.append(screenshotGroup)
-    settingsBody.append(recordingGroup)
+    settingsBody.append(filesGroup)
+    settingsBody.append(behaviourGroup)
+    settingsBody.append(placementGroup)
+    settingsBody.append(runtimeGroup)
     refreshBackendReadout()
   }
 
@@ -377,11 +314,32 @@ export function SettingsPage(props: SettingsPageProps) {
           }}
         >
           <box class="settings-page" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
-            <label
-              class="settings-title"
-              label="Capture settings"
-              halign={Gtk.Align.START}
-            />
+            <box
+              class="settings-head"
+              orientation={Gtk.Orientation.HORIZONTAL}
+              spacing={16}
+            >
+              <box orientation={Gtk.Orientation.VERTICAL} spacing={2} hexpand>
+                <label
+                  class="settings-title"
+                  label="Capture settings"
+                  halign={Gtk.Align.START}
+                />
+                <label
+                  class="settings-subtitle"
+                  label="The bar remembers every lane choice. This panel is for the things the bar has no room to show."
+                  wrap
+                  max_width_chars={64}
+                  halign={Gtk.Align.START}
+                />
+              </box>
+              <label
+                class="settings-save-chip"
+                label="Saved as you go"
+                halign={Gtk.Align.END}
+                valign={Gtk.Align.START}
+              />
+            </box>
             <box
               orientation={Gtk.Orientation.VERTICAL}
               spacing={0}
@@ -404,7 +362,7 @@ export function SettingsPage(props: SettingsPageProps) {
               <label class="kbd" label="Esc" />
               <label class="footer-note" label="back  ·" />
               <label class="kbd" label="Enter" />
-              <label class="footer-note" label="save" />
+              <label class="footer-note" label="done" />
             </box>
             <box hexpand halign={Gtk.Align.END}>
               <button class="ghost" label="Back" onClicked={closeSettings} />

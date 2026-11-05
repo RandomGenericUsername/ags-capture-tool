@@ -2,11 +2,17 @@
 // Persisted UI state (GUI-local JSON; no provisioning surface).
 //
 // PURE LAYER (design.md §2/§3.1/§3.4, tasks 3.2 + 3.4): the interfaces, the
-// first-run constants, the option vocabularies, the settings→defaults
-// precedence rule, and the MERGE half of `loadUiState` — which is pure once the
-// read is lifted. The read and the write (`loadUiState`'s I/O half and
-// `saveUiState`) own the GLib file reads/writes and the recursive directory
-// creation, and move to `adapters/glib-ui-state-store.ts` at A5.
+// first-run code constants, the option vocabularies, and the MERGE half of
+// `loadUiState` — which is pure once the read is lifted. The read and the write
+// (`loadUiState`'s I/O half and `saveUiState`) own the GLib file reads/writes
+// and the recursive directory creation, and move to
+// `adapters/glib-ui-state-store.ts` at A5.
+//
+// REQ-012: first run is `createUiState()` — code constants, never settings
+// defaults. After the first save `capture-ui.json` is authoritative. The old
+// `configDefaults(settings)` precedence layer was removed deliberately; legacy
+// `CaptureSettings.screenshot.format/output` and `recording.fps/quality/audio`
+// stay parseable for the backend but no longer seed the lane.
 // ---------------------------------------------------------------------------
 
 import type {
@@ -17,7 +23,7 @@ import type {
   RecordingQuality,
   ScreenshotFormat,
 } from "../types"
-import type { CaptureSettings, ConfigRecordingAudio } from "./settings"
+import type { ConfigRecordingAudio } from "./settings"
 
 export interface ScreenshotUiState {
   target: CaptureTarget
@@ -111,30 +117,10 @@ export function audioToUi(audio: ConfigRecordingAudio): AudioSource {
   return audio === "mic" ? "microphone" : audio
 }
 
-/** The pair of mode views `configDefaults` and `mergeUiState` both speak in. */
+/** The pair of mode views the pages and `mergeUiState` both speak in. */
 export interface UiState {
   screenshot: ScreenshotUiState
   recording: RecordingUiState
-}
-
-/**
- * Initial-selection defaults sourced from the settings config (precedence:
- * last-used UI state > settings defaults > hardcoded constants).
- */
-export function configDefaults(config: CaptureSettings): UiState {
-  return {
-    screenshot: {
-      ...DEFAULT_SCREENSHOT,
-      format: config.screenshot.format as ScreenshotFormat,
-      save: config.screenshot.output === "save",
-    },
-    recording: {
-      ...DEFAULT_RECORDING,
-      fps: config.recording.fps,
-      quality: config.recording.quality as RecordingQuality,
-      audio: audioToUi(config.recording.audio),
-    },
-  }
 }
 
 /** The on-disk shape `mergeUiState` accepts: every field optional. */
@@ -145,7 +131,7 @@ export interface PersistedUiState {
 
 /**
  * The MERGE half of `loadUiState` (design.md §3.1, task 3.2): overlay the
- * last-used values on the settings defaults, falling back per field.
+ * last-used values on the code first-run defaults, falling back per field.
  *
  * Pure — the existence probe, the read, the JSON parse, and the
  * missing-is-silent / corrupt-is-loud degradation stay with the caller until

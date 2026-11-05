@@ -14,6 +14,11 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
+import {
+  SETTINGS_RECORDING_CONTROL_OPTIONS,
+  SETTINGS_ROW_NAMES,
+} from "../../ui/shared/settings-defs.ts"
+
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 
 function read(...parts: string[]): string {
@@ -233,18 +238,22 @@ test("recording_controls is tolerant and defaults to the top bar", () => {
 })
 
 test("the settings page exposes the three unified modes and persists them", () => {
-  assert.match(SETTINGS_PAGE, /pillRow<RecordingControlsMode>\(\s*"Recording controls"/)
-  for (const [label, value] of [
-    ["Top bar", "top-bar"],
-    ["On hover", "hover"],
-    ["Always visible", "always"],
-  ] as const) {
-    assert.match(
-      SETTINGS_PAGE,
-      new RegExp(`\\{ label: "${label}", value: "${value}" \\}`),
-      `missing recording-controls mode ${label}`,
-    )
-  }
+  // REQ-012: the row keeps its name in Placement; the option table moved to
+  // the pure settings-defs contract the page now consumes.
+  assert.equal(SETTINGS_ROW_NAMES.recordingControls, "Recording controls")
+  assert.match(
+    SETTINGS_PAGE,
+    /pillRow<RecordingControlsMode>\(\s*SETTINGS_ROW_NAMES\.recordingControls/,
+  )
+  assert.deepEqual(
+    SETTINGS_RECORDING_CONTROL_OPTIONS.map(({ label, value }) => [label, value]),
+    [
+      ["Top bar", "top-bar"],
+      ["On hover", "hover"],
+      ["Always visible", "always"],
+    ],
+  )
+  assert.match(SETTINGS_PAGE, /\.\.\.SETTINGS_RECORDING_CONTROL_OPTIONS/)
   assert.doesNotMatch(SETTINGS_PAGE, /\{ label: "Hidden", value: "hidden" \}/)
   assert.match(SETTINGS_PAGE, /settingsConfig\.recording_controls = value/)
   // The row builder persists via RowContext, the same chain as bar placement.

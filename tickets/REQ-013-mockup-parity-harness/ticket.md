@@ -27,8 +27,10 @@ Make drift from the normative mockup a test failure.
 
 - [ ] `tests/ts/mockup-parity.test.ts` reads the mockup `design-contract` block
   and compares lane order/defaults/keys/descriptions/options, monitor shape,
-  settings groups/rows/recording controls, required CSS classes and the mockup
-  hash.
+  settings groups/rows/recording controls, the `bar_fields` setting
+  (`compact | detailed`), required CSS classes and the mockup hash.
+- [ ] Both compact and detailed presentations consume the same `field-defs`;
+  the detailed state is covered by the mockup contract.
 - [ ] The test fails if any one side changes without the other.
 - [ ] The mockup's own validator shows no drift banner.
 - [ ] `make test` includes the parity test and passes.

@@ -73,7 +73,21 @@ test("the Settings view paints its own opaque card while the window stays transp
   assert.match(CSS, /\.capture-bar\s*\{[^}]*background-color:\s*alpha\(@surface,\s*0\.92\)/)
 })
 
-test("S1 screenshot keeps every existing screenshot option", () => {
+test("S1 screenshot renders one dropdown trigger per field, not option groups", () => {
+  // EPIC-002 REQ-009: the screenshot lane's alternatives moved into field
+  // popovers. The page owns only the order; ClassicWindow builds the handles.
+  for (const field of ["target", "monitor", "delay", "format", "output", "cursor"]) {
+    assert.match(
+      SCREENSHOT,
+      new RegExp(`fields\\.${field}\\.root`),
+      `missing screenshot field ${field}`,
+    )
+  }
+  assert.doesNotMatch(SCREENSHOT, /bar-group|bar-pill/, "no side-by-side option group remains")
+  assert.match(SCREENSHOT, /fields\.target\.root[\s\S]*fields\.monitor\.root[\s\S]*fields\.delay\.root[\s\S]*fields\.format\.root[\s\S]*fields\.output\.root[\s\S]*fields\.cursor\.root/)
+
+  // Every old screenshot option survives in the pure contract, not in the page.
+  const defs = read("ui", "shared", "field-defs.ts")
   for (const label of [
     "Region",
     "Screen",
@@ -86,10 +100,19 @@ test("S1 screenshot keeps every existing screenshot option", () => {
     "JPEG",
     "Clipboard",
     "Save",
-    "Cursor",
+    "On",
     "Off",
   ]) {
-    assert.match(SCREENSHOT, new RegExp(`label="${label}"`), `missing screenshot pill ${label}`)
+    assert.match(defs, new RegExp(`label: "${label}"`), `missing screenshot option ${label}`)
+  }
+
+  // The active value reaches every trigger from the one state-to-UI path.
+  for (const field of ["target", "delay", "format", "output", "cursor"]) {
+    assert.match(
+      WINDOW,
+      new RegExp(`screenshotFields\\.${field}\\.setValue\\(`),
+      `applyStateToUi does not set ${field}`,
+    )
   }
 })
 

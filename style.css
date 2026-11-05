@@ -253,6 +253,13 @@ window#capture-overlay {
   color: @on_error;
 }
 
+/* Screenshot lane only: the field strip is wider than the old pill groups, so
+ * the CTA gives back a few horizontal pixels without changing the recording
+ * lane's CTA. */
+.bar-cta.screenshot {
+  padding: 0 11px;
+}
+
 /* The recording lane is the same row, one accent over: the active mode chip,
  * every selected option pill and the CTA read as recording. Scoped under
  * `.capture-shell.recording` so the screenshot lane keeps the palette's
@@ -275,6 +282,181 @@ window#capture-overlay {
   color: alpha(@on_surface, 0.82);
   font-size: 10px;
   font-weight: 700;
+}
+
+/* ------------------------------------------------------- Field trigger/popover
+ * EPIC-002 §3.1/§3.2. One trigger per setting: uppercase key over the active
+ * value, optional leading glyph, chevron. The alternatives live in a separate
+ * Gtk.Popover surface, so opening/closing a field never resizes the bar.
+ * Every colour is a palette token or an alpha() of one; no literal hex. */
+
+.field {
+  background-color: transparent;
+}
+
+.field-trigger {
+  min-height: 40px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: @on_surface;
+}
+
+.field-trigger:hover {
+  background-color: alpha(@on_surface, 0.06);
+  border-color: alpha(@on_surface, 0.12);
+}
+
+.field-trigger:focus-visible {
+  background-color: alpha(@on_surface, 0.04);
+  box-shadow: 0 0 0 1px @primary, 0 0 0 3px alpha(@primary, 0.22);
+}
+
+.field-key {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  color: alpha(@on_surface, 0.42);
+}
+
+.field-value {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: @on_surface;
+}
+
+.field-lead {
+  min-width: 15px;
+  min-height: 15px;
+  color: alpha(@on_surface, 0.72);
+}
+
+.field-chevron {
+  min-width: 8px;
+  min-height: 8px;
+  color: alpha(@on_surface, 0.45);
+}
+
+.field-open .field-trigger {
+  background-color: alpha(@primary, 0.12);
+  border-color: alpha(@primary, 0.45);
+}
+
+.field-open .field-key,
+.field-open .field-chevron {
+  color: @primary;
+}
+
+.field-popover {
+  padding: 6px;
+  border: 1px solid alpha(@on_surface, 0.22);
+  border-radius: 12px;
+  background-color: alpha(@surface, 0.98);
+  color: @on_surface;
+}
+
+.field-popover list,
+.field-popover listbox {
+  background-color: transparent;
+}
+
+.field-pop-header {
+  padding: 6px 9px 7px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid alpha(@on_surface, 0.12);
+}
+
+.field-pop-title {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: alpha(@on_surface, 0.55);
+}
+
+.field-pop-desc {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: alpha(@on_surface, 0.55);
+}
+
+.field-option {
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background-color: transparent;
+}
+
+.field-option:hover {
+  background-color: alpha(@on_surface, 0.06);
+}
+
+.field-option:focus-visible {
+  box-shadow: inset 0 0 0 1px @primary;
+}
+
+.field-selected {
+  background-color: alpha(@primary, 0.12);
+  border-color: alpha(@primary, 0.32);
+}
+
+.field-option-icon {
+  min-width: 16px;
+  min-height: 16px;
+  color: alpha(@on_surface, 0.62);
+}
+
+.field-selected .field-option-icon {
+  color: @primary;
+}
+
+.field-option-text {
+  background-color: transparent;
+}
+
+.field-option-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: @on_surface;
+}
+
+.field-option-desc {
+  font-size: 10px;
+  color: alpha(@on_surface, 0.55);
+}
+
+.field-radio {
+  min-width: 15px;
+  min-height: 15px;
+  border: 1px solid alpha(@on_surface, 0.22);
+  border-radius: 999px;
+  color: transparent;
+}
+
+.field-radio label {
+  font-size: 9px;
+  color: transparent;
+}
+
+.field-selected .field-radio {
+  background-color: @primary;
+  border-color: @primary;
+}
+
+.field-selected .field-radio label {
+  color: @on_primary;
+}
+
+.field-custom-editor {
+  padding: 6px 8px 2px 33px;
+}
+
+.field-custom-hint {
+  padding: 6px 4px 2px;
+  font-size: 9.5px;
+  color: alpha(@on_surface, 0.55);
 }
 
 /* --------------------------------------------------- capture-drawn cluster

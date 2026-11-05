@@ -37,7 +37,7 @@ runtime `v0.5.2`, provision `v0.1.33`, composition `f84dc204`.
 ## Children
 
 - [ ] `REQ-008` — Shared monitor catalog service (`dotfiles-runtime` + capture consumer contract)
-- [ ] `REQ-009` — Dropdown primitive + screenshot lane
+- [x] `REQ-009` — Dropdown primitive + screenshot lane
 - [ ] `REQ-010` — Recording lane dropdowns + conditional states
 - [ ] `REQ-011` — Dynamic monitor dropdown + remove cycle chip
 - [ ] `REQ-012` — Settings cleanup + persistence

@@ -575,7 +575,7 @@ window.capture-cluster-window {
 
 /* Recording indicator — exactly the bar's accepted design. The capture
    process now owns this surface, but the visual vocabulary is the bar's old
-   `.rec-*` set: rounded translucent card, pulsing #e0605f dot, 13px tabular
+   `.rec-*` set: rounded translucent card, pulsing recording-accent dot, 13px tabular
    timer, icon-only Pause/Play/Stop buttons, and the same popover card. */
 .rec-cluster {
   min-width: 109px;
@@ -599,19 +599,19 @@ window.capture-cluster-window {
   min-width: 9px;
   min-height: 9px;
   border-radius: 999px;
-  background-color: #e0605f;
+  background-color: var(--rec-accent);
   animation: cluster-rec-pulse 1.6s ease-out infinite;
 }
 
 @keyframes cluster-rec-pulse {
   0% {
-    box-shadow: 0 0 0 0 alpha(#e0605f, 0.55);
+    box-shadow: 0 0 0 0 alpha(@error, 0.55);
   }
   70% {
-    box-shadow: 0 0 0 8px alpha(#e0605f, 0);
+    box-shadow: 0 0 0 8px alpha(@error, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 alpha(#e0605f, 0);
+    box-shadow: 0 0 0 0 alpha(@error, 0);
   }
 }
 

@@ -55,6 +55,7 @@
 - [OPS-008-docs-reconciliation/ticket.md](./OPS-008-docs-reconciliation/ticket.md) — Documentation reconciliation: historical mockup/design + stale comments | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [OPS-009-evidence-reconciliation/ticket.md](./OPS-009-evidence-reconciliation/ticket.md) — Evidence and status reconciliation after EPIC-002 | `done` | worktree .worktrees/OPS-009/, branch ticket/OPS-009-evidence-reconciliation
+- [OPS-010-runtime-v061-note/ticket.md](./OPS-010-runtime-v061-note/ticket.md) — Refresh the EPIC-002 status note after runtime v0.6.1 | `done` | worktree .worktrees/OPS-010/, branch ticket/OPS-010-runtime-v061-note
 
 ## Spikes
 

@@ -41,7 +41,7 @@ runtime `v0.5.2`, provision `v0.1.33`, composition `f84dc204`.
 - [x] `REQ-010` — Recording lane dropdowns + conditional states
 - [x] `REQ-011` — Dynamic monitor dropdown + remove cycle chip
 - [x] `REQ-012` — Settings cleanup + persistence
-- [ ] `REQ-014` — Compact/detailed bar field presentation setting
+- [x] `REQ-014` — Compact/detailed bar field presentation setting
 - [ ] `REQ-013` — Mockup parity harness
 - [x] `OPS-008` — Documentation reconciliation
 - [ ] `OPS-007` — Release and pins

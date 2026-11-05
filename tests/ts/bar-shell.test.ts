@@ -239,7 +239,7 @@ test("settings is entered from S0 only (INV-3), and shows Files/Behaviour/Placem
     "Placement",
     "Runtime",
   ])
-  assert.match(SETTINGS, /settingsGroups\(\)/, "the page consumes the settings-defs order")
+  assert.match(SETTINGS, /settingsGroups\(\{\s*barFields: true,?\s*\}\)/, "the page consumes the settings-defs order")
   for (const def of ["filesDef", "behaviourDef", "placementDef", "runtimeDef"]) {
     assert.match(SETTINGS, new RegExp(`settingsGroup\\(${def}\\.title`), `missing group ${def}`)
   }
@@ -250,6 +250,7 @@ test("settings is entered from S0 only (INV-3), and shows Files/Behaviour/Placem
     ["filenamePattern", "Filename pattern"],
     ["showNotifications", "Show notifications"],
     ["compactBarIndicator", "Compact bar indicator"],
+    ["barFields", "Bar fields"],
     ["barPosition", "Bar position"],
     ["topOffset", "Top offset"],
     ["recordingControls", "Recording controls"],

@@ -20,7 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import { Gdk, Gtk } from "ags/gtk4"
-import type { FieldOptionDef } from "./field-defs"
+import type { BarFieldPresentation, FieldOptionDef } from "./field-defs"
 
 /** The handles a footer gets: commit a value, close, or return to the list. */
 export interface DropdownFooterControls {
@@ -62,6 +62,11 @@ export interface DropdownFieldConfig {
   lead?: boolean
   /** Recording fields use the red open ring and popover selection. */
   accent?: "primary" | "recording"
+  /**
+   * REQ-014: `compact` is the trigger/popover, `detailed` is the inline option
+   * group. The same `options` array feeds both. Defaults to `compact`.
+   */
+  presentation?: BarFieldPresentation
   /** Popover direction; bottom bars open TOP, top bars open BOTTOM. */
   popoverPosition?: () => Gtk.PositionType
   /** Optional extra widget appended below the list (custom duration). */
@@ -80,6 +85,14 @@ export interface DropdownFieldHandle {
   setDescription: (description: string) => void
   setEnabled: (enabled: boolean) => void
   setVisible: (visible: boolean) => void
+  /** Switch between the compact trigger/popover and the detailed inline group. */
+  setPresentation: (presentation: BarFieldPresentation) => void
+  /**
+   * True while an inline editor (the detailed duration spin) owns Enter/Esc.
+   * The window's capture-phase controller defers to it, exactly as it does to
+   * an open popover.
+   */
+  isEditing?: () => boolean
   getValue: () => string
   getSelectedValue: () => string
   open: () => void
@@ -119,6 +132,7 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
   let currentValue = config.value
   let currentSelected = config.selectedValue ?? config.value
   let currentOptions: readonly FieldOptionDef[] = config.options
+  let currentPresentation: BarFieldPresentation = config.presentation ?? "compact"
   let restoreFocus = false
 
   const root = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL })
@@ -160,6 +174,27 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
   chevron.add_css_class("field-chevron")
   triggerContent.append(chevron)
 
+  // REQ-014 detailed presentation: the SAME options array rendered as an
+  // inline key + pill group. The trigger/popover above stay built so a switch
+  // back to compact is only a visibility change; no handle is rebuilt.
+  const inline = new Gtk.Box({
+    orientation: Gtk.Orientation.HORIZONTAL,
+    spacing: 5,
+    valign: Gtk.Align.CENTER,
+  })
+  inline.add_css_class("inline-field")
+  const inlineKey = new Gtk.Label({ label: config.key, halign: Gtk.Align.START })
+  inlineKey.add_css_class("inline-key")
+  const inlineGroup = new Gtk.Box({
+    orientation: Gtk.Orientation.HORIZONTAL,
+    spacing: 2,
+    valign: Gtk.Align.CENTER,
+  })
+  inlineGroup.add_css_class("inline-group")
+  inline.append(inlineKey)
+  inline.append(inlineGroup)
+  root.append(inline)
+
   const popover = new Gtk.Popover()
   popover.add_css_class("field-popover")
   if (config.accent === "recording") popover.add_css_class("field-popover-recording")
@@ -186,6 +221,7 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
   function setKey(key: string): void {
     keyLabel.set_label(key)
     title.set_label(key)
+    inlineKey.set_label(key)
   }
 
   function setDescription(next: string): void {
@@ -202,6 +238,7 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
   body.append(list)
 
   let rows: Array<{ option: FieldOptionDef; row: Gtk.ListBoxRow }> = []
+  let pills: Array<{ option: FieldOptionDef; button: Gtk.Button }> = []
 
   function displayValue(value: string): string {
     const option = currentOptions.find((entry) => entry.value === value)
@@ -230,6 +267,10 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
       if (entry.option.value === currentSelected) entry.row.add_css_class("field-selected")
       else entry.row.remove_css_class("field-selected")
     }
+    for (const entry of pills) {
+      if (entry.option.value === currentSelected) entry.button.add_css_class("selected")
+      else entry.button.remove_css_class("selected")
+    }
     const selected = rows.find((entry) => entry.option.value === currentSelected)
     if (selected !== undefined) list.select_row(selected.row)
   }
@@ -242,6 +283,33 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
       child = next
     }
     rows = []
+  }
+
+  function clearPills(): void {
+    let child = inlineGroup.get_first_child()
+    while (child !== null) {
+      const next = child.get_next_sibling()
+      inlineGroup.remove(child)
+      child = next
+    }
+    pills = []
+  }
+
+  /**
+   * REQ-014: the detailed renderer iterates the SAME `currentOptions` as the
+   * popover. There is no second option table; `setOptions()` refreshes both.
+   */
+  function rebuildPills(): void {
+    clearPills()
+    for (const option of currentOptions) {
+      const button = new Gtk.Button({ label: option.label })
+      button.add_css_class("inline-pill")
+      button.set_valign(Gtk.Align.CENTER)
+      button.connect("clicked", () => chooseInline(option.value))
+      inlineGroup.append(button)
+      pills.push({ option, button })
+    }
+    markSelected()
   }
 
   function rebuildRows(): void {
@@ -294,6 +362,7 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
       list.append(row)
       rows.push({ option, row })
     }
+    rebuildPills()
     markSelected()
     syncLead()
   }
@@ -307,12 +376,21 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
   }
 
   function isOpen(): boolean {
-    return popover.get_visible()
+    return currentPresentation === "compact" && popover.get_visible()
   }
 
   function close(): void {
-    if (!isOpen()) return
+    if (currentPresentation === "detailed" || !isOpen()) return
     popover.popdown()
+  }
+
+  function chooseInline(value: string): void {
+    // Same footer hooks as the compact row: a footer may keep its own row
+    // selected without replacing the trigger value (duration Custom).
+    if (config.footer?.onActivate?.(value) === true) return
+    config.footer?.onChoose?.(value)
+    applyValue(value)
+    config.onSelect(value)
   }
 
   function choose(value: string): void {
@@ -325,7 +403,21 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
     config.onSelect(value)
   }
 
+  function setPresentation(presentation: BarFieldPresentation): void {
+    // Close before flipping the flag: `close()` is a no-op once detailed, and a
+    // popover must never outlive the compact renderer.
+    if (presentation === "detailed" && popover.get_visible()) popover.popdown()
+    currentPresentation = presentation
+    const detailed = presentation === "detailed"
+    root.remove_css_class("field-compact")
+    root.remove_css_class("field-detailed")
+    root.add_css_class(detailed ? "field-detailed" : "field-compact")
+    trigger.visible = !detailed
+    inline.visible = detailed
+  }
+
   function open(): void {
+    if (currentPresentation === "detailed") return
     if (!trigger.get_sensitive() || !root.get_visible()) return
     popover.set_position(
       config.popoverPosition === undefined ? Gtk.PositionType.TOP : config.popoverPosition(),
@@ -437,6 +529,7 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
   })
 
   rebuildRows()
+  setPresentation(currentPresentation)
 
   return {
     root,
@@ -451,11 +544,16 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
     setDescription,
     setEnabled(enabled: boolean): void {
       trigger.set_sensitive(enabled)
+      inlineGroup.set_sensitive(enabled)
       if (!enabled) close()
     },
     setVisible(visible: boolean): void {
       root.set_visible(visible)
       if (!visible) close()
+    },
+    setPresentation,
+    isEditing(): boolean {
+      return false
     },
     getValue(): string {
       return currentValue
@@ -491,6 +589,8 @@ export interface DurationFieldConfig {
   /** Current custom seconds; read lazily so `applyStateToUi` is enough. */
   customSeconds: () => number
   accent?: "primary" | "recording"
+  /** REQ-014: detailed reveals the inline seconds editor; compact uses the popover. */
+  presentation?: BarFieldPresentation
   popoverPosition?: () => Gtk.PositionType
   /** A preset row was activated (contract value). */
   onPreset: (value: string) => void
@@ -505,6 +605,10 @@ export function durationField(config: DurationFieldConfig): DropdownFieldHandle 
   let spin: Gtk.SpinButton | null = null
   let setButton: Gtk.Button | null = null
   let controls: DropdownFooterControls | null = null
+  let inlineEditor: Gtk.Box | null = null
+  let inlineSpin: Gtk.SpinButton | null = null
+  let inlineSetButton: Gtk.Button | null = null
+  let detailed = (config.presentation ?? "compact") === "detailed"
   let pending = false
   let committed = false
   let previousValue = config.value
@@ -521,6 +625,10 @@ export function durationField(config: DurationFieldConfig): DropdownFieldHandle 
     if (editor !== null) editor.visible = visible
   }
 
+  function showInlineEditor(visible: boolean): void {
+    if (inlineEditor !== null) inlineEditor.visible = visible
+  }
+
   function editorVisible(): boolean {
     return editor !== null && editor.get_visible()
   }
@@ -533,24 +641,58 @@ export function durationField(config: DurationFieldConfig): DropdownFieldHandle 
     return hasFocus(spin) || hasFocus(setButton)
   }
 
-  function commitCustom(): void {
-    if (spin === null || controls === null) return
-    const seconds = clampSeconds(spin.get_value_as_int())
-    spin.set_value(seconds)
+  function inlineEditorFocused(): boolean {
+    return hasFocus(inlineSpin) || hasFocus(inlineSetButton)
+  }
+
+  /**
+   * Shared commit path for both presentations: the compact footer editor and
+   * the detailed inline editor publish the same exact seconds through
+   * `onCustom`, so switching presentation cannot change the stored value.
+   */
+  function commitSeconds(raw: number): void {
+    const seconds = clampSeconds(raw)
+    if (spin !== null) spin.set_value(seconds)
+    if (inlineSpin !== null) inlineSpin.set_value(seconds)
     pending = false
     committed = true
     showEditor(false)
-    controls.setValue(`${seconds}s`, "Custom")
+    showInlineEditor(false)
+    if (detailed) {
+      handle.setValue(`${seconds}s`, "Custom")
+    } else {
+      if (controls !== null) controls.setValue(`${seconds}s`, "Custom")
+      handle.close()
+    }
     config.onCustom(seconds)
-    handle.close()
+  }
+
+  function commitCustom(): void {
+    if (spin === null || controls === null) return
+    commitSeconds(spin.get_value_as_int())
+  }
+
+  function commitInlineCustom(): void {
+    if (inlineSpin === null) return
+    commitSeconds(inlineSpin.get_value_as_int())
+  }
+
+  function restoreSeconds(): void {
+    if (spin !== null) spin.set_value(previousSeconds)
+    if (inlineSpin !== null) inlineSpin.set_value(previousSeconds)
+    pending = false
+    showEditor(false)
+    showInlineEditor(false)
+    if (detailed) {
+      handle.setValue(previousValue, previousSelected)
+    } else {
+      controls?.setValue(previousValue, previousSelected)
+      handle.close()
+    }
   }
 
   function restoreCustom(): void {
-    if (spin !== null) spin.set_value(previousSeconds)
-    pending = false
-    showEditor(false)
-    controls?.setValue(previousValue, previousSelected)
-    handle.close()
+    restoreSeconds()
   }
 
   /** The editor owns Enter/Esc while it has focus (popover or spin controller). */
@@ -567,6 +709,74 @@ export function durationField(config: DurationFieldConfig): DropdownFieldHandle 
     return false
   }
 
+  /** The detailed inline editor owns Enter/Esc while it has focus. */
+  function inlineEditorKey(keyval: number): boolean {
+    if (!detailed || !pending || !inlineEditorFocused()) return false
+    if (keyval === Gdk.KEY_Escape) {
+      restoreCustom()
+      return true
+    }
+    if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter) {
+      commitInlineCustom()
+      return true
+    }
+    return false
+  }
+
+  function beginInlineCustom(): void {
+    previousValue = handle.getValue()
+    previousSelected = handle.getSelectedValue()
+    previousSeconds = config.customSeconds()
+    pending = true
+    committed = false
+    handle.setValue(handle.getValue(), "Custom")
+    showInlineEditor(true)
+    if (inlineSpin !== null) {
+      inlineSpin.set_value(previousSeconds)
+      inlineSpin.grab_focus()
+    }
+  }
+
+  function buildInlineEditor(): Gtk.Box {
+    const box = new Gtk.Box({
+      orientation: Gtk.Orientation.HORIZONTAL,
+      spacing: 6,
+      valign: Gtk.Align.CENTER,
+    })
+    box.add_css_class("field-custom-editor")
+    box.add_css_class("field-inline-editor")
+    box.visible = false
+
+    const adjustment = new Gtk.Adjustment({
+      lower: 1,
+      upper: 3600,
+      step_increment: 1,
+      page_increment: 30,
+      value: config.customSeconds(),
+    })
+    inlineSpin = new Gtk.SpinButton({ adjustment, digits: 0 })
+    inlineSpin.add_css_class("field-custom-spin")
+    inlineSpin.set_halign(Gtk.Align.START)
+    inlineSpin.set_valign(Gtk.Align.CENTER)
+    inlineSpin.set_width_chars(5)
+    const spinKeys = new Gtk.EventControllerKey()
+    spinKeys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+    spinKeys.connect("key-pressed", (_controller, keyval) => inlineEditorKey(keyval))
+    inlineSpin.add_controller(spinKeys)
+    box.append(inlineSpin)
+
+    const unit = new Gtk.Label({ label: "s" })
+    unit.add_css_class("field-custom-unit")
+    box.append(unit)
+
+    inlineSetButton = new Gtk.Button({ label: "Set" })
+    inlineSetButton.add_css_class("field-custom-set")
+    inlineSetButton.connect("clicked", () => commitInlineCustom())
+    box.append(inlineSetButton)
+
+    return box
+  }
+
   handle = dropdownField({
     key: config.key,
     description: config.description,
@@ -574,8 +784,20 @@ export function durationField(config: DurationFieldConfig): DropdownFieldHandle 
     value: config.value,
     selectedValue: config.selectedValue,
     accent: config.accent,
+    presentation: config.presentation,
     popoverPosition: config.popoverPosition,
-    onSelect: (value) => config.onPreset(value),
+    onSelect: (value) => {
+      if (value === "Custom") {
+        if (detailed) beginInlineCustom()
+        else config.onPreset(value)
+        return
+      }
+      if (detailed) {
+        pending = false
+        showInlineEditor(false)
+      }
+      config.onPreset(value)
+    },
     onOpen: () => {
       previousValue = handle.getValue()
       previousSelected = handle.getSelectedValue()
@@ -660,6 +882,10 @@ export function durationField(config: DurationFieldConfig): DropdownFieldHandle 
       },
       onActivate: (value) => {
         if (value !== "Custom") return false
+        if (detailed) {
+          beginInlineCustom()
+          return true
+        }
         pending = true
         controls?.setValue(handle.getValue(), "Custom")
         showEditor(true)
@@ -672,6 +898,38 @@ export function durationField(config: DurationFieldConfig): DropdownFieldHandle 
       onKey: (keyval) => editorKey(keyval),
     },
   })
+
+  // REQ-014: the detailed editor is a child of the SAME field root, next to the
+  // inline group. It is built once and only shown/hidden; the compact footer
+  // above is untouched. The bar grows only in detailed mode.
+  inlineEditor = buildInlineEditor()
+  ;(handle.root as Gtk.Box).append(inlineEditor)
+
+  const baseSetValue = handle.setValue.bind(handle)
+  const baseSetPresentation = handle.setPresentation.bind(handle)
+  handle.setValue = (value: string, selectedValue?: string) => {
+    baseSetValue(value, selectedValue)
+    const selected = selectedValue ?? value
+    if (selected !== "Custom") {
+      pending = false
+      showInlineEditor(false)
+    } else if (detailed) {
+      showInlineEditor(true)
+    }
+  }
+  handle.setPresentation = (presentation: BarFieldPresentation) => {
+    baseSetPresentation(presentation)
+    detailed = presentation === "detailed"
+    if (!detailed) {
+      pending = false
+      showInlineEditor(false)
+      return
+    }
+    if (handle.getSelectedValue() === "Custom") showInlineEditor(true)
+  }
+  handle.isEditing = () => detailed && pending && inlineEditorFocused()
+
+  if (detailed && handle.getSelectedValue() === "Custom") showInlineEditor(true)
 
   return handle
 }

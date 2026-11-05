@@ -27,6 +27,26 @@ import type {
 
 export const DESIGN_CONTRACT_VERSION = 1
 
+/**
+ * Bar field presentation (REQ-014, design.md §3.8). Both values render the
+ * same `FieldOptionDef[]`; only the density differs.
+ */
+export type BarFieldPresentation = "compact" | "detailed"
+
+/**
+ * The `settings.barFields` contract: `[label, value]` pairs in the mockup,
+ * normalized to the `{ label, value }` shape the settings `pillRow` consumes.
+ */
+export const BAR_FIELD_PRESENTATIONS: ReadonlyArray<{
+  label: string
+  value: BarFieldPresentation
+}> = [
+  { label: "Compact", value: "compact" },
+  { label: "Detailed", value: "detailed" },
+]
+
+export const DEFAULT_BAR_FIELDS: BarFieldPresentation = "compact"
+
 /** One contract option tuple: `[value, label, description, icon]`. */
 export interface FieldOptionDef {
   readonly value: string

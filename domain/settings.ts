@@ -26,6 +26,8 @@ export type ConfigRecordingFps = 24 | 30 | 60
 export type ConfigRecordingQuality = "low" | "medium" | "high"
 export type ConfigRecordingAudio = "none" | "system" | "mic"
 export type ConfigBarPosition = "bottom" | "top"
+/** Bar field density: dropdown triggers or every option inline (REQ-014). */
+export type ConfigBarFields = "compact" | "detailed"
 export interface CaptureSettings {
   screenshot_dir: string
   recording_dir: string
@@ -41,6 +43,12 @@ export interface CaptureSettings {
    * `mergeSettings` and is no longer written.
    */
   recording_controls: RecordingControlsMode
+  /**
+   * Bar field presentation (REQ-014, design.md §3.8): `compact` is the
+   * dropdown trigger/popover; `detailed` renders every option inline. The
+   * backend ignores this key. Missing/corrupt values degrade to `compact`.
+   */
+  bar_fields: ConfigBarFields
   /**
    * Capture-bar placement (design.md §6). `bottom` is the default-recommended
    * position; `top` is auto-slotted below the compositor's reserved zone, with
@@ -97,6 +105,7 @@ export const DEFAULT_SETTINGS: CaptureSettings = {
   notifications: true,
   bar_compact_controls: false,
   recording_controls: DEFAULT_RECORDING_CONTROLS,
+  bar_fields: "compact",
   bar: { position: "bottom", offsetPx: 0 },
   screenshot: { format: "png", output: "clipboard", cursor: false },
   recording: { fps: 60, quality: "high", audio: "system", cursor: true },
@@ -113,6 +122,7 @@ export const CONFIG_RECORDING_QUALITIES: readonly ConfigRecordingQuality[] = [
 export const CONFIG_RECORDING_AUDIO: readonly ConfigRecordingAudio[] = ["none", "system", "mic"]
 export const CONFIG_BAR_POSITIONS: readonly ConfigBarPosition[] = ["bottom", "top"]
 export const CONFIG_RECORDING_CONTROLS = RECORDING_CONTROLS_MODES
+export const CONFIG_BAR_FIELDS: readonly ConfigBarFields[] = ["compact", "detailed"]
 
 export function configOneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback
@@ -167,6 +177,11 @@ export function mergeSettings(raw: unknown): CaptureSettings {
     recording_controls: resolveRecordingControls(
       record.recording_controls,
       bar.recording_hud,
+    ),
+    bar_fields: configOneOf(
+      record.bar_fields,
+      CONFIG_BAR_FIELDS,
+      DEFAULT_SETTINGS.bar_fields,
     ),
     bar: {
       position: configOneOf(bar.position, CONFIG_BAR_POSITIONS, DEFAULT_SETTINGS.bar.position),

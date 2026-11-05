@@ -99,6 +99,7 @@ import {
   screenshotOutputValue,
   screenshotTargetFromValue,
   screenshotTargetValue,
+  type BarFieldPresentation,
   type FieldOptionDef,
 } from "../shared/field-defs"
 import { createIconSlots, withIcon } from "../shared/icons"
@@ -163,6 +164,9 @@ export function ClassicWindow(
   // live HUD whose *display* state lives in `domain/recording-hud.ts`.
   let barState: BarState = homeBar()
   let config: CaptureSettings = initialSettings
+  // REQ-014: the current bar field density. Fields are built with this value
+  // and switched in place when Settings → Behaviour changes it.
+  let barFields: BarFieldPresentation = initialSettings.bar_fields
 
   // S4 feed. `hud` is the pure snapshot; the shared recording-cluster row is a
   // projection of it. `bar_compact_controls` is locked while live, so it
@@ -433,7 +437,7 @@ export function ClassicWindow(
    * The window is never EXCLUSIVE, so this value cannot feed back into the
    * compositor's own reserved zone (design.md §11.4).
    */
-  function applyPlacement() {
+  function applyPlacement(resize = true) {
     const window = captureWindow
     if (!window) return
     config = settingsStore.load()
@@ -444,7 +448,7 @@ export function ClassicWindow(
     window.valign = top ? Gtk.Align.START : Gtk.Align.END
     window.margin_top = margin
     window.margin_bottom = 0
-    syncWindowSize()
+    if (resize) syncWindowSize()
   }
 
   // Widget handles. The three S0 rail buttons, the S1 row and the settings page
@@ -502,6 +506,7 @@ export function ClassicWindow(
       options: SCREENSHOT_FIELDS.target.options,
       value: screenshotTargetValue(screenshot.target),
       lead: true,
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = screenshotFields.target
@@ -523,6 +528,7 @@ export function ClassicWindow(
       options: [],
       value: "",
       lead: true,
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = screenshotFields.monitor
@@ -541,6 +547,7 @@ export function ClassicWindow(
       description: SCREENSHOT_FIELDS.delay.description,
       options: SCREENSHOT_FIELDS.delay.options,
       value: screenshotDelayValue(screenshot.delay),
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = screenshotFields.delay
@@ -560,6 +567,7 @@ export function ClassicWindow(
       description: SCREENSHOT_FIELDS.format.description,
       options: SCREENSHOT_FIELDS.format.options,
       value: screenshotFormatValue(screenshot.format),
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = screenshotFields.format
@@ -579,6 +587,7 @@ export function ClassicWindow(
       description: SCREENSHOT_FIELDS.output.description,
       options: SCREENSHOT_FIELDS.output.options,
       value: screenshotOutputValue(screenshot.save),
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = screenshotFields.output
@@ -598,6 +607,7 @@ export function ClassicWindow(
       description: SCREENSHOT_FIELDS.cursor.description,
       options: SCREENSHOT_FIELDS.cursor.options,
       value: screenshotCursorValue(config.screenshot.cursor),
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = screenshotFields.cursor
@@ -624,6 +634,7 @@ export function ClassicWindow(
       value: recordingTargetValue(recording.target),
       lead: true,
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.target
@@ -646,6 +657,7 @@ export function ClassicWindow(
       value: "",
       lead: true,
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.monitor
@@ -665,6 +677,7 @@ export function ClassicWindow(
       options: recordingFpsDef(recording.format).options,
       value: recordingFpsValue(recording),
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.fps
@@ -686,6 +699,7 @@ export function ClassicWindow(
       options: RECORDING_FIELDS.format.options,
       value: recordingFormatValue(recording.format),
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.format
@@ -710,6 +724,7 @@ export function ClassicWindow(
       options: RECORDING_FIELDS.quality.options,
       value: recordingQualityValue(recording.quality),
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.quality
@@ -730,6 +745,7 @@ export function ClassicWindow(
       options: RECORDING_FIELDS.audio.options,
       value: recordingAudioValue(recording.audio),
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.audio
@@ -750,6 +766,7 @@ export function ClassicWindow(
       options: RECORDING_FIELDS.size.options,
       value: recordingSizeValue(recording.size),
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.size
@@ -772,6 +789,7 @@ export function ClassicWindow(
       selectedValue: durationSelection(recording) === -1 ? "Custom" : recordingDurationValue(recording.duration),
       customSeconds: () => recording.customDuration,
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.duration
@@ -797,6 +815,7 @@ export function ClassicWindow(
       options: RECORDING_FIELDS.cursor.options,
       value: recordingCursorValue(config.recording.cursor),
       accent: "recording",
+      presentation: barFields,
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.cursor
@@ -828,6 +847,27 @@ export function ClassicWindow(
     for (const field of Object.values(screenshotFields)) field.close()
     for (const field of Object.values(recordingFields)) field.close()
     activePopover = null
+  }
+
+  function allFields(): DropdownFieldHandle[] {
+    return [...Object.values(screenshotFields), ...Object.values(recordingFields)]
+  }
+
+  /**
+   * REQ-014: switch the bar's field density in place.
+   *
+   * The SAME handles are reused; only `setPresentation` changes their renderer.
+   * `closeAllFields()` first so no popover surface can outlive the compact
+   * presentation, and no `UiState` is read or written here: the current lane
+   * choices are preserved exactly. Returns true when the value actually changed
+   * so the caller can run exactly one `syncWindowSize()`.
+   */
+  function applyBarFields(presentation: BarFieldPresentation): boolean {
+    if (presentation === barFields) return false
+    barFields = presentation
+    closeAllFields()
+    for (const field of allFields()) field.setPresentation(presentation)
+    return true
   }
 
   /**
@@ -1277,6 +1317,12 @@ export function ClassicWindow(
     // S4 has no keyboard exit: INV-2 suppresses the back chevron, Enter must
     // not start a second recording, and Stop is the only exit (mockup Sheet 3).
     if (isLive(barState)) return true
+    // REQ-014: a focused detailed duration editor owns Enter/Esc. Returning
+    // false lets its capture-phase controller set or restore the seconds
+    // instead of committing the capture.
+    for (const field of allFields()) {
+      if (field.isEditing?.() === true) return false
+    }
     // An open field owns Enter/Esc/Space/arrows. Returning false is deliberate:
     // the popover's own controller closes it or activates the highlighted row,
     // so Esc cannot also walk the bar ladder in the same event.
@@ -1335,6 +1381,7 @@ export function ClassicWindow(
     Object.assign(screenshot, loaded.screenshot)
     Object.assign(recording, loaded.recording)
     config = settingsStore.load()
+    applyBarFields(config.bar_fields)
     screenshotFields.target.setValue(screenshotTargetValue(screenshot.target))
     screenshotFields.delay.setValue(screenshotDelayValue(screenshot.delay))
     screenshotFields.format.setValue(screenshotFormatValue(screenshot.format))
@@ -1356,8 +1403,18 @@ export function ClassicWindow(
   }
 
   function settingsChanged() {
-    applyPlacement()
-    config = settingsStore.load()
+    const previous = config
+    const next = settingsStore.load()
+    const switched = next.bar_fields !== previous.bar_fields
+    const placementChanged =
+      next.bar.position !== previous.bar.position ||
+      next.bar.offsetPx !== previous.bar.offsetPx
+    config = next
+    // REQ-014: apply the density switch in place; the size is re-measured once
+    // below, never on every unrelated settings save.
+    if (switched) applyBarFields(next.bar_fields)
+    if (placementChanged) applyPlacement(false)
+    if (switched || placementChanged) syncWindowSize()
     screenshotFields.cursor.setValue(screenshotCursorValue(config.screenshot.cursor))
     recordingFields.cursor.setValue(recordingCursorValue(config.recording.cursor))
     // `recording_controls` is an S4 decision. If it changed under a live lane,

@@ -5,8 +5,8 @@
 // names so the panel order has ONE definition; the mockup parity test compares
 // them to the `settings` block of the design contract.
 //
-// `barFields` is deliberately not part of the REQ-012 group rows: REQ-014 adds
-// that row. `settingsGroups({ barFields: true })` is the ready insertion point.
+// `barFields` is added by REQ-014. `settingsGroups({ barFields: true })` is the
+// single ordering table the page consumes.
 // ---------------------------------------------------------------------------
 
 import type { RecordingControlsMode } from "../../domain/recording-presentation"
@@ -24,7 +24,6 @@ export const SETTINGS_ROW_NAMES = {
   filenamePattern: "Filename pattern",
   showNotifications: "Show notifications",
   compactBarIndicator: "Compact bar indicator",
-  /** Reserved for REQ-014; not rendered in REQ-012. */
   barFields: "Bar fields",
   barPosition: "Bar position",
   topOffset: "Top offset",

@@ -79,6 +79,7 @@ test("mergeSettings: unknown extra keys are dropped, not merged through", () => 
   assert.deepEqual(Object.keys(merged).sort(), [
     "bar",
     "bar_compact_controls",
+    "bar_fields",
     "filename_pattern",
     "notifications",
     "recording",
@@ -344,6 +345,7 @@ test("mergeSettings: does not mutate DEFAULT_SETTINGS or alias its nested object
     notifications: true,
     bar_compact_controls: false,
     recording_controls: "top-bar",
+    bar_fields: "compact",
     bar: { position: "bottom", offsetPx: 0 },
     screenshot: { format: "png", output: "clipboard", cursor: false },
     recording: { fps: 60, quality: "high", audio: "system", cursor: true },

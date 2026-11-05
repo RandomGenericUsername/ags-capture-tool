@@ -35,9 +35,11 @@ import type { BackendProbe } from "../../ports/backend-probe"
 import type { SettingsStore } from "../../ports/settings-store"
 import type {
   CaptureSettings,
+  ConfigBarFields,
   ConfigBarPosition,
 } from "../../domain/settings"
 import type { RecordingControlsMode } from "../../domain/recording-presentation"
+import { BAR_FIELD_PRESENTATIONS } from "../shared/field-defs"
 import {
   SETTINGS_RECORDING_CONTROL_OPTIONS,
   SETTINGS_ROW_NAMES,
@@ -139,7 +141,9 @@ export function SettingsPage(props: SettingsPageProps) {
       settingsError.visible = false
     }
 
-    const [filesDef, behaviourDef, placementDef, runtimeDef] = settingsGroups()
+    const [filesDef, behaviourDef, placementDef, runtimeDef] = settingsGroups({
+      barFields: true,
+    })
 
     const filesGroup = settingsGroup(filesDef.title, [
       pathRow(
@@ -192,6 +196,15 @@ export function SettingsPage(props: SettingsPageProps) {
         },
         rowContext,
         () => settingsConfig.recording_controls !== "hover",
+      ),
+      pillRow<ConfigBarFields>(
+        SETTINGS_ROW_NAMES.barFields,
+        [...BAR_FIELD_PRESENTATIONS],
+        () => settingsConfig.bar_fields,
+        (value) => {
+          settingsConfig.bar_fields = value
+        },
+        rowContext,
       ),
     ])
 

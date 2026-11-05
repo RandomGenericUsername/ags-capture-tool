@@ -17,7 +17,7 @@
   - [REQ-011-dynamic-monitor-dropdown/ticket.md](./REQ-011-dynamic-monitor-dropdown/ticket.md) — Dynamic monitor dropdown + remove cycle chip (`done`)
   - [REQ-012-settings-cleanup-persistence/ticket.md](./REQ-012-settings-cleanup-persistence/ticket.md) — Settings cleanup + persistence (`done`)
   - [REQ-014-bar-field-presentation/ticket.md](./REQ-014-bar-field-presentation/ticket.md) — Compact/detailed bar field presentation setting (`done`)
-  - [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness (`in-progress`; harness green, mockup validator drift blocker)
+  - [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness (`done`)
   - [OPS-008-docs-reconciliation/ticket.md](./OPS-008-docs-reconciliation/ticket.md) — Documentation reconciliation (`done`)
   - [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins (`proposed`)
 
@@ -36,7 +36,7 @@
 - [REQ-011-dynamic-monitor-dropdown/ticket.md](./REQ-011-dynamic-monitor-dropdown/ticket.md) — Dynamic monitor dropdown + remove cycle chip | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [REQ-012-settings-cleanup-persistence/ticket.md](./REQ-012-settings-cleanup-persistence/ticket.md) — Settings cleanup + persistence | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [REQ-014-bar-field-presentation/ticket.md](./REQ-014-bar-field-presentation/ticket.md) — Compact/detailed bar field presentation setting | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
-- [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns | harness green; blocked on pre-existing mockup `rec.cursor description` validator drift (mockup not edited)
+- [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns | harness green; mockup self-validator fixed and re-checked
 
 ## Bugs
 

@@ -2,7 +2,7 @@
 id: EPIC-002
 title: "Shared monitor catalog + capture dropdown UI"
 kind: epic
-status: in-progress
+status: done
 lane: 4 — bmad-advisory
 links:
   openspec: none
@@ -44,4 +44,12 @@ runtime `v0.5.2`, provision `v0.1.33`, composition `f84dc204`.
 - [x] `REQ-014` — Compact/detailed bar field presentation setting
 - [x] `REQ-013` — Mockup parity harness
 - [x] `OPS-008` — Documentation reconciliation
-- [ ] `OPS-007` — Release and pins
+- [x] `OPS-007` — Release and pins
+
+## Done-when evidence (2026-11-04)
+
+- All nine children are `done`; the parity harness is green and the mockup self-validator is clean.
+- Runtime `v0.6.0` and capture `v0.4.0` are annotated tags pushed to origin.
+- `dotfiles-v3` pins runtime `v0.6.0` and capture `v0.4.0`; `make gates-ci` and `make deploy-coverage` pass on the pin commit.
+- Live evidence is indexed under `/tmp/opencode/capture-dropdowns/` (REQ-009/010/011/012/014).
+- The installed host is updated on the next provision/apply; the release pin is the v0.4.0 tag.

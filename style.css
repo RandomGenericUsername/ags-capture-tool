@@ -294,7 +294,7 @@ window#capture-overlay {
   background-color: transparent;
 }
 
-.field-trigger {
+button.field-trigger {
   min-height: 40px;
   padding: 4px;
   border: 1px solid transparent;
@@ -305,12 +305,12 @@ window#capture-overlay {
   color: @on_surface;
 }
 
-.field-trigger:hover {
+button.field-trigger:hover {
   background-color: alpha(@on_surface, 0.06);
   border-color: alpha(@on_surface, 0.12);
 }
 
-.field-trigger:focus-visible {
+button.field-trigger:focus-visible {
   background-color: alpha(@on_surface, 0.04);
   box-shadow: 0 0 0 1px @primary, 0 0 0 3px alpha(@primary, 0.22);
 }
@@ -340,7 +340,7 @@ window#capture-overlay {
   color: alpha(@on_surface, 0.45);
 }
 
-.field-open .field-trigger {
+.field-open button.field-trigger {
   background-color: alpha(@primary, 0.12);
   border-color: alpha(@primary, 0.45);
 }
@@ -350,7 +350,18 @@ window#capture-overlay {
   color: @primary;
 }
 
-.field-popover {
+/* One card, not a card inside a card. The Gtk.Popover node stays
+ * transparent; only its contents node paints the panel. */
+popover.field-popover,
+popover.field-popover > contents,
+popover.field-popover > arrow {
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+}
+
+popover.field-popover > contents {
   padding: 6px;
   border: 1px solid alpha(@on_surface, 0.22);
   border-radius: 12px;
@@ -358,9 +369,17 @@ window#capture-overlay {
   color: @on_surface;
 }
 
-.field-popover list,
-.field-popover listbox {
+list.field-list,
+list.field-list > row {
   background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+}
+
+list.field-list > row:selected {
+  background-color: transparent;
+  outline: none;
 }
 
 .field-pop-header {
@@ -382,24 +401,27 @@ window#capture-overlay {
   color: alpha(@on_surface, 0.55);
 }
 
-.field-option {
+row.field-option {
   padding: 7px 8px;
-  border: 1px solid transparent;
+  border: none;
   border-radius: 8px;
   background-color: transparent;
+  background-image: none;
+  box-shadow: none;
 }
 
-.field-option:hover {
+row.field-option:hover {
   background-color: alpha(@on_surface, 0.06);
 }
 
-.field-option:focus-visible {
+row.field-option:focus-visible {
   box-shadow: inset 0 0 0 1px @primary;
 }
 
-.field-selected {
+/* Selection is a tint, not an outlined sub-card. */
+row.field-option.field-selected {
   background-color: alpha(@primary, 0.12);
-  border-color: alpha(@primary, 0.32);
+  border: none;
 }
 
 .field-option-icon {
@@ -408,7 +430,7 @@ window#capture-overlay {
   color: alpha(@on_surface, 0.62);
 }
 
-.field-selected .field-option-icon {
+row.field-option.field-selected .field-option-icon {
   color: @primary;
 }
 
@@ -440,12 +462,12 @@ window#capture-overlay {
   color: transparent;
 }
 
-.field-selected .field-radio {
+row.field-option.field-selected .field-radio {
   background-color: @primary;
   border-color: @primary;
 }
 
-.field-selected .field-radio label {
+row.field-option.field-selected .field-radio label {
   color: @on_primary;
 }
 

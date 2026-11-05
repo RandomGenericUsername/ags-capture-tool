@@ -87,9 +87,12 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
   const root = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL })
   root.add_css_class("field")
 
-  const trigger = new Gtk.MenuButton()
+  // A plain Gtk.Button, not Gtk.MenuButton: MenuButton brings the theme's
+  // button chrome around the trigger and a second popover background, which
+  // reads as "containers inside containers". The button is the trigger node
+  // and `.field-trigger` can be fully flat at rest.
+  const trigger = new Gtk.Button()
   trigger.add_css_class("field-trigger")
-  trigger.set_always_show_arrow(false)
   root.append(trigger)
 
   const triggerContent = new Gtk.Box({
@@ -121,12 +124,15 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
 
   const popover = new Gtk.Popover()
   popover.add_css_class("field-popover")
-  popover.set_has_arrow(true)
+  // No oversized theme arrow; the panel is anchored to the field root.
+  popover.set_has_arrow(false)
   popover.set_autohide(true)
   popover.set_position(
     config.popoverPosition === undefined ? Gtk.PositionType.TOP : config.popoverPosition(),
   )
-  trigger.set_popover(popover)
+  // The field root is a Box, so the popover is a special child of the root
+  // rather than competing with the Button's single child.
+  popover.set_parent(root)
 
   const body = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 4 })
   popover.set_child(body)
@@ -257,7 +263,7 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
 
   function close(): void {
     if (!isOpen()) return
-    trigger.popdown()
+    popover.popdown()
   }
 
   function choose(value: string): void {
@@ -272,8 +278,13 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
     popover.set_position(
       config.popoverPosition === undefined ? Gtk.PositionType.TOP : config.popoverPosition(),
     )
-    trigger.popup()
+    popover.popup()
   }
+
+  trigger.connect("clicked", () => {
+    if (isOpen()) close()
+    else open()
+  })
 
   list.connect("row-activated", (_list, row) => {
     const entry = rows.find((candidate) => candidate.row === row)
@@ -382,6 +393,7 @@ export function dropdownField(config: DropdownFieldConfig): DropdownFieldHandle 
     destroy(): void {
       close()
       root.set_visible(false)
+      if (popover.get_parent() !== null) popover.unparent()
     },
   }
 }

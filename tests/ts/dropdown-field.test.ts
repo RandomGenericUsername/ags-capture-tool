@@ -147,7 +147,7 @@ test("the typed-state mapping round-trips every screenshot option", () => {
   assert.equal(screenshotCursorFromValue("Off"), false)
 })
 
-test("dropdown.ts exposes the reusable handle and uses MenuButton + Popover + ListBox", () => {
+test("dropdown.ts exposes the reusable handle and uses Button + Popover + ListBox", () => {
   assert.match(DROPDOWN, /export function dropdownField/)
   assert.match(DROPDOWN, /export interface DropdownFieldHandle/)
   for (const method of [
@@ -162,7 +162,7 @@ test("dropdown.ts exposes the reusable handle and uses MenuButton + Popover + Li
   ]) {
     assert.match(DROPDOWN, new RegExp(`\\b${method}\\b`), `handle is missing ${method}`)
   }
-  assert.match(DROPDOWN, /Gtk\.MenuButton/)
+  assert.match(DROPDOWN, /Gtk\.Button/)
   assert.match(DROPDOWN, /Gtk\.Popover/)
   assert.match(DROPDOWN, /Gtk\.ListBox/)
   assert.match(DROPDOWN, /popover\.connect\("map"[\s\S]*config\.onOpen/)

@@ -116,3 +116,20 @@ no temporary evidence hook is present in this commit.
 - `tests/ts/bar-shell.test.ts` — screenshot lane is one trigger per field and
   no `bar-group`/`bar-pill` remains; every old option lives in
   `ui/shared/field-defs.ts`; `applyStateToUi` sets each trigger value.
+
+## Review fix (2026-11-04)
+
+The first pass used `Gtk.MenuButton`, which added the theme's button chrome around
+every trigger and a second popover background. Review feedback: "everything is
+wrapped in embedded containers."
+
+- Trigger is now a plain `Gtk.Button` + `Gtk.Popover`; `.field-trigger` is the
+  button node and is flat at rest.
+- The popover paints one `contents` card; `list.field-list` and
+  `row.field-option` are transparent; selection is a tint, not an outlined
+  sub-card.
+- The oversized theme arrow is disabled.
+- `tests/ts/dropdown-field.test.ts` asserts `Button + Popover + ListBox`.
+- Gates after the fix: `make test` 368 pass; `make conformance` 17 pass;
+  `make backend` 114 pass; `make typecheck` 0 errors; `make bundle` 1,836,956
+  bytes.

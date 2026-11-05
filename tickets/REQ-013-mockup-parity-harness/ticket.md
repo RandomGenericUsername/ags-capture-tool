@@ -14,7 +14,7 @@ depends-on: [REQ-009, REQ-010, REQ-011, REQ-012, REQ-014]
 blocks: [OPS-008, OPS-007]
 design: ../EPIC-002-monitor-catalog-dropdowns/design.md
 mockup: ../EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html
-mockup-sha256: a07ec93664685d3f4bbec8faba17dc07216f3a653bb35ac25be75550e683d2ab
+mockup-sha256: 096e9a31fbedd5298d3eb22a62738d7dd87c6f3b02812c9075ac12523bf08824
 ---
 
 # Mockup parity harness

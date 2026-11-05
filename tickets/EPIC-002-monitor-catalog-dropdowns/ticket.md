@@ -17,7 +17,7 @@ done-when: "All children done; the mockup parity harness is green; live evidence
 
 Normative design: [design.md](./design.md).
 Normative mockup: [mockups/capture-tool-dropdowns.html](./mockups/capture-tool-dropdowns.html)
-(sha256 `a07ec93664685d3f4bbec8faba17dc07216f3a653bb35ac25be75550e683d2ab`).
+(sha256 `096e9a31fbedd5298d3eb22a62738d7dd87c6f3b02812c9075ac12523bf08824`).
 Agent brief: [agent-brief.md](./agent-brief.md).
 
 ## Done-when

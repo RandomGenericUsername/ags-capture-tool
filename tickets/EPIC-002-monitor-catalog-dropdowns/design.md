@@ -1,6 +1,7 @@
 # EPIC-002 — Shared monitor catalog + capture dropdown UI
 
-**Status:** planning complete; implementation not started.
+**Status:** implemented and released — EPIC-002 closed 2026-11-04; runtime `v0.6.0`
+and capture `v0.4.0` tagged and pinned in `dotfiles-v3`.
 **Authority:** this plan + the normative mockup
 [`capture-tool-dropdowns.html`](./capture-tool-dropdowns.html) + the
 `design-contract` JSON block inside that mockup.

@@ -51,5 +51,6 @@ runtime `v0.5.2`, provision `v0.1.33`, composition `f84dc204`.
 - All nine children are `done`; the parity harness is green and the mockup self-validator is clean.
 - Runtime `v0.6.0` and capture `v0.4.0` are annotated tags pushed to origin.
 - `dotfiles-v3` pins runtime `v0.6.0` and capture `v0.4.0`; `make gates-ci` and `make deploy-coverage` pass on the pin commit.
-- Live evidence is indexed under `/tmp/opencode/capture-dropdowns/` (REQ-009/010/011/012/014).
-- The installed host is updated on the next provision/apply; the release pin is the v0.4.0 tag.
+- Live evidence is indexed under `/tmp/opencode/capture-dropdowns/` (REQ-009/010/011/012/014); the durable copy is `~/.opencode/evidence/capture-dropdowns/` (`/tmp` does not survive reboot).
+- Applied to the host on 2026-11-05: capture `v0.4.0` and runtime `v0.6.1` (the `v0.6.0` metadata patch); `dotfiles-provision verify` exit 0.
+- The released mockup is `mockups/capture-tool-dropdowns.html` (`sha256 820b59cc…f5d3f0`). The evidence bundle also keeps the pre-`REQ-014` staged proposal as `mockup/capture-tool-dropdowns.html`; it is historical and has no `barFields`.

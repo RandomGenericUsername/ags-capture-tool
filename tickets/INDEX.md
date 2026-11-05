@@ -54,6 +54,7 @@
 - [OPS-006-ci-conformance-checkout/ticket.md](./OPS-006-ci-conformance-checkout/ticket.md) — Fix CI conformance: ignore the contracts checkout in the source walk | `done` | worktree none, branch main | root cause: CI checks out contracts inside ROOT; local `.dev` sibling masked it
 - [OPS-008-docs-reconciliation/ticket.md](./OPS-008-docs-reconciliation/ticket.md) — Documentation reconciliation: historical mockup/design + stale comments | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
+- [OPS-009-evidence-reconciliation/ticket.md](./OPS-009-evidence-reconciliation/ticket.md) — Evidence and status reconciliation after EPIC-002 | `done` | worktree .worktrees/OPS-009/, branch ticket/OPS-009-evidence-reconciliation
 
 ## Spikes
 

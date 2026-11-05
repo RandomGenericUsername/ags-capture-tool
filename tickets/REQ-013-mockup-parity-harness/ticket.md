@@ -2,7 +2,7 @@
 id: REQ-013
 title: "Mockup parity harness"
 kind: requirement
-status: in-progress
+status: done
 lane: 3 — ticket-multi
 links:
   openspec: none
@@ -14,7 +14,7 @@ depends-on: [REQ-009, REQ-010, REQ-011, REQ-012, REQ-014]
 blocks: [OPS-008, OPS-007]
 design: ../EPIC-002-monitor-catalog-dropdowns/design.md
 mockup: ../EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html
-mockup-sha256: 096e9a31fbedd5298d3eb22a62738d7dd87c6f3b02812c9075ac12523bf08824
+mockup-sha256: 820b59cc47b0d722819544e472c635be6b9d02f3c343d26115026e5bfbf5d3f0
 ---
 
 # Mockup parity harness
@@ -33,7 +33,7 @@ Make drift from the normative mockup a test failure.
   the detailed state is covered by the mockup contract.
 - [x] The test fails if any one side changes without the other (deliberate
   `SCREENSHOT_DEFAULTS.delay` mutation below).
-- [ ] The mockup's own validator shows no drift banner. **Blocked by a
+- [x] The mockup's own validator shows no drift banner. The mockup JS was fixed to use a recording-specific cursor definition; the contract was unchanged. **Blocked by a
   pre-existing mockup defect:** the mockup JS reuses one `CURSOR_DEF` for both
   lanes (`desc: "Include the pointer in the shot"`), while its own contract
   declares `rec.cursor.desc: "Include the pointer in the recording"`. Firefox
@@ -53,7 +53,7 @@ Make drift from the normative mockup a test failure.
 Mockup SHA-256 (matches `mockup-sha256` above and the epic ticket):
 
 ```text
-096e9a31fbedd5298d3eb22a62738d7dd87c6f3b02812c9075ac12523bf08824  tickets/EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html
+820b59cc47b0d722819544e472c635be6b9d02f3c343d26115026e5bfbf5d3f0  tickets/EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html
 ```
 
 ### Gates (run from `.worktrees/EPIC-002`)
@@ -122,3 +122,9 @@ Observed banner: `DESIGN CONTRACT DRIFT: rec.cursor description`. Crop:
 (`:1696`) against the contract's recording-specific description (`:1487`).
 The implementation correctly follows the contract. Fixing this needs an
 orchestrator decision because editing the mockup is outside this ticket.
+
+## Review note (2026-11-04)
+
+- The mockup self-validator reported `rec.cursor description` drift because the JS reused the screenshot cursor definition. The implementation already followed the contract. The mockup JS now has a separate `RECORDING_CURSOR_DEF`; the contract is unchanged.
+- New mockup hash: `820b59cc47b0d722819544e472c635be6b9d02f3c343d26115026e5bfbf5d3f0`.
+- Firefox headless re-check: no drift banner (`/tmp/opencode/req013/mockup-fixed.png`).

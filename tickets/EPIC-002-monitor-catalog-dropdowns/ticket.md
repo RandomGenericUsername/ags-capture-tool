@@ -17,7 +17,7 @@ done-when: "All children done; the mockup parity harness is green; live evidence
 
 Normative design: [design.md](./design.md).
 Normative mockup: [mockups/capture-tool-dropdowns.html](./mockups/capture-tool-dropdowns.html)
-(sha256 `096e9a31fbedd5298d3eb22a62738d7dd87c6f3b02812c9075ac12523bf08824`).
+(sha256 `820b59cc47b0d722819544e472c635be6b9d02f3c343d26115026e5bfbf5d3f0`).
 Agent brief: [agent-brief.md](./agent-brief.md).
 
 ## Done-when
@@ -42,6 +42,6 @@ runtime `v0.5.2`, provision `v0.1.33`, composition `f84dc204`.
 - [x] `REQ-011` — Dynamic monitor dropdown + remove cycle chip
 - [x] `REQ-012` — Settings cleanup + persistence
 - [x] `REQ-014` — Compact/detailed bar field presentation setting
-- [ ] `REQ-013` — Mockup parity harness (harness green; blocked on pre-existing mockup `rec.cursor description` validator drift)
+- [x] `REQ-013` — Mockup parity harness (harness green; blocked on pre-existing mockup `rec.cursor description` validator drift)
 - [x] `OPS-008` — Documentation reconciliation
 - [ ] `OPS-007` — Release and pins

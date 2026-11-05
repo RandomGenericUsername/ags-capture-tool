@@ -1564,6 +1564,18 @@
     ],
   };
 
+  // The recording lane has its own cursor purpose text in the contract; reusing
+  // the screenshot definition here was a mockup-only drift (the implementation
+  // already follows the contract).
+  const RECORDING_CURSOR_DEF = {
+    key: "Cursor",
+    desc: "Include the pointer in the recording",
+    options: [
+      ["On", "On", "Draw the pointer", "i-cursor"],
+      ["Off", "Off", "Hide the pointer", "i-cursor-off"],
+    ],
+  };
+
   const STD_FPS = {
     key: "FPS",
     desc: "Frames per second",
@@ -1693,7 +1705,7 @@
           ["Custom", "Custom", "Set exact seconds", "i-clock"],
         ],
       },
-      cursor: CURSOR_DEF,
+      cursor: RECORDING_CURSOR_DEF,
     },
     cta: { label: "Record", icon: "i-video" },
   };

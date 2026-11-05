@@ -10,7 +10,7 @@
   - [REQ-002-capture-bar-shell/ticket.md](./REQ-002-capture-bar-shell/ticket.md) — Capture bar shell: five-state S0–S4, placement + on-demand pills (`done`)
   - [REQ-003-selection-first-flow/ticket.md](./REQ-003-selection-first-flow/ticket.md) — Selection-first capture flow: pending protocol + irreversible commit (`done`)
   - [REQ-004-recording-lifecycle/ticket.md](./REQ-004-recording-lifecycle/ticket.md) — Recording lifecycle: red accent + live HUD (`done`)
-- [EPIC-002-monitor-catalog-dropdowns/ticket.md](./EPIC-002-monitor-catalog-dropdowns/ticket.md) — Shared monitor catalog + capture dropdown UI | `in-progress` | 7/9 children done | done-when: parity harness green, live evidence, runtime v0.6.0 + capture v0.4.0 pinned, no mockup drift | current mockup: `EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html`
+- [EPIC-002-monitor-catalog-dropdowns/ticket.md](./EPIC-002-monitor-catalog-dropdowns/ticket.md) — Shared monitor catalog + capture dropdown UI | `in-progress` | 8/9 children done | done-when: parity harness green, live evidence, runtime v0.6.0 + capture v0.4.0 pinned, no mockup drift | current mockup: `EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html`
   - [REQ-008-shared-monitor-catalog/ticket.md](./REQ-008-shared-monitor-catalog/ticket.md) — Shared monitor catalog service (`done`)
   - [REQ-009-dropdown-primitive-screenshot/ticket.md](./REQ-009-dropdown-primitive-screenshot/ticket.md) — Dropdown primitive + screenshot lane (`done`)
   - [REQ-010-recording-lane-dropdowns/ticket.md](./REQ-010-recording-lane-dropdowns/ticket.md) — Recording lane dropdowns + conditional states (`done`)
@@ -36,7 +36,7 @@
 - [REQ-011-dynamic-monitor-dropdown/ticket.md](./REQ-011-dynamic-monitor-dropdown/ticket.md) — Dynamic monitor dropdown + remove cycle chip | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [REQ-012-settings-cleanup-persistence/ticket.md](./REQ-012-settings-cleanup-persistence/ticket.md) — Settings cleanup + persistence | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [REQ-014-bar-field-presentation/ticket.md](./REQ-014-bar-field-presentation/ticket.md) — Compact/detailed bar field presentation setting | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
-- [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness | `in-progress` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns | harness green; blocked on pre-existing mockup `rec.cursor description` validator drift (mockup not edited)
+- [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness | `done` | links: worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns | harness green; blocked on pre-existing mockup `rec.cursor description` validator drift (mockup not edited)
 
 ## Bugs
 

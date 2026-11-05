@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.4.0 — 2026-11-04
+
+The capture bar now presents options as compact field dropdowns, with a
+dynamic Monitor field backed by the shared runtime monitor catalog.
+
+### Added
+
+- One field trigger per S1 option: the active value is visible and the
+  alternatives live in a popover. `Enter` commits; `Space`/`↓` opens; `Esc`
+  closes the popover first.
+- `bar_fields: compact | detailed` (default `compact`). Detailed restores the
+  old inline-options density; both presentations use the same field vocabulary.
+- Monitor dropdown populated from `dotfiles-runtime monitors list --format json`
+  (runtime v0.6.0), with the GDK topology as the authoritative targetable set
+  and fallback. The old cycle chip is removed.
+
+### Changed
+
+- The recording lane uses the same field primitive. GIF swaps the FPS vocabulary
+  and the Audio→Size slot in place; the custom-duration editor lives inside the
+  duration popover (compact) or inline (detailed).
+- Settings is regrouped into Files / Behaviour / Placement / Runtime. The
+  duplicate Screenshot/Recording defaults are removed; first run uses code
+  constants and `capture-ui.json` is authoritative after that.
+- Cursor remains in `config.json`; the bar dropdown is the only cursor control.
+
+### Fixed
+
+- Flat field triggers and a single popover card, without the nested
+  `Gtk.MenuButton`/theme chrome.
+- Field spacing and the two thin row separators match the EPIC-002 mockup.
+- The recording cluster pulse reads `--rec-accent` / `@error`; `style.css` has
+  no literal hex colours.
+
 ## v0.3.0 — 2026-11-04
 
 Recording controls now have one presentation setting shared by the capture

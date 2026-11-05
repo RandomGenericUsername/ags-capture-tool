@@ -11,7 +11,7 @@ worktree: .worktrees/EPIC-002/
 branch: ticket/EPIC-002-monitor-catalog-dropdowns
 repos: [ags-capture-tool]
 depends-on: [REQ-009, REQ-010, REQ-011]
-blocks: [REQ-013, OPS-008, OPS-007]
+blocks: [REQ-014, REQ-013, OPS-008, OPS-007]
 design: ../EPIC-002-monitor-catalog-dropdowns/design.md
 mockup: ../EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html
 ---

@@ -181,6 +181,28 @@
   .mode svg{width:17px;height:17px}
   .sep{width:1px;height:24px;flex:none;margin:0 3px;background:var(--hairline)}
 
+  /* ------------------------------------------------- detailed presentation
+   * The pre-EPIC-002 density, restored as a user choice. Same field vocabulary,
+   * every option visible inline, no popovers. */
+  .inline-field{display:inline-flex;align-items:center;gap:5px}
+  .inline-key{
+    font-size:8.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+    color:rgba(232,234,240,.42)
+  }
+  .inline-group{
+    display:inline-flex;align-items:center;gap:2px;padding:2px;
+    border:1px solid var(--hairline);border-radius:9px;
+    background:rgba(0,0,0,.12)
+  }
+  .inline-pill{
+    min-height:30px;padding:0 9px;border:1px solid transparent;border-radius:7px;
+    background:transparent;color:var(--text-dim);font:inherit;font-size:11.5px;
+    font-weight:600;cursor:pointer;white-space:nowrap
+  }
+  .inline-pill:hover{color:var(--text);background:rgba(255,255,255,.06)}
+  .inline-pill.selected{background:var(--accent);color:var(--accent-ink)}
+  .bar.rec .inline-pill.selected{background:var(--rec);color:var(--rec-ink)}
+
   /* -------------------------------------------------------------- fields */
   .field{position:relative;display:flex}
   .trigger{
@@ -1024,6 +1046,13 @@
             <div class="srow-l"><span class="srow-name">Compact bar indicator</span><span class="srow-desc">Available for Top bar and Always visible. On hover forces the inline controls so Pause/Stop is one click.</span></div>
             <button class="switch on" data-compact-switch type="button" role="switch" aria-checked="true" aria-label="Compact bar indicator"><span class="knob"></span></button>
           </div>
+          <div class="srow">
+            <div class="srow-l"><span class="srow-name">Bar fields</span><span class="srow-desc">Compact shows the active choice and opens a popover; Detailed shows every option inline.</span></div>
+            <div class="seg" data-seg="bar-fields" role="group" aria-label="Bar fields">
+              <button type="button" class="on" data-value="compact">Compact</button>
+              <button type="button" data-value="detailed">Detailed</button>
+            </div>
+          </div>
         </div>
 
         <div class="group">
@@ -1088,7 +1117,7 @@
     </div>
 
     <p class="caption">
-      The panel keeps only what the bar cannot express: file locations, notification behaviour, the compact indicator, placement and recording-controls ownership, plus the read-only runtime facts. <b>Bar position</b> and <b>Recording controls</b> stay segmented on purpose: in a form, showing all choices is faster; the dropdown is a density adaptation for the one-row bar, not a brand rule. <b>Top offset</b> dims when Bottom is selected so the dependency is visible without a layout jump. <b>Compact bar indicator</b> turns off and disables while <b>On hover</b> is selected, matching the v0.3.x policy that hover must expose Pause/Stop in one click.
+      The panel keeps only what the bar cannot express: file locations, notification behaviour, the compact indicator, the bar-field presentation, placement and recording-controls ownership, plus the read-only runtime facts. <b>Bar position</b>, <b>Bar fields</b> and <b>Recording controls</b> stay segmented on purpose: in a form, showing all choices is faster; the dropdown is a density adaptation for the one-row bar, not a brand rule. <b>Top offset</b> dims when Bottom is selected so the dependency is visible without a layout jump. <b>Compact bar indicator</b> turns off and disables while <b>On hover</b> is selected, matching the v0.3.x policy that hover must expose Pause/Stop in one click.
       <span class="gtk">GTK</span> <code>Enter</code> now reads “done” because every edit already persists; the footer keeps <code>Esc</code> and the Back button, so returning to the bar is always one action.
     </p>
   </section>
@@ -1205,6 +1234,75 @@
         </ul>
       </div>
     </div>
+  </section>
+
+  <!-- ================================================================ 12 -->
+  <section>
+    <div class="sec"><span class="num">12</span><h2>Detailed presentation · <code>Bar fields = Detailed</code></h2><span class="hint">same vocabulary, every option visible</span></div>
+
+    <div class="sechead"><h2>— screenshot lane</h2></div>
+    <div class="screen short" style="height:220px">
+      <div class="topbar"><span>◈</span><span>workspaces</span><span class="grow"></span><span>wed 15:42</span></div>
+      <div class="bar bottom" style="gap:4px;padding:5px 7px;transform:translateX(-50%) scale(.92);transform-origin:bottom center">
+        <button class="back" type="button" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
+        <button class="mode on" type="button" aria-label="Screenshot"><svg aria-hidden="true"><use href="#i-cam"/></svg></button>
+        <button class="mode" type="button" aria-label="Recording"><svg aria-hidden="true"><use href="#i-video"/></svg></button>
+        <span class="sep" aria-hidden="true"></span>
+        <span class="inline-field"><span class="inline-key">Target</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">Region</button><button class="inline-pill" type="button">Screen</button><button class="inline-pill" type="button">Window</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Delay</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">None</button><button class="inline-pill" type="button">3s</button><button class="inline-pill" type="button">5s</button><button class="inline-pill" type="button">10s</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Format</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">PNG</button><button class="inline-pill" type="button">JPEG</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Output</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">Clipboard</button><button class="inline-pill" type="button">Save</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Cursor</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">On</button><button class="inline-pill" type="button">Off</button>
+        </span></span>
+        <span class="sep" aria-hidden="true"></span>
+        <button class="cta" type="button"><svg aria-hidden="true"><use href="#i-cam"/></svg><span>Capture</span><kbd>Enter</kbd></button>
+      </div>
+    </div>
+    <p class="caption">Detailed is the pre-EPIC-002 density: every option is visible inline. It uses the same <code>field-defs</code> labels and values as Compact; only the presentation changes. The setting is <b>Bar fields: Compact | Detailed</b> in Settings → Behaviour. Compact remains the default.</p>
+
+    <div class="sechead"><h2>— recording lane</h2></div>
+    <div class="screen short" style="height:220px">
+      <div class="topbar"><span>◈</span><span>workspaces</span><span class="grow"></span><span>wed 15:42</span></div>
+      <div class="bar rec bottom" style="gap:3px;padding:5px 6px;transform:translateX(-50%) scale(.84);transform-origin:bottom center">
+        <button class="back" type="button" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
+        <button class="mode" type="button" aria-label="Screenshot"><svg aria-hidden="true"><use href="#i-cam"/></svg></button>
+        <button class="mode on" type="button" aria-label="Recording"><svg aria-hidden="true"><use href="#i-video"/></svg></button>
+        <span class="sep" aria-hidden="true"></span>
+        <span class="inline-field"><span class="inline-key">Target</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">Region</button><button class="inline-pill" type="button">Screen</button><button class="inline-pill" type="button">Window</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">FPS</span><span class="inline-group">
+          <button class="inline-pill" type="button">24</button><button class="inline-pill" type="button">30</button><button class="inline-pill selected" type="button">60</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Format</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">MP4</button><button class="inline-pill" type="button">WebM</button><button class="inline-pill" type="button">GIF</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Quality</span><span class="inline-group">
+          <button class="inline-pill" type="button">Low</button><button class="inline-pill" type="button">Medium</button><button class="inline-pill selected" type="button">High</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Audio</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">System</button><button class="inline-pill" type="button">Mic</button><button class="inline-pill" type="button">None</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Duration</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">∞</button><button class="inline-pill" type="button">10s</button><button class="inline-pill" type="button">30s</button><button class="inline-pill" type="button">60s</button><button class="inline-pill" type="button">Custom</button>
+        </span></span>
+        <span class="inline-field"><span class="inline-key">Cursor</span><span class="inline-group">
+          <button class="inline-pill selected" type="button">On</button><button class="inline-pill" type="button">Off</button>
+        </span></span>
+        <span class="sep" aria-hidden="true"></span>
+        <button class="cta rec" type="button"><svg aria-hidden="true"><use href="#i-video"/></svg><span>Record</span><kbd>Enter</kbd></button>
+      </div>
+    </div>
+    <p class="caption">The detailed recording row keeps the structural red tab/CTA/tally and the same field order as Compact. It is intentionally wider; the compact width budget does not apply. Both presentations share the selection handlers, so switching never commits or loses the pending selection.</p>
   </section>
 
   <footer class="page-foot">
@@ -1402,7 +1500,7 @@
   "settings": {
     "groups": [
       { "title": "Files", "rows": ["Screenshot folder", "Recording folder", "Filename pattern"] },
-      { "title": "Behaviour", "rows": ["Show notifications", "Compact bar indicator"] },
+      { "title": "Behaviour", "rows": ["Show notifications", "Compact bar indicator", "Bar fields"] },
       { "title": "Placement", "rows": ["Bar position", "Top offset", "Recording controls"] },
       { "title": "Runtime", "rows": ["Recorder backend", "Lane memory"] }
     ],
@@ -1410,7 +1508,14 @@
       ["Top bar", "top-bar"],
       ["On hover", "hover"],
       ["Always visible", "always"]
-    ]
+    ],
+    "barFields": {
+      "default": "compact",
+      "options": [
+        ["Compact", "compact"],
+        ["Detailed", "detailed"]
+      ]
+    }
   }
 }
 </script>
@@ -1662,6 +1767,17 @@
       (button) => [button.textContent.trim(), button.dataset.value],
     );
     check(same(controls, contract.settings.recordingControls), "recording controls");
+
+    const barFields = [...document.querySelectorAll('[data-seg="bar-fields"] button')].map(
+      (button) => [button.textContent.trim(), button.dataset.value],
+    );
+    check(same(barFields, contract.settings.barFields.options), "bar fields");
+    const barFieldsDefault = document.querySelector('[data-seg="bar-fields"] button.on');
+    check(
+      barFieldsDefault !== null &&
+        barFieldsDefault.dataset.value === contract.settings.barFields.default,
+      "bar fields default",
+    );
 
     if (problems.length > 0) {
       console.error("design-contract drift:", problems);

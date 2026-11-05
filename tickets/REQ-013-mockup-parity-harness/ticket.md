@@ -10,11 +10,11 @@ links:
 worktree: .worktrees/EPIC-002/
 branch: ticket/EPIC-002-monitor-catalog-dropdowns
 repos: [ags-capture-tool]
-depends-on: [REQ-009, REQ-010, REQ-011, REQ-012]
+depends-on: [REQ-009, REQ-010, REQ-011, REQ-012, REQ-014]
 blocks: [OPS-008, OPS-007]
 design: ../EPIC-002-monitor-catalog-dropdowns/design.md
 mockup: ../EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html
-mockup-sha256: a3f8cb4883b342dd902d231a9a4f79381e5a104b0b099123f6fcb3f5755e02df
+mockup-sha256: a07ec93664685d3f4bbec8faba17dc07216f3a653bb35ac25be75550e683d2ab
 ---
 
 # Mockup parity harness

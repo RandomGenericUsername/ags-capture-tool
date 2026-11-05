@@ -94,6 +94,7 @@ inside a child ticket.
 | D10 | The mockup's `design-contract` JSON is the machine-readable vocabulary. The implementation's pure `field-defs.ts` and settings layout must match it; the parity test is the gate. | This plan (anti-drift) |
 | D11 | The Monitor field is visible when `Target = Screen` and more than one monitor is targetable. With exactly one monitor it stays hidden, matching the current `count > 1` rule. | This plan (keeps current behaviour; change only with user approval) |
 | D12 | Full-word labels `System` and `Medium` replace `Sys` and `Med`; the old labels are gone from the UI and tests. | Mockup / Sally proposal |
+| D13 | `bar_fields` = `compact | detailed` is in scope. `compact` (default) is the dropdown trigger/popover; `detailed` renders the same `field-defs` as inline option groups. The setting lives in Settings → Behaviour, preserves `UiState`, and calls `syncWindowSize()` once on switch. | User request, 2026-11-04 |
 
 ---
 
@@ -295,7 +296,7 @@ must be copied verbatim into `ui/shared/field-defs.ts`.
   `Saved as you go` chip.
 - Groups:
   - **Files**: Screenshot folder, Recording folder, Filename pattern.
-  - **Behaviour**: Show notifications, Compact bar indicator.
+  - **Behaviour**: Show notifications, Compact bar indicator, Bar fields.
   - **Placement**: Bar position, Top offset, Recording controls.
   - **Runtime**: Recorder backend readout, Lane memory readout.
 - Deleted: Screenshot defaults (format/output/cursor) and Recording defaults
@@ -303,6 +304,11 @@ must be copied verbatim into `ui/shared/field-defs.ts`.
 - `Recording controls` is segmented: `Top bar | On hover | Always visible`,
   default `Top bar`. `Compact bar indicator` disables and shows off when
   `On hover` is selected; it restores its stored state when leaving `On hover`.
+- `Bar fields` is segmented `Compact | Detailed`, default `Compact`. Compact
+  uses the dropdown triggers; Detailed re-renders S1 as inline option groups
+  from the same `field-defs` (the old visible-options density). Switching
+  preserves the current `UiState`, closes any open popover, and calls
+  `syncWindowSize()` once.
 - `Top offset` is insensitive/dimmed when `Bar position = Bottom`; it becomes
   active when `Top`.
 - Footer: `Esc back · Enter done` + `Back` button. Edits still save immediately.
@@ -332,6 +338,23 @@ Implementation rules:
   inherit `color`; if generated icons are used in rows, register the open
   popover with the appearance surface or rebuild only its icons.
 
+### 3.8 Detailed presentation (`bar_fields = "detailed"`)
+
+- The same `field-defs` vocabulary renders inline option groups: every option is
+  visible, no popover. This is the old density, restored as a user choice.
+- Field order and values are identical to compact; only the presentation
+  differs.
+- The detailed row keeps the mode tabs, dividers, CTA and recording structural
+  red. It does not use popovers, so the keyboard contract is the old pill one:
+  Enter commits, Esc backs out, Space/Enter on a focused pill selects.
+- `syncWindowSize()` runs once after the switch. The compact width budgets do
+  not apply; detailed is explicitly allowed to be wider and may need horizontal
+  clamping on small screens.
+- The setting is global (both lanes) and persisted in `config.json` as
+  `bar_fields`; default `compact`; missing/corrupt values degrade to `compact`.
+- The parity contract includes the setting and the detailed presentation; the
+  detailed renderer must use `field-defs`, never a second option table.
+
 ---
 
 ## 4. Anti-drift harness
@@ -349,7 +372,8 @@ The mockup contains:
 
 It declares, for both lanes: field order, defaults, each field's key,
 description and options (`value`, `label`, `description`, icon), the monitor
-list shape, the settings group/row order, and the recording-controls values.
+list shape, the settings group/row order, the recording-controls values, and
+the `barFields` setting (`compact | detailed`, default `compact`).
 The mockup's own `validateDesignContract()` compares its JS definitions to this
 block and shows a red banner on mismatch.
 
@@ -440,8 +464,9 @@ complete; runtime and capture releases tagged; `dotfiles-v3` pins updated and
 | `REQ-009` | Dropdown primitive + screenshot lane | `ags-capture-tool` | — | `REQ-010`, `REQ-011`, `REQ-012` |
 | `REQ-010` | Recording lane dropdowns + conditional states | `ags-capture-tool` | `REQ-009` | `REQ-012`, `OPS-007` |
 | `REQ-011` | Dynamic monitor dropdown + remove cycle chip | `ags-capture-tool` | `REQ-008`, `REQ-009` | `REQ-012`, `OPS-007` |
-| `REQ-012` | Settings cleanup + persistence | `ags-capture-tool` | `REQ-009`, `REQ-010`, `REQ-011` | `OPS-007` |
-| `REQ-013` | Mockup parity harness | `ags-capture-tool` | `REQ-009`–`REQ-012` | `OPS-007` |
+| `REQ-012` | Settings cleanup + persistence | `ags-capture-tool` | `REQ-009`, `REQ-010`, `REQ-011` | `REQ-014`, `OPS-007` |
+| `REQ-014` | Compact/detailed bar field presentation setting | `ags-capture-tool` | `REQ-010`, `REQ-011`, `REQ-012` | `REQ-013`, `OPS-007` |
+| `REQ-013` | Mockup parity harness | `ags-capture-tool` | `REQ-009`–`REQ-012`, `REQ-014` | `OPS-007` |
 | `OPS-008` | Documentation reconciliation | `ags-capture-tool` | `REQ-012` | `OPS-007` |
 | `OPS-007` | Release and pins | `dotfiles-runtime`, `ags-capture-tool`, `dotfiles-v3` | all above | — |
 
@@ -727,6 +752,46 @@ regroup the panel.
 
 ---
 
+### REQ-014 — Compact/detailed bar field presentation setting
+
+**Repos:** `ags-capture-tool`.
+**Goal:** let the user choose the new compact dropdown bar or the old detailed
+inline-options bar without duplicating the option vocabulary.
+
+**Implementation:**
+
+- `domain/settings.ts`: add `bar_fields: "compact" | "detailed"` with
+  `CONFIG_BAR_FIELDS`, default `compact`, and `mergeSettings` tolerance. The
+  backend ignores it.
+- `ui/shared/field-defs.ts`: export `BAR_FIELD_PRESENTATIONS` and
+  `DEFAULT_BAR_FIELDS` from the mockup contract.
+- `ui/shared/dropdown.ts`: add an inline renderer that consumes the same
+  `FieldOptionDef[]` and exposes the same `FieldHandle` surface as the compact
+  dropdown. No second option table.
+- `ScreenshotPage` / `RecordingPage`: choose the renderer from
+  `settingsConfig.bar_fields`; switching closes open popovers, preserves the
+  current `UiState`, re-renders S1 once, and calls `syncWindowSize()`.
+- `SettingsPage` / `settings-defs.ts`: Behaviour → `Bar fields`
+  (`Compact | Detailed`), persisted immediately.
+- Tests: default compact; missing/corrupt -> compact; detailed renders every
+  option inline; switching preserves `UiState`; one `syncWindowSize()` per
+  switch; both presentations read the same `field-defs`.
+- Live evidence: `detailed-shot.png`, `detailed-rec.png`,
+  `settings-bar-fields.png`.
+
+**Acceptance:**
+
+- [ ] Settings shows `Bar fields: Compact | Detailed`, default Compact.
+- [ ] Compact is the dropdown bar; Detailed is the inline option-group bar;
+  both cover every existing option in both lanes.
+- [ ] Switching preserves the current selections and does not commit.
+- [ ] `syncWindowSize()` runs once after the switch; no popover is left open.
+- [ ] A missing/corrupt `bar_fields` degrades to `compact`.
+- [ ] Both presentations consume `field-defs.ts`; no duplicate option table.
+- [ ] Gates pass; parity covers the setting and the detailed presentation.
+
+---
+
 ### REQ-013 — Mockup parity harness
 
 **Repos:** `ags-capture-tool`.
@@ -750,8 +815,8 @@ regroup the panel.
 **Acceptance:**
 
 - [ ] The parity test fails if a label, description, option value, field order,
-  default, monitor id, settings row, recording-control value, required class,
-  hex literal, or mockup hash changes on one side only.
+  default, monitor id, settings row, recording-control value, `bar_fields`
+  value, required class, hex literal, or mockup hash changes on one side only.
 - [ ] The mockup's own validator shows no drift banner.
 - [ ] `make test` includes the parity test and passes.
 - [ ] The ticket records the mockup hash and the exact command output.
@@ -859,7 +924,8 @@ pins, and prove the deployed shape.
    - `REQ-010` (recording) after `REQ-009`.
    - `REQ-011` (monitor dropdown) after `REQ-008` + `REQ-009`.
    - `REQ-012` (settings) after `REQ-010` + `REQ-011`.
-   - `REQ-013` (parity) after `REQ-012`; fix any drift before OPS.
+   - `REQ-014` (compact/detailed setting) after `REQ-012`.
+   - `REQ-013` (parity) after `REQ-014`; fix any drift before OPS.
    - `OPS-008` (historical banners + stale comment cleanup) after `REQ-012`;
      this is the answer to the user’s “I still see old references” report.
    - `OPS-007` last.
@@ -902,6 +968,9 @@ pins, and prove the deployed shape.
 | Settings schema deletion breaks old configs/backend | Do not delete fields; deprecate and keep `mergeSettings`/backend reads. |
 | Test labels pin `Sys`/`Med`/old groups | Move assertions to `field-defs.ts`/`settings-defs.ts` and the parity test; update the old source tests deliberately. |
 | Width budget missed because GTK fonts differ | Measure `panel.measure`; adjust padding/gaps, not options; stop if > ceiling. |
+| Detailed mode overflows a small screen | Detailed is explicitly allowed to be wider; clamp horizontally and record the measured width. Do not shrink the option set. |
+| Two presentations drift | Both must consume `field-defs.ts`; parity covers the `bar_fields` setting and the detailed state. |
+| Switching presentation while a popover is open | Close all popovers synchronously, preserve `UiState`, then re-render and call `syncWindowSize()` once. |
 | Two-monitor test host has one monitor | Use `hyprctl output create headless`; record cleanup; fall back to a unit test with fake descriptors if headless is unavailable. |
 | Contracts/program-tuple blast radius | D9: no `contracts` bump; runtime-owned schema; only runtime + capture + composition pins change. |
 | Cursor split between settings and UI state | D4: cursor stays in `config.json`; the bar writes it; no migration in this epic. |
@@ -924,6 +993,8 @@ pins, and prove the deployed shape.
   catalog, with a working GDK fallback.
 - [ ] Settings no longer shows the duplicate defaults; first run comes from
   code; `capture-ui.json` is authoritative.
+- [ ] `Bar fields: Compact | Detailed` exists and both presentations preserve
+  the same selections; Detailed is the old inline density.
 - [ ] `Enter` still commits; `Space`/`↓` opens; `Esc` closes the popover then
   walks the ladder.
 
@@ -949,6 +1020,10 @@ memory).
 
 **Recording controls:** Top bar (`top-bar`), On hover (`hover`), Always
 visible (`always`). Default `top-bar`.
+
+**Bar fields:** Compact (`compact`), Detailed (`detailed`). Default
+`compact`. Detailed uses the same field vocabulary inline; compact uses the
+dropdown triggers.
 
 **First-run code defaults:** screenshot Region/None/PNG/Clipboard/Cursor Off;
 recording Region/60/MP4/High/System/∞/Cursor On; GIF 15 fps/Original.

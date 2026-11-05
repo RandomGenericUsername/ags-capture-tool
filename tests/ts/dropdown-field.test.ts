@@ -18,9 +18,30 @@ import { fileURLToPath } from "node:url"
 
 import {
   DESIGN_CONTRACT_VERSION,
+  RECORDING_DEFAULTS,
+  RECORDING_FIELDS,
+  RECORDING_FIELD_ORDER,
   SCREENSHOT_DEFAULTS,
   SCREENSHOT_FIELDS,
   SCREENSHOT_FIELD_ORDER,
+  recordingAudioFromValue,
+  recordingAudioOrSize,
+  recordingAudioValue,
+  recordingCursorFromValue,
+  recordingCursorValue,
+  recordingDurationFromValue,
+  recordingDurationValue,
+  recordingFormatFromValue,
+  recordingFormatValue,
+  recordingFpsDef,
+  recordingFpsFromValue,
+  recordingFpsValue,
+  recordingQualityFromValue,
+  recordingQualityValue,
+  recordingSizeFromValue,
+  recordingSizeValue,
+  recordingTargetFromValue,
+  recordingTargetValue,
   screenshotCursorFromValue,
   screenshotCursorValue,
   screenshotDelayFromValue,
@@ -31,6 +52,7 @@ import {
   screenshotOutputValue,
   screenshotTargetFromValue,
   screenshotTargetValue,
+  type RecordingFieldDefs,
   type ScreenshotFieldDefs,
 } from "../../ui/shared/field-defs.ts"
 
@@ -59,22 +81,29 @@ const DROPDOWN = code(read("ui", "shared", "dropdown.ts"))
 const FIELD_DEFS_SOURCE = read("ui", "shared", "field-defs.ts")
 const CSS = read("style.css")
 
+interface ContractLane {
+  fields: string[]
+  defaults: Record<string, string>
+  defs: Record<
+    string,
+    {
+      key?: string
+      desc?: string
+      source?: string
+      options?: string[][]
+      variants?: Record<
+        string,
+        { key: string; desc: string; options: string[][] }
+      >
+    }
+  >
+}
+
 function contract(): {
   version: number
   lanes: {
-    shot: {
-      fields: string[]
-      defaults: Record<string, string>
-      defs: Record<
-        string,
-        {
-          key: string
-          desc: string
-          source?: string
-          options?: string[][]
-        }
-      >
-    }
+    shot: ContractLane
+    rec: ContractLane
   }
 } {
   const match =
@@ -118,6 +147,64 @@ test("the screenshot lane matches the mockup design-contract exactly", () => {
   }
 })
 
+test("the recording lane matches the mockup design-contract exactly", () => {
+  const rec = contract().lanes.rec
+  assert.deepEqual([...RECORDING_FIELD_ORDER], rec.fields)
+  assert.deepEqual(RECORDING_DEFAULTS, rec.defaults)
+
+  for (const field of RECORDING_FIELD_ORDER) {
+    const expected = rec.defs[field]
+    const actual = RECORDING_FIELDS[field as keyof RecordingFieldDefs]
+    assert.ok(expected, `contract has no ${field} definition`)
+
+    if (field === "fps") {
+      const variants = (actual as RecordingFieldDefs["fps"]).variants
+      for (const variant of ["std", "gif"] as const) {
+        const def = expected.variants?.[variant]
+        assert.ok(def, `contract has no ${variant} FPS variant`)
+        assert.equal(variants[variant].key, def.key, `${variant} FPS key drifted`)
+        assert.equal(
+          variants[variant].description,
+          def.desc,
+          `${variant} FPS description drifted`,
+        )
+        assert.deepEqual(
+          variants[variant].options,
+          def.options.map(([value, label, description, icon]) => ({
+            value,
+            label,
+            description,
+            icon,
+          })),
+          `${variant} FPS options drifted`,
+        )
+      }
+      continue
+    }
+
+    const actualDef = actual as
+      | RecordingFieldDefs["target"]
+      | RecordingFieldDefs["monitor"]
+    assert.equal(actualDef.key, expected.key, `${field} key drifted`)
+    assert.equal(actualDef.description, expected.desc, `${field} description drifted`)
+    if (expected.source !== undefined) {
+      assert.equal("source" in actualDef && actualDef.source, expected.source)
+      continue
+    }
+    assert.ok("options" in actualDef)
+    assert.deepEqual(
+      actualDef.options,
+      (expected.options ?? []).map(([value, label, description, icon]) => ({
+        value,
+        label,
+        description,
+        icon,
+      })),
+      `${field} options drifted`,
+    )
+  }
+})
+
 test("the typed-state mapping round-trips every screenshot option", () => {
   for (const [target, value] of [
     ["region", "Region"],
@@ -147,6 +234,93 @@ test("the typed-state mapping round-trips every screenshot option", () => {
   assert.equal(screenshotCursorFromValue("Off"), false)
 })
 
+test("the typed-state mapping round-trips every recording option", () => {
+  for (const [target, value] of [
+    ["region", "Region"],
+    ["screen", "Screen"],
+    ["window", "Window"],
+  ] as const) {
+    assert.equal(recordingTargetValue(target), value)
+    assert.equal(recordingTargetFromValue(value), target)
+  }
+  for (const [format, value] of [
+    ["mp4", "MP4"],
+    ["webm", "WebM"],
+    ["gif", "GIF"],
+  ] as const) {
+    assert.equal(recordingFormatValue(format), value)
+    assert.equal(recordingFormatFromValue(value), format)
+  }
+  for (const [quality, value] of [
+    ["low", "Low"],
+    ["medium", "Medium"],
+    ["high", "High"],
+  ] as const) {
+    assert.equal(recordingQualityValue(quality), value)
+    assert.equal(recordingQualityFromValue(value), quality)
+  }
+  for (const [audio, value] of [
+    ["system", "System"],
+    ["microphone", "Mic"],
+    ["none", "None"],
+  ] as const) {
+    assert.equal(recordingAudioValue(audio), value)
+    assert.equal(recordingAudioFromValue(value), audio)
+  }
+  for (const [size, value] of [
+    ["original", "Original"],
+    ["75%", "75%"],
+    ["50%", "50%"],
+  ] as const) {
+    assert.equal(recordingSizeValue(size), value)
+    assert.equal(recordingSizeFromValue(value), size)
+  }
+  for (const [duration, value] of [
+    [0, "∞"],
+    [10, "10s"],
+    [30, "30s"],
+    [60, "60s"],
+    [15, "15s"],
+  ] as const) {
+    assert.equal(recordingDurationValue(duration), value)
+    assert.equal(recordingDurationFromValue(value), duration)
+  }
+  assert.equal(recordingDurationFromValue("Custom"), null)
+  assert.equal(recordingCursorValue(true), "On")
+  assert.equal(recordingCursorFromValue("Off"), false)
+  assert.equal(recordingFpsFromValue("60"), 60)
+})
+
+test("GIF switches the FPS vocabulary and the Audio/Size slot in place", () => {
+  // The stored std fps/audio are never overwritten by the conditional state;
+  // only the visible vocabulary and the occupied slot change.
+  const recording = {
+    format: "mp4" as "mp4" | "webm" | "gif",
+    fps: 60,
+    gifFps: 15,
+    audio: "system" as "system" | "microphone" | "none",
+  }
+
+  assert.equal(recordingFpsDef(recording.format).key, "FPS")
+  assert.equal(recordingFpsValue(recording), "60")
+  assert.equal(recordingAudioOrSize(recording.format), "audio")
+
+  recording.format = "gif"
+  assert.equal(recordingFpsDef(recording.format).key, "GIF FPS")
+  assert.deepEqual(
+    recordingFpsDef(recording.format).options.map((option) => option.value),
+    ["10", "15", "20", "30"],
+  )
+  assert.equal(recordingFpsValue(recording), "15")
+  assert.equal(recordingAudioOrSize(recording.format), "size")
+
+  recording.format = "mp4"
+  assert.equal(recordingFpsDef(recording.format).key, "FPS")
+  assert.equal(recordingFpsValue(recording), "60", "std FPS survived the round trip")
+  assert.equal(recording.audio, "system", "std audio survived the round trip")
+  assert.equal(recordingAudioOrSize(recording.format), "audio")
+})
+
 test("dropdown.ts exposes the reusable handle and uses Button + Popover + ListBox", () => {
   assert.match(DROPDOWN, /export function dropdownField/)
   assert.match(DROPDOWN, /export interface DropdownFieldHandle/)
@@ -172,12 +346,12 @@ test("dropdown.ts exposes the reusable handle and uses Button + Popover + ListBo
 
 test("opening/closing a popover never calls syncWindowSize; Target still does", () => {
   const openBlocks = WINDOW.match(/onOpen: \(\) => \{[\s\S]*?\n      \},/g) ?? []
-  assert.equal(openBlocks.length, 6, "expected one onOpen per screenshot field")
+  assert.equal(openBlocks.length, 15, "expected one onOpen per field in both lanes")
   for (const block of openBlocks) {
     assert.doesNotMatch(block, /syncWindowSize/)
   }
   const closeBlocks = WINDOW.match(/onClose: \(\) => \{[\s\S]*?\n      \},/g) ?? []
-  assert.equal(closeBlocks.length, 6, "expected one onClose per screenshot field")
+  assert.equal(closeBlocks.length, 15, "expected one onClose per field in both lanes")
   for (const block of closeBlocks) {
     assert.doesNotMatch(block, /syncWindowSize/)
   }

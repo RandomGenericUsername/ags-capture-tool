@@ -475,10 +475,94 @@ row.field-option.field-selected .field-radio label {
   padding: 6px 8px 2px 33px;
 }
 
+.field-custom-spin {
+  min-height: 32px;
+  min-width: 72px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border: 1px solid alpha(@on_surface, 0.22);
+  border-radius: 7px;
+  background-color: alpha(@surface, 0.45);
+  color: @on_surface;
+}
+
+.field-custom-spin:focus-within {
+  border-color: @primary;
+  box-shadow: 0 0 0 2px alpha(@primary, 0.2);
+}
+
+.field-custom-unit {
+  font-size: 11px;
+  color: alpha(@on_surface, 0.55);
+}
+
+.field-custom-set {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid alpha(@primary, 0.45);
+  border-radius: 7px;
+  background-color: alpha(@primary, 0.12);
+  color: @primary;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .field-custom-hint {
   padding: 6px 4px 2px;
   font-size: 9.5px;
   color: alpha(@on_surface, 0.55);
+}
+
+/* Recording keeps the field values neutral; only the open ring and the
+ * popover selection carry the structural red. */
+.field-recording.field-open button.field-trigger {
+  background-color: alpha(@error, 0.12);
+  border-color: alpha(@error, 0.45);
+  box-shadow: 0 0 0 1px var(--rec-accent), 0 0 0 3px alpha(@error, 0.2);
+}
+
+.field-recording.field-open .field-key,
+.field-recording.field-open .field-chevron {
+  color: var(--rec-accent);
+}
+
+.field-popover-recording row.field-option.field-selected {
+  background-color: alpha(@error, 0.12);
+}
+
+.field-popover-recording row.field-option.field-selected .field-option-icon {
+  color: var(--rec-accent);
+}
+
+.field-popover-recording row.field-option.field-selected .field-radio {
+  background-color: var(--rec-accent);
+  border-color: var(--rec-accent);
+}
+
+.field-popover-recording row.field-option.field-selected .field-radio label {
+  color: @on_error;
+}
+
+.field-popover-recording row.field-option:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--rec-accent);
+}
+
+.field-popover-recording .field-custom-spin:focus-within {
+  border-color: var(--rec-accent);
+  box-shadow: 0 0 0 2px alpha(@error, 0.2);
+}
+
+.field-popover-recording .field-custom-set {
+  border-color: alpha(@error, 0.45);
+  background-color: alpha(@error, 0.12);
+  color: var(--rec-accent);
+}
+
+/* Structural recording red on the bar plate: the red edge and the 2px tally
+ * line are the lane identity; the field values stay neutral. */
+.capture-shell.recording .capture-bar.open {
+  border-color: alpha(@error, 0.38);
+  box-shadow: inset 0 2px 0 var(--rec-accent);
 }
 
 /* --------------------------------------------------- capture-drawn cluster
@@ -630,7 +714,6 @@ window.capture-cluster-window {
 /* S4 has no separate HUD vocabulary: both the top-bar cluster and the
    capture hover row render the shared `.rec-*` design above. */
 
-.bar-custom-duration spinbutton,
 .bar-offset-spin {
   min-height: 30px;
   padding-left: 8px;
@@ -784,17 +867,6 @@ window.capture-cluster-window {
   background-color: @primary;
   border-color: transparent;
   color: @on_primary;
-}
-
-/* Inline custom-duration editor (revealed by the Custom pill). */
-.custom-duration spinbutton {
-  min-height: 36px;
-  border: 1px solid alpha(@on_surface, 0.12);
-  border-radius: 9px;
-  background-color: alpha(@surface, 0.45);
-  color: @on_surface;
-  padding-left: 8px;
-  padding-right: 8px;
 }
 
 /* ----------------------------------------------------------- Primary CTA */

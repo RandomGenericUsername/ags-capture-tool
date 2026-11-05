@@ -116,32 +116,85 @@ test("S1 screenshot renders one dropdown trigger per field, not option groups", 
   }
 })
 
-test("S1 recording keeps the capture vocabulary and the GIF/duration extras", () => {
+test("S1 recording renders one dropdown trigger per field, not option groups", () => {
+  // EPIC-002 REQ-010: the recording lane's alternatives moved into the shared
+  // field popovers. The page owns only the order; ClassicWindow builds the
+  // handles. Field order is asserted against the mockup in
+  // `dropdown-field.test.ts`.
+  for (const field of [
+    "target",
+    "monitor",
+    "fps",
+    "format",
+    "quality",
+    "audio",
+    "size",
+    "duration",
+    "cursor",
+  ]) {
+    assert.match(
+      RECORDING,
+      new RegExp(`fields\\.${field}\\.root`),
+      `missing recording field ${field}`,
+    )
+  }
+  assert.doesNotMatch(RECORDING, /bar-group|bar-pill/, "no side-by-side option group remains")
+  assert.match(
+    RECORDING,
+    /fields\.target\.root[\s\S]*fields\.monitor\.root[\s\S]*fields\.fps\.root[\s\S]*fields\.format\.root[\s\S]*fields\.quality\.root[\s\S]*fields\.audio\.root[\s\S]*fields\.size\.root[\s\S]*fields\.duration\.root[\s\S]*fields\.cursor\.root/,
+  )
+
+  // Every old recording option survives in the pure contract, not in the page.
+  const defs = read("ui", "shared", "field-defs.ts")
   for (const label of [
     "Region",
     "Screen",
     "Window",
-    "24",
-    "30",
-    "60",
+    "24 fps",
+    "30 fps",
+    "60 fps",
+    "10 fps",
+    "15 fps",
+    "20 fps",
     "Low",
-    "Med",
+    "Medium",
     "High",
-    "Sys",
+    "System",
     "Mic",
     "None",
     "MP4",
     "WebM",
     "GIF",
+    "Original",
+    "75%",
+    "50%",
     "∞",
     "10s",
     "30s",
     "60s",
     "Custom",
-    "Cursor",
+    "On",
     "Off",
   ]) {
-    assert.match(RECORDING, new RegExp(`label="${label}"`), `missing recording pill ${label}`)
+    assert.match(defs, new RegExp(`label: "${label}"`), `missing recording option ${label}`)
+  }
+
+  // The active value reaches every trigger from the one state-to-UI path.
+  for (const field of [
+    "target",
+    "fps",
+    "format",
+    "quality",
+    "audio",
+    "size",
+    "duration",
+    "cursor",
+  ]) {
+    assert.match(
+      WINDOW,
+      new RegExp(`recordingFields\\.${field}\\.setValue\\(`),
+      `applyStateToUi does not set ${field}`,
+    )
   }
 })
 

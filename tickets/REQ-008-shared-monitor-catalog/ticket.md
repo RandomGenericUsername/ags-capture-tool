@@ -2,7 +2,7 @@
 id: REQ-008
 title: "Shared monitor catalog service"
 kind: requirement
-status: proposed
+status: done
 lane: 3 — ticket-multi
 links:
   openspec: none
@@ -32,18 +32,18 @@ The runtime's wallpaper code and the capture tool consume the same descriptors.
 
 ## Acceptance
 
-- [ ] `dotfiles-runtime monitors list --format json` emits `schema_version: 1`,
+- [x] `dotfiles-runtime monitors list --format json` emits `schema_version: 1`,
   `source`, and `monitors[]` with the contract in `design.md` §2.2.
-- [ ] Disabled and mirrored outputs are filtered; order is x, y, connector.
-- [ ] Headless/unavailable returns exit 0 with `source: "unavailable"` and
+- [x] Disabled and mirrored outputs are filtered; order is x, y, connector.
+- [x] Headless/unavailable returns exit 0 with `source: "unavailable"` and
   `monitors: []`.
-- [ ] `IMonitorSource.detect_monitors()` behavior and all existing runtime tests
+- [x] `IMonitorSource.detect_monitors()` behavior and all existing runtime tests
   are unchanged.
-- [ ] A runtime-owned schema at
+- [x] A runtime-owned schema at
   `dotfiles-runtime/contracts/schemas/monitors-list.schema.json` validates the
   real output in a test.
-- [ ] No daemon, no state write, no XDG write.
-- [ ] Runtime `make gates` passes; CHANGELOG/README/ticket/INDEX updated.
+- [x] No daemon, no state write, no XDG write.
+- [x] Runtime `make gates` passes; CHANGELOG/README/ticket/INDEX updated.
 
 ## Implementation map
 

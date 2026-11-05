@@ -17,6 +17,7 @@
 import { Astal, Gdk, Gtk } from "ags/gtk4"
 import GLib from "gi://GLib?version=2.0"
 import { barMarginTop } from "../../domain/bar-placement"
+import { mergeMonitors } from "../../domain/monitor-catalog"
 import {
   applyHoverLeaveGrace,
   barFootprint,
@@ -458,8 +459,6 @@ export function ClassicWindow(
   let hudRow: Gtk.Box | null = null
   let hudPopup: Gtk.Popover | null = null
   let hudCluster: RecordingClusterHandle | null = null
-  let monitorChip: Gtk.Button | null = null
-  let monitorChipLabel: Gtk.Label | null = null
   let screenshotPage: ScreenshotPageHandle | null = null
   let recordingPage: RecordingPageHandle | null = null
   let settingsPage: SettingsPageHandle | null = null
@@ -472,6 +471,25 @@ export function ClassicWindow(
   // same objects. The recording lane still uses the old group arrays until
   // REQ-010 converts it.
   let activePopover: DropdownFieldHandle | null = null
+
+  // REQ-011: the GDK topology is the trigger for a catalog re-read. The
+  // signature changes only when the targetable set or its geometry changes, so
+  // a selection repaint does not spawn the CLI again (the adapter also caches
+  // for 2 s, but this keeps even the cache lookup off the hot path).
+  let monitorSignature = ""
+  let refreshingMonitors = false
+  let windowDestroyed = false
+
+  function monitorSignatureOf(
+    monitors: readonly { connector: string | null; geometry: { x: number; y: number; width: number; height: number } }[],
+  ): string {
+    return monitors
+      .map(
+        (monitor) =>
+          `${monitor.connector ?? ""}@${monitor.geometry.x},${monitor.geometry.y},${monitor.geometry.width},${monitor.geometry.height}`,
+      )
+      .join("|")
+  }
 
   function popoverPosition(): Gtk.PositionType {
     return config.bar.position === "top" ? Gtk.PositionType.BOTTOM : Gtk.PositionType.TOP
@@ -508,7 +526,7 @@ export function ClassicWindow(
       popoverPosition,
       onOpen: () => {
         activePopover = screenshotFields.monitor
-        refreshMonitorFields()
+        void refreshMonitorFields()
       },
       onClose: () => {
         if (activePopover === screenshotFields.monitor) activePopover = null
@@ -631,7 +649,7 @@ export function ClassicWindow(
       popoverPosition,
       onOpen: () => {
         activePopover = recordingFields.monitor
-        refreshMonitorFields()
+        void refreshMonitorFields()
       },
       onClose: () => {
         if (activePopover === recordingFields.monitor) activePopover = null
@@ -812,27 +830,57 @@ export function ClassicWindow(
     activePopover = null
   }
 
-  function refreshMonitorFields() {
+  /**
+   * Re-read the runtime catalog and rebuild both Monitor popovers (REQ-011).
+   *
+   * GDK stays authoritative: `mergeMonitors()` drops catalog-only connectors
+   * and keeps a GDK-only monitor with a connector+geometry fallback. The
+   * current pick is preserved when it is still connected; otherwise it falls
+   * back to the focused output, then the first canonical row.
+   *
+   * Never rejects: the adapter turns every CLI failure into `[]`.
+   */
+  async function refreshMonitorFields(): Promise<void> {
+    const catalog = await ports.monitorCatalog.list()
+    if (windowDestroyed) return
     const monitors = selection.monitors()
-    const focused = selection.focused()
+    const merged = mergeMonitors(monitors, catalog, selection.focused())
+    const options: FieldOptionDef[] = merged.map((monitor) => ({
+      value: monitor.connector,
+      label: monitor.label,
+      description: monitor.detail,
+      icon: "i-screen",
+    }))
+    const connected = new Set(merged.map((monitor) => monitor.connector))
     const pending = selection.pending()
+    const wanted =
+      pending.target === "screen"
+        ? (pending.monitor ?? selection.focused())
+        : selection.focused()
+    const focused = merged.find((monitor) => monitor.focused)?.connector ?? null
     const picked =
-      pending.target === "screen" ? (pending.monitor ?? focused) : focused
-    const options: FieldOptionDef[] = monitors
-      .filter((monitor) => monitor.connector !== null)
-      .map((monitor) => {
-        const connector = monitor.connector as string
-        const detail = `${monitor.geometry.width}×${monitor.geometry.height}`
-        return {
-          value: connector,
-          label: connector,
-          description: connector === focused ? `${detail} · focused` : detail,
-          icon: "i-screen",
-        }
-      })
+      wanted !== null && connected.has(wanted)
+        ? wanted
+        : (focused ?? merged[0]?.connector ?? null)
+
     for (const field of [screenshotFields.monitor, recordingFields.monitor]) {
       field.setOptions(options)
       if (picked !== null) field.setValue(picked)
+    }
+
+    // Hotplug: an explicit pick that disappeared must not survive into the
+    // pending outline or the commit argv. Move it to the same fallback the
+    // trigger now shows.
+    if (
+      pending.target === "screen" &&
+      pending.monitor !== null &&
+      !connected.has(pending.monitor) &&
+      picked !== null &&
+      !refreshingMonitors
+    ) {
+      refreshingMonitors = true
+      selection.selectMonitor(picked)
+      refreshingMonitors = false
     }
   }
 
@@ -841,7 +889,7 @@ export function ClassicWindow(
   }
 
   /**
-   * Keep the bar's commit affordance and `Monitor n` chip in step with the
+   * Keep the bar's commit affordance and `Monitor n` badge in step with the
    * pending selection. The overlay itself is rendered by the controller; this
    * only mirrors "can commit?" and the screen target's monitor identity.
    */
@@ -849,11 +897,10 @@ export function ClassicWindow(
     const modeOpen = isModeOpen(barState)
     if (cta) cta.sensitive = modeOpen && selection.canCommit()
     const screen = modeOpen && currentTarget() === "screen"
-    const count = selection.monitors().length
+    const monitors = selection.monitors()
     // D11: the Monitor field appears for Screen when more than one output is
-    // targetable. Both lanes use the field; the old cycle chip is retired by
-    // REQ-011 and stays unmapped here.
-    const showMonitor = screen && count > 1
+    // targetable. Both lanes use the same field; there is no cycle button.
+    const showMonitor = screen && monitors.length > 1
     screenshotFields.monitor.setVisible(barState.view === "screenshot" && showMonitor)
     recordingFields.monitor.setVisible(barState.view === "recording" && showMonitor)
     if (showMonitor) {
@@ -867,7 +914,14 @@ export function ClassicWindow(
         if (barState.view === "recording") recordingFields.monitor.setValue(picked)
       }
     }
-    if (monitorChip) monitorChip.visible = false
+    // The controller re-reads GDK topology on the existing hotplug signal and
+    // notifies its subscribers. A changed targetable set/geometry is the one
+    // trigger that re-reads the catalog while the lane is open.
+    const signature = monitorSignatureOf(monitors)
+    if (signature !== monitorSignature) {
+      monitorSignature = signature
+      void refreshMonitorFields()
+    }
   }
 
   /**
@@ -1285,7 +1339,8 @@ export function ClassicWindow(
     screenshotFields.format.setValue(screenshotFormatValue(screenshot.format))
     screenshotFields.output.setValue(screenshotOutputValue(screenshot.save))
     screenshotFields.cursor.setValue(screenshotCursorValue(config.screenshot.cursor))
-    refreshMonitorFields()
+    monitorSignature = monitorSignatureOf(selection.monitors())
+    void refreshMonitorFields()
     recordingFields.target.setValue(recordingTargetValue(recording.target))
     applyRecordingMode()
     recordingFields.format.setValue(recordingFormatValue(recording.format))
@@ -1380,6 +1435,7 @@ export function ClassicWindow(
         })
         self.connect("destroy", () => {
           // No poll, cached footprint or armed state survives the window.
+          windowDestroyed = true
           closeAllFields()
           for (const field of Object.values(screenshotFields)) field.destroy()
           for (const field of Object.values(recordingFields)) field.destroy()
@@ -1587,26 +1643,6 @@ export function ClassicWindow(
                 recordingPage = handle
               }}
             />
-
-            <button
-              visible={false}
-              class="bar-pill monitor-chip"
-              tooltipText="Switch the pending screen pick"
-              onClicked={() => {
-                selection.cycleMonitor()
-                applyBarState()
-              }}
-              $={(self) => {
-                monitorChip = self
-              }}
-            >
-              <label
-                label="Monitor 1"
-                $={(self) => {
-                  monitorChipLabel = self
-                }}
-              />
-            </button>
 
             <button
               class="bar-cta"

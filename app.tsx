@@ -1,5 +1,6 @@
 import app from "ags/gtk4/app"
 import { Gdk } from "ags/gtk4"
+import { execAsync } from "ags/process"
 import style from "./style.css"
 // Theming through the platform Theme port (spine AD-13): the adapter owns WHICH
 // artifact is applied — the stable `colors.css` pointer, repointed on every
@@ -15,6 +16,7 @@ import { hyprlandMonitorFocus } from "./adapters/hyprland-monitor-focus"
 import { hyprlandMonitorReservedTop } from "./adapters/hyprland-monitor-reserved"
 import { hyprlandPointerPosition } from "./adapters/hyprland-pointer-position"
 import { hyprlandWindowClients } from "./adapters/hyprland-window-clients"
+import { runtimeMonitorCatalog } from "./adapters/runtime-monitor-catalog"
 import {
   createMonitorWindowSet,
   installFocusedWindowLookup,
@@ -89,6 +91,7 @@ function buildPorts(): CapturePorts {
     backendProbe: execBackendProbe(),
     monitorReservedTop: hyprlandMonitorReservedTop(),
     pointerPosition: hyprlandPointerPosition(),
+    monitorCatalog: runtimeMonitorCatalog((argv) => execAsync([...argv])),
   }
 }
 

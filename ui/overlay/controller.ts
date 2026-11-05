@@ -12,6 +12,7 @@
 // pin the Esc ladder, commit lock and INV-4 refresh survival without a display.
 // ---------------------------------------------------------------------------
 
+import { compareMonitors } from "../../domain/monitor-catalog"
 import type { MonitorDescriptor } from "../../domain/monitor-registry"
 import type { ClientRect, PendingPick, Rect, Selection } from "../../domain/selection"
 import { clientByAddress, hitClient } from "../../domain/selection"
@@ -89,7 +90,6 @@ export interface SelectionController {
   hoverAt(x: number, y: number): void
   leave(): void
   selectMonitor(connector: string): void
-  cycleMonitor(): void
   canCommit(): boolean
   selection(): Selection | null
   /** Commit and lock; returns the finished selection, overlay hidden. */
@@ -106,7 +106,20 @@ export function createSelectionController(
   const { topology, focus, clients } = options
   const hosts: OverlayHost[] = []
   const listeners: Array<() => void> = []
-  let monitors: MonitorDescriptor[] = topology.list().map((entry) => entry.descriptor)
+
+  /**
+   * The targetable set in canonical order. The SAME comparator drives the
+   * Monitor dropdown (`mergeMonitors`) and the `Monitor n` badge, so the badge
+   * index, the dropdown rows and the pending pick cannot disagree.
+   */
+  function readMonitors(): MonitorDescriptor[] {
+    return topology
+      .list()
+      .map((entry) => entry.descriptor)
+      .sort(compareMonitors)
+  }
+
+  let monitors: MonitorDescriptor[] = readMonitors()
   let session: SelectionSession = emptySelection()
   let mode: BarMode = "screenshot"
   let hoverAddress: string | null = null
@@ -160,7 +173,7 @@ export function createSelectionController(
   }
 
   topology.subscribe(() => {
-    monitors = topology.list().map((entry) => entry.descriptor)
+    monitors = readMonitors()
     renderAll()
   })
   focus.subscribe(() => renderAll())
@@ -246,18 +259,6 @@ export function createSelectionController(
     },
     selectMonitor(connector): void {
       session = setScreenMonitor(session, connector, focusedConnector())
-      renderAll()
-    },
-    cycleMonitor(): void {
-      if (!session.active || session.target !== "screen" || monitors.length === 0) return
-      const focused = focusedConnector()
-      const current =
-        session.pending.target === "screen"
-          ? (session.pending.monitor ?? focused)
-          : focused
-      const at = monitors.findIndex((monitor) => monitor.connector === current)
-      const next = monitors[(at < 0 ? 0 : at + 1) % monitors.length]
-      session = setScreenMonitor(session, next.connector, focused)
       renderAll()
     },
     canCommit(): boolean {

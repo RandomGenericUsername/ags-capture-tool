@@ -12,17 +12,25 @@ import type { ClientRect } from "../../domain/selection.ts"
 import type { OverlayHost, OverlayView } from "../../ui/overlay/controller.ts"
 import { createSelectionController } from "../../ui/overlay/controller.ts"
 
-function monitor(connector: string): MonitorDescriptor {
+function monitor(
+  connector: string,
+  geometry: MonitorDescriptor["geometry"] = { x: 0, y: 0, width: 1920, height: 1080 },
+): MonitorDescriptor {
   return {
     connector,
     model: connector,
     manufacturer: "",
-    geometry: { x: 0, y: 0, width: 1920, height: 1080 },
+    geometry,
   }
 }
 
-function harness(clients: ClientRect[] = []) {
-  const monitors = [monitor("eDP-1"), monitor("HDMI-2")]
+function harness(
+  clients: ClientRect[] = [],
+  monitors: MonitorDescriptor[] = [
+    monitor("eDP-1"),
+    monitor("HDMI-2", { x: 1920, y: 0, width: 2560, height: 1440 }),
+  ],
+) {
   let focused: string | null = "eDP-1"
   let listener: (() => void) | null = null
   const topology = {
@@ -157,16 +165,47 @@ test("clicking another client re-pins; clicking empty space keeps the pin", () =
   assert.equal(h.last().pinned?.address, "0xdef", "empty space is not an unpin")
 })
 
-test("screen cycle swaps the monitor and Esc resets to the focused default", () => {
+test("selectMonitor swaps the pending screen pick and Esc resets to the focused default", () => {
   const h = harness()
   h.controller.begin("screenshot", "screen")
   assert.equal(h.controller.monitorIndex("eDP-1"), 1)
   assert.equal(h.controller.monitorIndex("HDMI-2"), 2)
-  h.controller.cycleMonitor()
+  h.controller.selectMonitor("HDMI-2")
   assert.deepEqual(h.last().pending, { target: "screen", monitor: "HDMI-2" })
+  assert.equal(h.last().monitorIndex, 2, "the badge follows the explicit pick")
   assert.equal(h.controller.escape(), false)
   assert.deepEqual(h.last().pending, { target: "screen", monitor: null })
   assert.equal(h.controller.escape(), true)
+})
+
+test("selection.monitors() is canonically sorted so badge and dropdown agree", () => {
+  // Out-of-registration order: the right-hand output is listed first.
+  const h = harness(
+    [],
+    [
+      monitor("HDMI-2", { x: 1920, y: 0, width: 2560, height: 1440 }),
+      monitor("eDP-1", { x: 0, y: 0, width: 1920, height: 1080 }),
+    ],
+  )
+  assert.deepEqual(
+    h.controller.monitors().map((entry) => entry.connector),
+    ["eDP-1", "HDMI-2"],
+    "x ascending, not registration order",
+  )
+  assert.equal(h.controller.monitorIndex("eDP-1"), 1)
+  assert.equal(h.controller.monitorIndex("HDMI-2"), 2)
+  h.controller.begin("screenshot", "screen")
+  h.controller.selectMonitor("HDMI-2")
+  assert.equal(h.last().monitorIndex, 2)
+  assert.deepEqual(h.last().pending, { target: "screen", monitor: "HDMI-2" })
+})
+
+test("selecting the focused monitor stays the default, not an explicit pick", () => {
+  const h = harness()
+  h.controller.begin("screenshot", "screen")
+  h.controller.selectMonitor("eDP-1")
+  assert.deepEqual(h.last().pending, { target: "screen", monitor: null })
+  assert.equal(h.last().monitorIndex, 1)
 })
 
 test("commit returns the finished selection, hides every overlay and locks", () => {

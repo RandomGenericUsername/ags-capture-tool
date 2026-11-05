@@ -39,7 +39,7 @@ runtime `v0.5.2`, provision `v0.1.33`, composition `f84dc204`.
 - [x] `REQ-008` — Shared monitor catalog service (`dotfiles-runtime` + capture consumer contract)
 - [x] `REQ-009` — Dropdown primitive + screenshot lane
 - [x] `REQ-010` — Recording lane dropdowns + conditional states
-- [ ] `REQ-011` — Dynamic monitor dropdown + remove cycle chip
+- [x] `REQ-011` — Dynamic monitor dropdown + remove cycle chip
 - [ ] `REQ-012` — Settings cleanup + persistence
 - [ ] `REQ-014` — Compact/detailed bar field presentation setting
 - [ ] `REQ-013` — Mockup parity harness

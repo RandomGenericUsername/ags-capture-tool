@@ -10,7 +10,7 @@
   - [REQ-002-capture-bar-shell/ticket.md](./REQ-002-capture-bar-shell/ticket.md) — Capture bar shell: five-state S0–S4, placement + on-demand pills (`done`)
   - [REQ-003-selection-first-flow/ticket.md](./REQ-003-selection-first-flow/ticket.md) — Selection-first capture flow: pending protocol + irreversible commit (`done`)
   - [REQ-004-recording-lifecycle/ticket.md](./REQ-004-recording-lifecycle/ticket.md) — Recording lifecycle: red accent + live HUD (`done`)
-- [EPIC-002-monitor-catalog-dropdowns/ticket.md](./EPIC-002-monitor-catalog-dropdowns/ticket.md) — Shared monitor catalog + capture dropdown UI | `in-progress` | 8/9 children done | done-when: parity harness green, live evidence, runtime v0.6.0 + capture v0.4.0 pinned, no mockup drift | current mockup: `EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html`
+- [EPIC-002-monitor-catalog-dropdowns/ticket.md](./EPIC-002-monitor-catalog-dropdowns/ticket.md) — Shared monitor catalog + capture dropdown UI | `done` | 9/9 children done | done-when: parity harness green, live evidence, runtime v0.6.0 + capture v0.4.0 pinned, no mockup drift | current mockup: `EPIC-002-monitor-catalog-dropdowns/mockups/capture-tool-dropdowns.html`
   - [REQ-008-shared-monitor-catalog/ticket.md](./REQ-008-shared-monitor-catalog/ticket.md) — Shared monitor catalog service (`done`)
   - [REQ-009-dropdown-primitive-screenshot/ticket.md](./REQ-009-dropdown-primitive-screenshot/ticket.md) — Dropdown primitive + screenshot lane (`done`)
   - [REQ-010-recording-lane-dropdowns/ticket.md](./REQ-010-recording-lane-dropdowns/ticket.md) — Recording lane dropdowns + conditional states (`done`)
@@ -19,7 +19,7 @@
   - [REQ-014-bar-field-presentation/ticket.md](./REQ-014-bar-field-presentation/ticket.md) — Compact/detailed bar field presentation setting (`done`)
   - [REQ-013-mockup-parity-harness/ticket.md](./REQ-013-mockup-parity-harness/ticket.md) — Mockup parity harness (`done`)
   - [OPS-008-docs-reconciliation/ticket.md](./OPS-008-docs-reconciliation/ticket.md) — Documentation reconciliation (`done`)
-  - [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins (`proposed`)
+  - [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins (`done`)
 
 ## Requirements
 
@@ -53,7 +53,7 @@
 - [OPS-005-t4-refinement-intake/ticket.md](./OPS-005-t4-refinement-intake/ticket.md) — Refinement intake for capture v0.2.0 (T4): JD live pass recorded; C5+C17 confirmed, deferred list recorded | `done` | worktree none, branch main | filed BUG-001/BUG-002; v0.2.1 retest closed both and JD live-confirmed them; C3 is expected hover behaviour, positive path verified reachable on probe (no BUG-003); 3 not-bug, 1 accepted, 10 deferred
 - [OPS-006-ci-conformance-checkout/ticket.md](./OPS-006-ci-conformance-checkout/ticket.md) — Fix CI conformance: ignore the contracts checkout in the source walk | `done` | worktree none, branch main | root cause: CI checks out contracts inside ROOT; local `.dev` sibling masked it
 - [OPS-008-docs-reconciliation/ticket.md](./OPS-008-docs-reconciliation/ticket.md) — Documentation reconciliation: historical mockup/design + stale comments | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
-- [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins | `proposed` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
+- [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 
 ## Spikes
 

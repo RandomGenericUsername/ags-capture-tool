@@ -50,15 +50,21 @@ export function ScreenshotPage(props: ScreenshotPageProps) {
       visible={false}
       class="bar-open-view screenshot-view"
       orientation={Gtk.Orientation.HORIZONTAL}
-      spacing={0}
+      spacing={4}
       $={(self) => {
         screenshotView = self
+        const lead = new Gtk.Box()
+        lead.add_css_class("bar-divider")
+        self.append(lead)
         self.append(fields.target.root)
         self.append(fields.monitor.root)
         self.append(fields.delay.root)
         self.append(fields.format.root)
         self.append(fields.output.root)
         self.append(fields.cursor.root)
+        const trail = new Gtk.Box()
+        trail.add_css_class("bar-divider")
+        self.append(trail)
       }}
     />
   )

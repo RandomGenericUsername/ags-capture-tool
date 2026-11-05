@@ -53,9 +53,12 @@ export function RecordingPage(props: RecordingPageProps) {
       visible={false}
       class="bar-open-view recording-view"
       orientation={Gtk.Orientation.HORIZONTAL}
-      spacing={0}
+      spacing={4}
       $={(self) => {
         recordingView = self
+        const lead = new Gtk.Box()
+        lead.add_css_class("bar-divider")
+        self.append(lead)
         self.append(fields.target.root)
         self.append(fields.monitor.root)
         self.append(fields.fps.root)
@@ -65,6 +68,9 @@ export function RecordingPage(props: RecordingPageProps) {
         self.append(fields.size.root)
         self.append(fields.duration.root)
         self.append(fields.cursor.root)
+        const trail = new Gtk.Box()
+        trail.add_css_class("bar-divider")
+        self.append(trail)
       }}
     />
   )

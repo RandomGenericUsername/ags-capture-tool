@@ -36,6 +36,9 @@ option bar. Both presentations read the same `field-defs` vocabulary.
 - [ ] Both presentations consume `field-defs.ts`; no duplicate option table.
 - [ ] The detailed row keeps the mode tabs, dividers, CTA and recording
   structural red; it does not use popovers.
+- [ ] Detailed duration `Custom` reveals the inline seconds editor (the old
+  behavior); compact keeps the editor inside the popover. The bar may grow in
+  detailed mode only.
 - [ ] Tests: default compact; corrupt -> compact; detailed renders every option;
   switching preserves state; one resize per switch; parity covers both.
 - [ ] Gates pass; live evidence `detailed-shot.png`, `detailed-rec.png`,

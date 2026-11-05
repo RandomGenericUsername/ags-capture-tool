@@ -346,7 +346,10 @@ Implementation rules:
   differs.
 - The detailed row keeps the mode tabs, dividers, CTA and recording structural
   red. It does not use popovers, so the keyboard contract is the old pill one:
-  Enter commits, Esc backs out, Space selects a focused pill (D2: Enter never selects).
+  Enter commits, Esc backs out, Space selects a focused pill (D2: Enter never
+  selects). Detailed duration `Custom` reveals an inline seconds editor next to
+  the group (the old behavior); the bar may grow. Compact keeps that editor
+  inside the duration popover.
 - `syncWindowSize()` runs once after the switch. The compact width budgets do
   not apply; detailed is explicitly allowed to be wider and may need horizontal
   clamping on small screens.

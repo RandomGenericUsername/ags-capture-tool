@@ -14,7 +14,8 @@
 //      work) where work only runs refreshAppAppearance();
 //   4. the capture request surface (screenshot/record/settings + cluster) is
 //      unchanged and no new request command is added;
-//   5. the panel width comes from the layout token, not a hard TSX constant;
+//   5. the panel width is CSS-owned: no capture layout token or widthRequest
+//      plumbing survives in TSX;
 //   6. style.css still carries the bundled glass fallback and --rec-accent.
 //
 // Static, no desktop stack needed.
@@ -195,27 +196,32 @@ assert.doesNotMatch(
   "request command dispatch stays in lib/request-dispatch, not app.tsx",
 )
 
-// ── 5. Panel width is the TSX-owned layout token ──────────────────────────
+// ── 5. Panel width is CSS-owned, with no capture layout token ─────────────
 
-assert.match(
+assert.doesNotMatch(
   app,
-  /appearance\.value\(\s*"layout\.ags-capture\.panel-width",\s*560\s*\)/,
-  "the panel width must come from the ags-capture layout token, with 560 as fallback",
+  /layout\.ags-capture\.panel-width/,
+  "app.tsx must not read the removed capture layout token",
+)
+assert.doesNotMatch(
+  app,
+  /appearance\.value\(/,
+  "the app must not read any capture layout token",
 )
 assert.match(
   app,
-  /ClassicWindow\(monitor, ports, state, selection, panelWidth\)/,
-  "the accessor is passed to the window instead of a duplicated constant",
+  /ClassicWindow\(monitor, ports, state, selection\)/,
+  "the window is constructed without a panel-width argument",
 )
-assert.match(
+assert.doesNotMatch(
   window,
-  /panelWidth=\{panelWidth\}/,
-  "the window passes the accessor to the settings page",
+  /panelWidth/,
+  "ClassicWindow must not plumb a panel-width prop",
 )
-assert.match(
+assert.doesNotMatch(
   settings,
-  /widthRequest=\{panelWidth\.peek\(\)\}/,
-  "the settings panel reads the layout token with peek() for a plain pixel number",
+  /panelWidth|widthRequest/,
+  "SettingsPage relies on style.css min-width instead of requesting a width",
 )
 
 // ── 6. Bundled glass fallback and recording accent survive ────────────────

@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.5.0 — 2026-11-05
+
+The capture app now consumes the frozen skin plane: the runtime-expanded
+`ags-capture/skin.css` overlays the bundled glass stylesheet at USER priority.
+
+### Added
+
+- One module-level `createAppSkin({ configDir: "ags-capture" })`, applied
+  immediately after the palette in `main()`. The skin's composed provider
+  carries the live palette roles plus the runtime-expanded skin CSS.
+- The adapter's own artifact monitor reloads `skin.css` / `skin.json`; no
+  capture request command was added.
+
+### Changed
+
+- Pins move to `ags-platform` `v0.8.0` and `contracts` `v0.6.0` (the
+  app-scoped Skin adapter and the 24-token skin plane); CI checks the same
+  tags.
+
+### Unchanged
+
+- `style.css` remains the bundled glass fallback, including its local
+  `--rec-accent` recording mechanism.
+- The palette-refresh handler, window structure, classes, gestures, sizes and
+  behavior are unchanged; no layout tokens are consumed in v1.
+
 ## v0.4.0 — 2026-11-04
 
 The capture bar now presents options as compact field dropdowns, with a

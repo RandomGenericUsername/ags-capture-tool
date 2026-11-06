@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.6.0 — 2026-11-06
+
+The capture app now consumes the unified v2 Appearance plane: palette, skin and
+mode are one generation installed by one composed provider.
+
+### Added
+
+- One module-level `createAppearance({ configDir: "ags-capture" })`, applied in
+  `main()`.
+- `layout.ags-capture.panel-width` (fallback `560`) drives the settings panel
+  width from TSX.
+
+### Changed
+
+- The `palette-refresh` path uses
+  `createAppearanceRefreshHandler(appearance, work)`; the platform helper
+  re-applies the whole appearance before the app-owned
+  `refreshAppAppearance()` fan-out.
+- Pins move to `ags-platform` `v0.9.0` and `contracts` `v0.7.0`; CI checks the
+  same tags.
+
+### Removed
+
+- The split `theme.apply()` / `skin.apply()` startup, the v1 Theme/Skin imports
+  and the app-local palette-refresh wrapper.
+
+### Unchanged
+
+- `style.css` remains the bundled glass fallback, including its local
+  `--rec-accent` recording mechanism.
+- The capture request surface, window structure, classes, gestures, sizes and
+  behavior are unchanged; no request command was added.
+
 ## v0.5.0 — 2026-11-05
 
 The capture app now consumes the frozen skin plane: the runtime-expanded

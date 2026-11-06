@@ -5,8 +5,8 @@
 // This is the repo-local gate the standalone contract requires:
 //   1. `app.manifest.json` is schema-valid and carries the capture identity;
 //   2. app.tsx / window / stylesheet / launcher / keybind agree with it;
-//   3. the live palette-refresh handler is real: it re-applies the Theme
-//      pointer AND reloads generated icons in every live per-monitor window,
+//   3. the live palette-refresh handler is real: it re-applies the whole
+//      appearance AND reloads generated icons in every live per-monitor window,
 //      without closing the active surface or resetting shared UI state;
 //   4. the shared dev-flow template (AGENTS, tickets, guard, Makefile, CI,
 //      tests, templates/ags-app) is present and the platform's own
@@ -250,7 +250,7 @@ test("the frozen copyable template is present for the next app", () => {
   }
 })
 
-test("the contracts v0.6.0 manifest schema agrees with the platform", () => {
+test("the contracts v0.7.0 manifest schema agrees with the platform", () => {
   const contractsRoot = findContractsRoot()
   assert.notEqual(contractsRoot, null, "cannot find contracts (set CONTRACTS_ROOT)")
   const schema = JSON.parse(
@@ -269,21 +269,21 @@ test("the contracts v0.6.0 manifest schema agrees with the platform", () => {
   )
 })
 
-test("the Makefile pins the v0.8.0 platform / v0.6.0 contracts tuple", () => {
+test("the Makefile pins the v0.9.0 platform / v0.7.0 contracts tuple", () => {
   const makefile = readText("Makefile")
-  assert.match(makefile, /^AGS_PLATFORM_VERSION := v0\.8\.0$/m)
-  assert.match(makefile, /^CONTRACTS_VERSION := v0\.6\.0$/m)
+  assert.match(makefile, /^AGS_PLATFORM_VERSION := v0\.9\.0$/m)
+  assert.match(makefile, /^CONTRACTS_VERSION := v0\.7\.0$/m)
 })
 
 // ── 3. The live handler is real and non-destructive ────────────────────────
 
-test("app.tsx registers the real palette-refresh handler, not a Theme-only ack", () => {
+test("app.tsx registers the real palette-refresh handler through the appearance plane", () => {
   const app = readText("app.tsx")
-  assert.match(app, /from\s+"\.\/lib\/palette-refresh"/)
-  assert.match(app, /createCapturePaletteRefresh\(/)
+  assert.match(app, /from\s+"ags-platform\/ports\/appearance-refresh"/)
+  assert.match(app, /createAppearanceRefreshHandler\(appearance,/)
   assert.match(app, /createCaptureRequestHandler\(paletteRefresh/)
   assert.match(app, /requestHandler,/)
-  assert.match(app, /theme\.apply\(\)/, "the stable Theme pointer is re-applied")
+  assert.match(app, /appearance\.apply\(\)/, "the appearance is applied")
   assert.match(app, /refreshAppAppearance\(\)/, "the generated icons/windows are refreshed")
 })
 
@@ -356,7 +356,7 @@ test("the refresh does not reset selection, draft or the shared UI state", () =>
   assert.doesNotMatch(surface, /settingsPage|screenshotPage|recordingPage/)
 
   const app = readText("app.tsx")
-  const refresh = functionBody(app, "const paletteRefresh = createCapturePaletteRefresh")
+  const refresh = functionBody(app, "const paletteRefresh = createAppearanceRefreshHandler")
   assert.doesNotMatch(refresh, /createUiState\(/)
   assert.doesNotMatch(refresh, /windowSet|get_monitors\(\)/)
 })

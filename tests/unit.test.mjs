@@ -2,9 +2,10 @@
 // Stock-runner unit tests for the capture tool's live palette refresh.
 //
 // These execute the app's real pure modules under plain Node:
-//   - lib/appearance.ts        (ordering, registry, hash idempotence)
-//   - lib/palette-refresh.ts   (the same handler app.tsx registers)
+//   - lib/appearance.ts        (ordering and the per-window registry)
 //   - ui/appearance.ts         (the per-window fan-out)
+//   - the platform's appearance-refresh handler (the same handler app.tsx
+//     registers, including hash idempotence and retry semantics)
 //
 // No AGS/GTK import is reachable from any module loaded here.
 // ---------------------------------------------------------------------------
@@ -12,12 +13,11 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { PALETTE_REFRESH_COMMAND, createPaletteRefreshHandler } from "ags-platform/ports/palette-refresh"
+import { createAppearanceRefreshHandler } from "ags-platform/ports/appearance-refresh"
 import {
   applyAppearance,
-  createAppearanceRefresh,
   createAppearanceRegistry,
 } from "../lib/appearance.ts"
-import { createCapturePaletteRefresh } from "../lib/palette-refresh.ts"
 import { refreshSurfaces } from "../ui/appearance.ts"
 
 const HASH = "appearance-2026-10-27"
@@ -30,6 +30,19 @@ function recorder() {
       clearCaches: () => calls.push("clear"),
       rebuildIcons: () => calls.push("icons"),
       refreshWindow: () => calls.push("window"),
+    },
+  }
+}
+
+/** The platform helper only needs `apply()` from an Appearance. */
+function fakeAppearance() {
+  const calls = { applies: 0 }
+  return {
+    calls,
+    appearance: {
+      apply() {
+        calls.applies += 1
+      },
     },
   }
 }
@@ -77,69 +90,48 @@ test("one failing window does not strand the other windows on the old palette", 
   assert.deepEqual(good.calls, ["clear", "icons", "window"], "the good window was still refreshed")
 })
 
-test("appearance refresh is idempotent by appearance hash", () => {
-  let applies = 0
-  const refresh = createAppearanceRefresh(() => {
-    applies += 1
-  })
-
-  assert.deepEqual(refresh(HASH), { status: "applied" })
-  assert.equal(applies, 1)
-  assert.deepEqual(refresh(HASH), { status: "applied" })
-  assert.equal(applies, 1, "the same hash is a safe no-op")
-  assert.deepEqual(refresh("appearance-next"), { status: "applied" })
-  assert.equal(applies, 2, "a new hash applies again")
-})
-
-test("a failed appearance refresh is retried for the same hash", () => {
-  let applies = 0
-  const refresh = createAppearanceRefresh(() => {
-    applies += 1
-    if (applies === 1) throw new Error("palette not ready")
-  })
-
-  assert.throws(() => refresh(HASH), /palette not ready/)
-  assert.deepEqual(refresh(HASH), { status: "applied" })
-  assert.equal(applies, 2, "the failed hash was not recorded as applied")
-})
-
 // ── The real handler ───────────────────────────────────────────────────────
 
-test("palette-refresh answers once with the protocol's JSON string", () => {
+test("palette-refresh applies the appearance, runs work and answers once", () => {
   const responses = []
-  let applies = 0
-  const handler = createCapturePaletteRefresh(() => {
-    applies += 1
+  const { calls, appearance } = fakeAppearance()
+  let work = 0
+  const handler = createAppearanceRefreshHandler(appearance, () => {
+    work += 1
   })
 
   handler([PALETTE_REFRESH_COMMAND, HASH], (response) => responses.push(response))
 
-  assert.equal(applies, 1, "the real refresh ran")
+  assert.equal(calls.applies, 1, "the platform helper applied the whole appearance")
+  assert.equal(work, 1, "the app-owned fan-out ran")
   assert.equal(responses.length, 1, "exactly one response")
   assert.equal(typeof responses[0], "string", "AGS transport is a string")
   assert.equal(responses[0], JSON.stringify({ ok: true }))
 })
 
-test("palette-refresh is a no-op for the same hash but still applied", () => {
+test("palette-refresh re-applies the appearance but skips work for the same hash", () => {
   const responses = []
-  let applies = 0
-  const handler = createCapturePaletteRefresh(() => {
-    applies += 1
+  const { calls, appearance } = fakeAppearance()
+  let work = 0
+  const handler = createAppearanceRefreshHandler(appearance, () => {
+    work += 1
   })
 
   handler([PALETTE_REFRESH_COMMAND, HASH], (response) => responses.push(response))
   handler([PALETTE_REFRESH_COMMAND, HASH], (response) => responses.push(response))
 
-  assert.equal(applies, 1)
+  assert.equal(calls.applies, 2, "the whole appearance is always re-applied")
+  assert.equal(work, 1, "the same hash does not rebuild the app surface twice")
   assert.deepEqual(responses, [JSON.stringify({ ok: true }), JSON.stringify({ ok: true })])
 })
 
-test("palette-refresh reports a thrown refresh as retryable and does not record the hash", () => {
+test("palette-refresh reports a thrown work as retryable and does not record the hash", () => {
   const responses = []
-  let applies = 0
-  const handler = createCapturePaletteRefresh(() => {
-    applies += 1
-    throw new Error("theme pointer missing")
+  const { calls, appearance } = fakeAppearance()
+  let work = 0
+  const handler = createAppearanceRefreshHandler(appearance, () => {
+    work += 1
+    if (work === 1) throw new Error("theme pointer missing")
   })
 
   handler([PALETTE_REFRESH_COMMAND, HASH], (response) => responses.push(response))
@@ -149,23 +141,24 @@ test("palette-refresh reports a thrown refresh as retryable and does not record 
     retryable: true,
   })
 
-  const next = []
-  const retry = createCapturePaletteRefresh(() => {
-    applies += 1
-  })
-  retry([PALETTE_REFRESH_COMMAND, HASH], (response) => next.push(response))
-  assert.deepEqual(JSON.parse(next[0]), { ok: true })
+  const retry = []
+  handler([PALETTE_REFRESH_COMMAND, HASH], (response) => retry.push(response))
+  assert.equal(calls.applies, 2, "the appearance is re-applied on the retry")
+  assert.equal(work, 2, "the failed hash was not recorded as applied")
+  assert.deepEqual(JSON.parse(retry[0]), { ok: true })
 })
 
 test("a malformed palette-refresh request never runs the refresh", () => {
   const responses = []
-  let applies = 0
-  const handler = createCapturePaletteRefresh(() => {
-    applies += 1
+  const { calls, appearance } = fakeAppearance()
+  let work = 0
+  const handler = createAppearanceRefreshHandler(appearance, () => {
+    work += 1
   })
 
   handler([PALETTE_REFRESH_COMMAND], (response) => responses.push(response))
-  assert.equal(applies, 0)
+  assert.equal(calls.applies, 0)
+  assert.equal(work, 0)
   assert.equal(responses.length, 1)
   assert.deepEqual(JSON.parse(responses[0]), {
     ok: false,

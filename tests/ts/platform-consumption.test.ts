@@ -6,8 +6,8 @@
 //
 //   1. no app-local icon-registry copy; the platform IconProvider is used
 //      (spine AD-7);
-//   2. theming routes through the platform `Theme` port; no direct
-//      `app.apply_css` call survives (spine AD-13);
+//   2. theming routes through the platform Appearance plane; no direct
+//      `app.apply_css` call survives (spine AD-13/AD-27);
 //   3. no app -> app imports (spine AD-1): every relative import stays inside
 //      this repo; the app depends on `ags-platform` and `contracts`, never on a
 //      sibling app directory;
@@ -98,17 +98,23 @@ test("the capture icons resolve through the platform IconProvider", () => {
 })
 
 // ---------------------------------------------------------------------------
-// 2. Theming through the platform Theme port
+// 2. Theming through the platform Appearance plane
 // ---------------------------------------------------------------------------
 
-test("the app applies its palette through the platform Theme port", () => {
+test("the app applies its appearance through the platform Appearance adapter", () => {
   const app = read(resolve(ROOT, "app.tsx"))
   assert.match(
     app,
-    /from "ags-platform\/adapters\/theme"/,
-    "app.tsx must import the platform Theme adapter (AD-13)",
+    /from "ags-platform\/adapters\/appearance"/,
+    "app.tsx must import the platform Appearance adapter (AD-13/AD-27)",
   )
-  assert.match(app, /theme\.apply\(\)/, "app.tsx must call theme.apply()")
+  assert.match(
+    app,
+    /createAppearance\(\{\s*configDir: "ags-capture",?\s*\}\)/,
+    "the appearance must be scoped to the ags-capture config dir",
+  )
+  assert.match(app, /appearance\.apply\(\)/, "app.tsx must call appearance.apply()")
+  assert.doesNotMatch(app, /theme\.apply\(\)|skin\.apply\(\)/)
 })
 
 test("no direct app.apply_css call survives in the app", () => {

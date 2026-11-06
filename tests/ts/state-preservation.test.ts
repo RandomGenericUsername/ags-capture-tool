@@ -21,9 +21,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
+import { PALETTE_REFRESH_COMMAND } from "ags-platform/ports/palette-refresh"
+import { createAppearanceRefreshHandler } from "ags-platform/ports/appearance-refresh"
 import {
   applyAppearance,
-  createAppearanceRefresh,
   createAppearanceRegistry,
   type AppearanceSurface,
 } from "../../lib/appearance.ts"
@@ -172,12 +173,16 @@ test("the same appearance hash does not rebuild icons twice", () => {
   const window = fakeWindow("eDP-1", active, measurements)
   const registry = createAppearanceRegistry()
   registry.register(window.surface)
-  const refresh = createAppearanceRefresh(() => refreshSurfaces(registry.surfaces()))
+  const refresh = createAppearanceRefreshHandler(
+    { apply: () => {} },
+    () => refreshSurfaces(registry.surfaces()),
+  )
+  const respond = () => {}
 
-  refresh("hash-a")
-  refresh("hash-a")
+  refresh([PALETTE_REFRESH_COMMAND, "hash-a"], respond)
+  refresh([PALETTE_REFRESH_COMMAND, "hash-a"], respond)
   assert.equal(window.iconGeneration, 1, "an idempotent trigger must be a no-op")
-  refresh("hash-b")
+  refresh([PALETTE_REFRESH_COMMAND, "hash-b"], respond)
   assert.equal(window.iconGeneration, 2, "a new appearance rebuilds the icons")
   assert.equal(active.visible, true)
 })

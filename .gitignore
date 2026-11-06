@@ -10,7 +10,7 @@ env.d.ts
 build/
 dist/
 
-# Local-only platform/contracts checkouts for the v0.3.0 tuple. The symlinks
+# Local-only platform/contracts checkouts for the current tuple. The symlinks
 # point at sibling repos; no fetched artifact is committed.
 .dev/
 

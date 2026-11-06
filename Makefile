@@ -1,11 +1,12 @@
 .PHONY: help platform-dev contracts-dev deps types test-deps test conformance backend ci bundle typecheck gates clean
 
-# The program tuple this app builds/tests against (AD-31/AD-34). v0.5.0 is the
-# theme-provider role tuple (palette.v1) the CSS migration consumes; contracts
-# stays v0.3.0. The tuple is LOCAL-ONLY in this run: local gates symlink it from
-# .dev/ (gitignored), CI checks out the tags explicitly once published.
-AGS_PLATFORM_VERSION := v0.5.0
-CONTRACTS_VERSION := v0.3.0
+# The program tuple this app builds/tests against (AD-31/AD-34). v0.8.0 is the
+# theme-provider role tuple (palette.v1) plus the app-scoped Skin adapter
+# (`createAppSkin({ configDir })`); contracts v0.6.0 carries the frozen skin
+# plane (24 tokens, six groups). The tuple is LOCAL-ONLY in this run: local
+# gates symlink it from .dev/ (gitignored), CI checks out the tags explicitly.
+AGS_PLATFORM_VERSION := v0.8.0
+CONTRACTS_VERSION := v0.6.0
 AGS_PLATFORM_REPO := https://github.com/RandomGenericUsername/ags-platform.git
 AGS_PLATFORM_DEV ?=
 PLATFORM_FETCH_DIR := $(CURDIR)/.dev/ags-platform/$(AGS_PLATFORM_VERSION)
@@ -24,9 +25,9 @@ help:
 	@echo "make ci           stock-runner gates: test + conformance + backend"
 	@echo "make gates        all local gates: ci + bundle + typecheck"
 	@echo ""
-	@echo "Local-only platform v0.5.0 / contracts v0.3.0 tuple: put checkouts/symlinks at"
-	@echo "  .dev/ags-platform/v0.5.0  (or AGS_PLATFORM_DEV=/path/to/ags-platform)"
-	@echo "and .dev/contracts/v0.3.0 (make conformance links ../contracts, or set CONTRACTS_ROOT)."
+	@echo "Local-only platform v0.8.0 / contracts v0.6.0 tuple: put checkouts/symlinks at"
+	@echo "  .dev/ags-platform/v0.8.0  (or AGS_PLATFORM_DEV=/path/to/ags-platform)"
+	@echo "and .dev/contracts/v0.6.0 (make conformance links ../contracts, or set CONTRACTS_ROOT)."
 
 # The platform shortcut. It MUST point outside node_modules: Node refuses to
 # type-strip `.ts` under a real node_modules directory, but realpaths a symlink

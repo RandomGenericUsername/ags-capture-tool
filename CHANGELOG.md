@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.6.1 — 2026-11-06
+
+The capture app no longer reads the now-unused capture layout token; the
+settings panel width is CSS-owned again.
+
+### Changed
+
+- The settings panel no longer requests `layout.ags-capture.panel-width`; it
+  relies on `style.css` `min-width: 560px`, matching the pre-v2 construction.
+- `app.tsx`, `ClassicWindow` and `SettingsPage` drop the `panelWidth`
+  accessor/prop plumbing. The appearance apply, `configDir` and `palette-refresh`
+  wiring are unchanged.
+
+### Removed
+
+- The `layout.ags-capture.panel-width` accessor and `widthRequest` plumbing,
+  following the assets repo's removal of `[groups.layout.ags-capture]`.
+
 ## v0.6.0 — 2026-11-06
 
 The capture app now consumes the unified v2 Appearance plane: palette, skin and

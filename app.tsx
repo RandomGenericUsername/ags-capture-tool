@@ -6,6 +6,7 @@ import style from "./style.css"
 // artifact is applied — the stable `colors.css` pointer, repointed on every
 // palette change — so this app does not carry its own `app.apply_css` call.
 import { theme } from "ags-platform/adapters/theme"
+import { createAppSkin } from "ags-platform/adapters/skin"
 import { execBackendProbe } from "./adapters/exec-backend-probe"
 import { execCaptureLauncher } from "./adapters/exec-capture-launcher"
 import { platformCaptureStateFeed } from "./adapters/platform-capture-state-feed"
@@ -56,6 +57,12 @@ const paletteRefresh = createCapturePaletteRefresh(() => {
   refreshAppAppearance()
 })
 
+// The skin plane is app-scoped: only the CSS pointer
+// ($XDG_CONFIG_HOME/ags-capture/skin.css) is per app; the token map and both
+// palette artifacts are shared. The adapter owns its own file monitor, so a
+// runtime repoint of skin.css reloads without a capture request command.
+const skin = createAppSkin({ configDir: "ags-capture" })
+
 // The cluster controller is built inside `main()` (it needs the live topology
 // and the capture-state feed), but AGS registers the request handler before
 // `main()` runs. The indirection keeps the palette handler reachable during
@@ -102,6 +109,10 @@ app.start({
   main() {
     try {
       theme.apply()
+      // Applied AFTER the palette: the skin's composed provider carries the
+      // palette roles plus the runtime-expanded skin.css at USER priority,
+      // over the bundled style.css glass fallback.
+      skin.apply()
     } catch (error) {
       console.error(`capture-tool: palette CSS apply failed: ${error}`)
     }

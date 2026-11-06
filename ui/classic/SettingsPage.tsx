@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import { Gtk } from "ags/gtk4"
+import type { ReadAccessor } from "ags-platform/ports/reactive"
 import { clearChildren } from "../shared/groups"
 import {
   numberRow,
@@ -69,6 +70,8 @@ export interface SettingsPageHandle {
 export interface SettingsPageProps {
   settingsStore: SettingsStore
   backendProbe: BackendProbe
+  /** The app-owned `layout.ags-capture.panel-width` accessor. */
+  panelWidth: ReadAccessor<number>
   /** Return to a mode view; called once the draft has been persisted. */
   selectMode: (mode: "screenshot" | "recording") => void
   /** The mode to return to. */
@@ -79,7 +82,15 @@ export interface SettingsPageProps {
 }
 
 export function SettingsPage(props: SettingsPageProps) {
-  const { settingsStore, backendProbe, selectMode, mode, onSettingsChanged, setHandle } = props
+  const {
+    settingsStore,
+    backendProbe,
+    panelWidth,
+    selectMode,
+    mode,
+    onSettingsChanged,
+    setHandle,
+  } = props
 
   let settingsView: Gtk.Box | null = null
   let settingsBody: Gtk.Box | null = null
@@ -326,7 +337,12 @@ export function SettingsPage(props: SettingsPageProps) {
             settingsView = self
           }}
         >
-          <box class="settings-page" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
+          <box
+            class="settings-page"
+            orientation={Gtk.Orientation.VERTICAL}
+            spacing={12}
+            widthRequest={panelWidth.peek()}
+          >
             <box
               class="settings-head"
               orientation={Gtk.Orientation.HORIZONTAL}

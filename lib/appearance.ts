@@ -34,8 +34,8 @@
  * non-icon widget must register its own rebuild in `AppearanceSurface`.
  *
  * PURE: no `ags`, no `gi://*`, no I/O. The GTK operations arrive as callbacks
- * so a stock-runner test executes the exact ordering and idempotence used by
- * app.tsx.
+ * so a stock-runner test executes the exact ordering used by app.tsx under the
+ * platform's `createAppearanceRefreshHandler` (which owns hash idempotence).
  */
 
 /** The three window operations performed for one appearance. */
@@ -46,11 +46,6 @@ export interface AppearanceSurface {
   rebuildIcons(): void
   /** Re-assert window/surface sizing without mapping or hiding it. */
   refreshWindow(): void
-}
-
-/** What the platform's `createPaletteRefreshHandler` accepts as applied. */
-export interface AppearanceApplied {
-  status: "applied"
 }
 
 /** The live appearance surfaces, one per per-monitor window. */
@@ -100,26 +95,5 @@ export function createAppearanceRegistry(): AppearanceRegistry {
     surfaces(): readonly AppearanceSurface[] {
       return registered
     },
-  }
-}
-
-/**
- * Wrap an appearance application as a hash-idempotent refresh.
- *
- * The same appearance hash does no work and still reports `applied`; a new
- * hash applies once. A throw is NOT recorded as applied, so the runtime's
- * ledger retries the same hash on its next trigger.
- */
-export function createAppearanceRefresh(
-  apply: () => void,
-): (appearanceHash: string) => AppearanceApplied {
-  let appliedHash: string | null = null
-
-  return (appearanceHash: string): AppearanceApplied => {
-    if (appearanceHash !== appliedHash) {
-      apply()
-      appliedHash = appearanceHash
-    }
-    return { status: "applied" }
   }
 }

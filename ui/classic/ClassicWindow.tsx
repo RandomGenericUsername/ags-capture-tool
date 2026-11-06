@@ -15,6 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { Astal, Gdk, Gtk } from "ags/gtk4"
+import type { ReadAccessor } from "ags-platform/ports/reactive"
 import GLib from "gi://GLib?version=2.0"
 import { barMarginTop } from "../../domain/bar-placement"
 import { mergeMonitors } from "../../domain/monitor-catalog"
@@ -147,6 +148,7 @@ export function ClassicWindow(
   ports: CapturePorts,
   state: UiState,
   selection: SelectionController,
+  panelWidth: ReadAccessor<number>,
 ): Astal.Window {
   const { settingsStore, uiStateStore, launcher, captureState, monitorReservedTop } = ports
 
@@ -1731,6 +1733,7 @@ export function ClassicWindow(
           <SettingsPage
             settingsStore={settingsStore}
             backendProbe={ports.backendProbe}
+            panelWidth={panelWidth}
             selectMode={() => returnHome()}
             mode={barState.mode}
             onSettingsChanged={settingsChanged}

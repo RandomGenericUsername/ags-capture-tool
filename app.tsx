@@ -2,11 +2,12 @@ import app from "ags/gtk4/app"
 import { Gdk } from "ags/gtk4"
 import { execAsync } from "ags/process"
 import style from "./style.css"
-// Theming through the platform Theme port (spine AD-13): the adapter owns WHICH
-// artifact is applied — the stable `colors.css` pointer, repointed on every
-// palette change — so this app does not carry its own `app.apply_css` call.
-import { theme } from "ags-platform/adapters/theme"
-import { createAppSkin } from "ags-platform/adapters/skin"
+// The v2 appearance plane (spine AD-13/AD-27): palette, skin and mode are ONE
+// generation behind `$XDG_STATE_HOME/dotfiles/current/appearance`. The platform
+// adapter owns the single watched hop, the composed provider and its own
+// `app.apply_css`-equivalent install, so this app only applies the appearance.
+import { createAppearance } from "ags-platform/adapters/appearance"
+import { createAppearanceRefreshHandler } from "ags-platform/ports/appearance-refresh"
 import { execBackendProbe } from "./adapters/exec-backend-probe"
 import { execCaptureLauncher } from "./adapters/exec-capture-launcher"
 import { platformCaptureStateFeed } from "./adapters/platform-capture-state-feed"
@@ -28,7 +29,6 @@ import {
   createClusterRequestHandler,
   type ClusterHandler,
 } from "./lib/cluster-request"
-import { createCapturePaletteRefresh } from "./lib/palette-refresh"
 import { createCaptureRequestHandler } from "./lib/request-dispatch"
 import type { CapturePorts } from "./ports/capture-ports"
 import { refreshAppAppearance } from "./ui/appearance"
@@ -37,31 +37,36 @@ import { createClusterController } from "./ui/cluster/controller"
 import { createSelectionController } from "./ui/overlay/controller"
 import { SelectionOverlay } from "./ui/overlay/SelectionOverlay"
 
+// The v2 appearance plane is app-scoped: palette, skin and mode are published
+// as ONE generation behind `$XDG_STATE_HOME/dotfiles/current/appearance`, and
+// the platform adapter installs the composed sheet as one USER-priority
+// provider. Only the stable consumer link
+// (`$XDG_CONFIG_HOME/ags-capture/appearance.css`) is per app; the adapter owns
+// the single watcher, so a runtime repoint reloads without a capture request.
+const appearance = createAppearance({ configDir: "ags-capture" })
+
+// TSX-owned layout token. The accessor is reactive; `peek()` reads it without
+// registering a dependency where the panel needs a plain pixel number.
+const panelWidth = appearance.value("layout.ags-capture.panel-width", 560)
+
 // THE RUNTIME-OWNED LIVE REFRESH (AD-27). This is the real capture refresh,
 // not a Theme-only acknowledgement:
 //
-//   1. re-apply the stable Theme pointer, so the stylesheet sees the new
-//      palette;
-//   2. fan out to EVERY live per-monitor window's appearance surface, where
-//      the generated capture icons are removed and rebuilt from the newly
-//      regenerated SVG files, then the layer surface size is re-asserted.
+//   1. `createAppearanceRefreshHandler` re-applies the WHOLE appearance
+//      (palette + skin + mode), so the stylesheet sees the new generation;
+//   2. the app-owned work fans out to EVERY live per-monitor window's
+//      appearance surface, where the generated capture icons are removed and
+//      rebuilt from the newly regenerated SVG files, then the layer surface
+//      size is re-asserted.
 //
 // The windows themselves are NOT closed, destroyed or recreated. The active
 // screenshot/recording/settings surface, the mode switch, the open inline path
 // editor, the selected option groups and the single shared `createUiState()`
-// object all survive. `createCapturePaletteRefresh` wraps this as the platform
-// handler: one JSON-string response, idempotent by appearance hash, and a
-// thrown refresh remains retryable.
-const paletteRefresh = createCapturePaletteRefresh(() => {
-  theme.apply()
+// object all survive. The platform helper owns the one JSON-string response,
+// idempotence by appearance hash, and a thrown refresh remains retryable.
+const paletteRefresh = createAppearanceRefreshHandler(appearance, () => {
   refreshAppAppearance()
 })
-
-// The skin plane is app-scoped: only the CSS pointer
-// ($XDG_CONFIG_HOME/ags-capture/skin.css) is per app; the token map and both
-// palette artifacts are shared. The adapter owns its own file monitor, so a
-// runtime repoint of skin.css reloads without a capture request command.
-const skin = createAppSkin({ configDir: "ags-capture" })
 
 // The cluster controller is built inside `main()` (it needs the live topology
 // and the capture-state feed), but AGS registers the request handler before
@@ -108,13 +113,11 @@ app.start({
   requestHandler,
   main() {
     try {
-      theme.apply()
-      // Applied AFTER the palette: the skin's composed provider carries the
-      // palette roles plus the runtime-expanded skin.css at USER priority,
-      // over the bundled style.css glass fallback.
-      skin.apply()
+      // One composed provider carries the palette roles, the skin and the
+      // resolved mode over the bundled style.css glass fallback.
+      appearance.apply()
     } catch (error) {
-      console.error(`capture-tool: palette CSS apply failed: ${error}`)
+      console.error(`capture-tool: appearance CSS apply failed: ${error}`)
     }
     const ports = buildPorts()
     // ONE live UI state for the whole app, built here and handed to every
@@ -182,7 +185,8 @@ app.start({
       app,
       topology,
       focus,
-      createWindow: (monitor) => ClassicWindow(monitor, ports, state, selection),
+      createWindow: (monitor) =>
+        ClassicWindow(monitor, ports, state, selection, panelWidth),
       report: (message) => console.log(message),
     })
     installFocusedWindowLookup(app, windowSet)

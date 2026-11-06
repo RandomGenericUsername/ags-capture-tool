@@ -23,6 +23,8 @@ app=capture  instance=capture  configDir=ags-capture  mode=live
   “Open capture UI”.
 - No app imports another app. `ags-platform` is the runtime dependency;
   `contracts` is a test-time schema dependency.
+- Appearance is ONE app-scoped `createAppearance({ configDir: "ags-capture" })`,
+  applied once in `main()`; the split Theme/Skin startup is retired.
 - The runtime is the only palette-refresh trigger. Do not subscribe to
   `wallpaper.state` for palette application.
 - `bin/capture-tool` is the preserved Python backend. Its deployed binary name
@@ -50,7 +52,9 @@ Never work on main: `scripts/worktree-guard.sh check-clean` then
 
 ## 5. Live refresh invariants
 
-- Exactly one JSON-string response, through `createPaletteRefreshHandler`.
+- Exactly one JSON-string response, through the platform
+  `createAppearanceRefreshHandler(appearance, work)`; the platform helper always
+  re-applies the whole appearance before the app-owned work.
 - Idempotent by appearance hash; a throw is retryable and not recorded applied.
 - Clear the built icon images before rebuilding them; re-measure the surface
   after the icon pass.

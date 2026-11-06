@@ -30,7 +30,7 @@ are backend contracts, not the AGS app identity.
 ```text
 app.tsx                  AGS entry point (instance capture)
 app.manifest.json        identity tuple
-lib/                     pure appearance/refresh core + handler wiring
+lib/                     pure appearance/refresh core
 ui/appearance.ts         the process-wide per-window appearance registry
 ui/classic/              ClassicWindow + screenshot/recording/settings pages
 ui/shared/               row/group/icon builders (icon slots are refreshable)
@@ -46,19 +46,36 @@ templates/ags-app/       frozen copyable template for the next app repo
 `lib/` is also desktop-free, which is why the refresh core executes under plain
 Node in the stock-runner gates.
 
+## Appearance plane
+
+The app consumes the v2 Appearance plane (`contracts` v0.7.0 / `ags-platform`
+v0.9.0). Palette, skin and mode are ONE immutable generation behind
+`$XDG_STATE_HOME/dotfiles/current/appearance`. One module-level
+`createAppearance({ configDir: "ags-capture" })` watches that hop, reads
+`$XDG_CONFIG_HOME/ags-capture/appearance.css` plus its `tokens.json`, and
+installs the composed sheet as one USER-priority provider. `main()` calls
+`appearance.apply()`; there is no split `theme.apply()` / `skin.apply()`.
+
+The capture panel width is the TSX-owned
+`layout.ags-capture.panel-width` token (fallback `560`), read with `peek()`
+where a plain pixel number is required. `style.css` remains the bundled glass
+fallback.
+
 ## Runtime contract: `palette-refresh`
 
 The runtime invokes `ags request palette-refresh <appearance-hash> -i capture`
 after an appearance change. The app:
 
-1. re-applies the stable Theme pointer (`$XDG_CONFIG_HOME/ags/colors.css`);
-2. fans out to **every live per-monitor window** and, in order:
+1. re-applies the WHOLE appearance through
+   `createAppearanceRefreshHandler(appearance, work)` — palette, skin and mode
+   from the current generation;
+2. the app-owned `work` fans out to **every live per-monitor window** and, in
+   order:
    - clears the built icon images (the app's only palette-dependent cache),
    - reloads the generated capture icons from
      `$XDG_STATE_HOME/dotfiles/current/icons` and rebuilds each `Gtk.Image`,
    - re-measures/re-asserts the layer-surface size;
-3. answers through `createPaletteRefreshHandler` with exactly one JSON string
-   (`{"ok":true}` or a protocol failure).
+3. answers with exactly one JSON string (`{"ok":true}` or a protocol failure).
 
 The per-monitor windows are **updated in place, never destroyed or recreated**.
 The active screenshot/recording/settings surface, the mode switch, the open
@@ -76,18 +93,18 @@ active view/focus, the open inline path editor and the pages' captured group
 lists safely. The safe refresh therefore rebuilds **icon widgets and CSS** in
 place. The structural widget tree is not recreated; a future palette-dependent
 non-icon widget must add its own step to `AppearanceSurface`. Capture has no
-such widget today — palette colour lives in `style.css`, which the Theme pointer
-reloads.
+such widget today — palette colour lives in `style.css`, which the composed
+appearance provider reloads.
 
 ## Local development
 
-The program tuple is `ags-platform` `v0.8.0` / `contracts` `v0.6.0`, local-only
+The program tuple is `ags-platform` `v0.9.0` / `contracts` `v0.7.0`, local-only
 in this run. The local gates symlink both under `.dev/` (gitignored): the
 platform from `../ags-platform`, and contracts from `../contracts` via `make
 conformance`.
 
 ```sh
-ln -s ../../../ags-platform .dev/ags-platform/v0.8.0   # or use AGS_PLATFORM_DEV
+ln -s ../../../ags-platform .dev/ags-platform/v0.9.0   # or use AGS_PLATFORM_DEV
 make test          # pure unit + copied app tests (Node only)
 make conformance   # manifest + handler + template gate
 make backend       # Python backend pytest suite (uv)

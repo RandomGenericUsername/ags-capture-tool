@@ -56,10 +56,9 @@ v0.9.0). Palette, skin and mode are ONE immutable generation behind
 installs the composed sheet as one USER-priority provider. `main()` calls
 `appearance.apply()`; there is no split `theme.apply()` / `skin.apply()`.
 
-The capture panel width is the TSX-owned
-`layout.ags-capture.panel-width` token (fallback `560`), read with `peek()`
-where a plain pixel number is required. `style.css` remains the bundled glass
-fallback.
+The settings panel width is CSS-owned: `style.css` remains the bundled glass
+fallback and its `min-width: 560px` governs the panel. The app reads no capture
+layout token.
 
 ## Runtime contract: `palette-refresh`
 

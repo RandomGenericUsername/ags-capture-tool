@@ -45,10 +45,6 @@ import { SelectionOverlay } from "./ui/overlay/SelectionOverlay"
 // the single watcher, so a runtime repoint reloads without a capture request.
 const appearance = createAppearance({ configDir: "ags-capture" })
 
-// TSX-owned layout token. The accessor is reactive; `peek()` reads it without
-// registering a dependency where the panel needs a plain pixel number.
-const panelWidth = appearance.value("layout.ags-capture.panel-width", 560)
-
 // THE RUNTIME-OWNED LIVE REFRESH (AD-27). This is the real capture refresh,
 // not a Theme-only acknowledgement:
 //
@@ -185,8 +181,7 @@ app.start({
       app,
       topology,
       focus,
-      createWindow: (monitor) =>
-        ClassicWindow(monitor, ports, state, selection, panelWidth),
+      createWindow: (monitor) => ClassicWindow(monitor, ports, state, selection),
       report: (message) => console.log(message),
     })
     installFocusedWindowLookup(app, windowSet)

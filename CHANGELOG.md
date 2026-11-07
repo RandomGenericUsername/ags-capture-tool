@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.7.0 — 2026-11-07
+
+The capture app now consumes Generations v3: the appearance plane is read only
+from the committed state generation and live refresh is generation-bound.
+
+### Changed
+
+- Pins move to `ags-platform` `v1.0.0` and `contracts` `v0.8.0`; CI checks the
+  same tags.
+- The runtime contract is `appearance-refresh <genHash>`. The combined capture
+  request handler routes it to
+  `createAppearanceRefreshHandler(appearance, work)`, and `work` returns the v3
+  applied result after `refreshAppAppearance()`.
+- Responses are the frozen v3 union: `{"applied":"<genHash>"}`,
+  `{"deferred":"reason","genHash":"<genHash>"}` or
+  `{"failed":"reason","retryable":true|false,"genHash":"<genHash>"}`. The v2
+  `palette-refresh` boolean ack is not produced or accepted.
+- `createAppearance({ configDir: "ags-capture" })` reads
+  `current/manifest.json` and `current/appearance/ags-capture.css` plus
+  `tokens.json`; the `$XDG_CONFIG_HOME` appearance link is no longer read.
+
+### Unchanged
+
+- `style.css` remains the bundled glass fallback, and the Python backend and
+  overlay sources are byte-unchanged.
+- The capture request surface, window structure, classes, gestures and sizes
+  are unchanged; no request command was added.
+
+### Tests
+
+- The unit, state-preservation and dispatch suites pin the v3 command, the
+  requested-generation ack, deferred/failed responses and the retired
+  `palette-refresh` rejection.
+- The source migration gate pins the v3 dispatcher and the `work` applied
+  result.
+
 ## v0.6.1 — 2026-11-06
 
 The capture app no longer reads the now-unused capture layout token; the

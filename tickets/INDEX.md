@@ -40,7 +40,7 @@
 - [REQ-015-skin-consumption/ticket.md](./REQ-015-skin-consumption/ticket.md) — Consume the app-scoped skin plane | `done` | links: worktree .worktrees/REQ-015/, branch ticket/REQ-015-skin-consumption | delivered v0.5.0
 - [REQ-016-appearance-migration/ticket.md](./REQ-016-appearance-migration/ticket.md) — Migrate the capture tool to the v2 appearance plane | `done` | links: worktree .worktrees/REQ-016/, branch ticket/REQ-016-appearance-migration | delivered v0.6.0
 - [REQ-017-layout-token-cleanup/ticket.md](./REQ-017-layout-token-cleanup/ticket.md) — Remove the unused capture panel-width layout token | `done` | links: worktree .worktrees/REQ-017/, branch ticket/REQ-017-layout-token-cleanup | delivered v0.6.1
-- [REQ-018-generations-v3/ticket.md](./REQ-018-generations-v3/ticket.md) — Consume Generations v3 and the appearance-refresh protocol | `in-progress` | links: worktree .worktrees/REQ-018/, branch ticket/REQ-018-generations-v3
+- [REQ-018-generations-v3/ticket.md](./REQ-018-generations-v3/ticket.md) — Consume Generations v3 and the appearance-refresh protocol | `done` | links: worktree .worktrees/REQ-018/, branch ticket/REQ-018-generations-v3 | delivered v0.7.0
 
 ## Bugs
 

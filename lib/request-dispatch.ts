@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
 // The capture app's request dispatcher (SPIKE-003).
 //
-// `palette-refresh` is the existing live-refresh contract and routes to the
-// existing helper unchanged. `capture-cluster` is the AGS request channel the
-// bar uses to ask this process to draw its recording cluster. Any other
-// argv[0] gets one JSON error instead of the helper's text ack.
+// `appearance-refresh` is the Generations v3 live-refresh contract and routes
+// to the platform helper unchanged. `capture-cluster` is the AGS request
+// channel the bar uses to ask this process to draw its recording cluster. Any
+// other argv[0] gets one JSON error instead of the helper's text ack.
 //
 // PURE: no `ags/*`, no `gi://*`, no I/O.
 // ---------------------------------------------------------------------------
@@ -15,9 +15,9 @@ import {
   type ClusterResponse,
 } from "ags-platform/ports/capture-cluster"
 import {
-  PALETTE_REFRESH_COMMAND,
-  type PaletteRefreshRequestHandler,
-} from "ags-platform/ports/palette-refresh"
+  APPEARANCE_REFRESH_COMMAND,
+  type AppearanceRefreshRequestHandler,
+} from "ags-platform/ports/appearance-refresh"
 import type { ClusterHandler } from "./cluster-request"
 
 export type CaptureRequestHandler = (
@@ -30,14 +30,14 @@ function terminal(error: string, retryable: boolean): ClusterResponse {
 }
 
 export function createCaptureRequestHandler(
-  paletteRefresh: PaletteRefreshRequestHandler,
+  appearanceRefresh: AppearanceRefreshRequestHandler,
   cluster: ClusterHandler,
 ): CaptureRequestHandler {
   return (argv, respond) => {
     const command = argv[0]
 
-    if (command === PALETTE_REFRESH_COMMAND) {
-      paletteRefresh(argv, respond)
+    if (command === APPEARANCE_REFRESH_COMMAND) {
+      appearanceRefresh(argv, respond)
       return
     }
 

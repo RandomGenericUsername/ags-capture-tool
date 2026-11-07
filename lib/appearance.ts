@@ -1,8 +1,8 @@
 /**
  * The pure core of the capture tool's live appearance refresh (AD-27).
  *
- * The runtime invokes `palette-refresh <appearance-hash>` after the palette
- * pointer moved. Capture must converge on the new appearance WITHOUT closing
+ * The runtime invokes `appearance-refresh <genHash>` after the generation is
+ * committed. Capture must converge on the requested generation WITHOUT closing
  * the active surface or rebuilding the widget tree that owns the shared UI
  * state. The surface the operator is using (screenshot, recording or settings),
  * the selected option groups, the settings draft and the one shared
@@ -35,7 +35,8 @@
  *
  * PURE: no `ags`, no `gi://*`, no I/O. The GTK operations arrive as callbacks
  * so a stock-runner test executes the exact ordering used by app.tsx under the
- * platform's `createAppearanceRefreshHandler` (which owns hash idempotence).
+ * platform's `createAppearanceRefreshHandler` (which owns generation
+ * idempotence).
  */
 
 /** The three window operations performed for one appearance. */

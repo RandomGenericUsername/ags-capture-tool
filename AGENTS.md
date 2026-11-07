@@ -25,8 +25,8 @@ app=capture  instance=capture  configDir=ags-capture  mode=live
   `contracts` is a test-time schema dependency.
 - Appearance is ONE app-scoped `createAppearance({ configDir: "ags-capture" })`,
   applied once in `main()`; the split Theme/Skin startup is retired.
-- The runtime is the only palette-refresh trigger. Do not subscribe to
-  `wallpaper.state` for palette application.
+- The runtime is the only `appearance-refresh` trigger. Do not subscribe to
+  `wallpaper.state` for appearance application.
 - `bin/capture-tool` is the preserved Python backend. Its deployed binary name
   and its `$XDG_CONFIG_HOME/capture-tool/config.json` are backend contracts;
   they are not the AGS app identity.

@@ -48,42 +48,46 @@ Node in the stock-runner gates.
 
 ## Appearance plane
 
-The app consumes the v2 Appearance plane (`contracts` v0.7.0 / `ags-platform`
-v0.9.0). Palette, skin and mode are ONE immutable generation behind
-`$XDG_STATE_HOME/dotfiles/current/appearance`. One module-level
-`createAppearance({ configDir: "ags-capture" })` watches that hop, reads
-`$XDG_CONFIG_HOME/ags-capture/appearance.css` plus its `tokens.json`, and
-installs the composed sheet as one USER-priority provider. `main()` calls
-`appearance.apply()`; there is no split `theme.apply()` / `skin.apply()`.
+The app consumes the Generations v3 Appearance plane (`contracts` v0.8.0 /
+`ags-platform` v1.0.0). Palette, skin and mode are ONE immutable generation
+behind `$XDG_STATE_HOME/dotfiles/current`. One module-level
+`createAppearance({ configDir: "ags-capture" })` watches that one hop, verifies
+`current/manifest.json`, reads `current/appearance/ags-capture.css` plus
+`current/appearance/tokens.json`, and installs the composed sheet as one
+USER-priority provider. `main()` calls `appearance.apply()`; there is no split
+`theme.apply()` / `skin.apply()` and no `$XDG_CONFIG_HOME` appearance read.
 
 The settings panel width is CSS-owned: `style.css` remains the bundled glass
 fallback and its `min-width: 560px` governs the panel. The app reads no capture
 layout token.
 
-## Runtime contract: `palette-refresh`
+## Runtime contract: `appearance-refresh`
 
-The runtime invokes `ags request palette-refresh <appearance-hash> -i capture`
-after an appearance change. The app:
+The runtime invokes `ags request appearance-refresh <genHash> -i capture` after
+a generation is committed. The app:
 
-1. re-applies the WHOLE appearance through
+1. resolves and installs the requested generation through
    `createAppearanceRefreshHandler(appearance, work)` — palette, skin and mode
-   from the current generation;
+   from `generations/<genHash>/`, or a verified `current` fallback;
 2. the app-owned `work` fans out to **every live per-monitor window** and, in
    order:
    - clears the built icon images (the app's only palette-dependent cache),
    - reloads the generated capture icons from
      `$XDG_STATE_HOME/dotfiles/current/icons` and rebuilds each `Gtk.Image`,
    - re-measures/re-asserts the layer-surface size;
-3. answers with exactly one JSON string (`{"ok":true}` or a protocol failure).
+3. answers with exactly one JSON string: `{"applied":"<genHash>"}`,
+   `{"deferred":"reason","genHash":"<genHash>"}` or
+   `{"failed":"reason","retryable":true|false,"genHash":"<genHash>"}`.
 
 The per-monitor windows are **updated in place, never destroyed or recreated**.
 The active screenshot/recording/settings surface, the mode switch, the open
 inline path editor, the selected option groups and the one shared
 `createUiState()` object all survive. Overlapping requests answer
-`{"ok":false,"error":"busy","retryable":true}` rather than queueing.
+`{"deferred":"busy","genHash":"<genHash>"}` rather than queueing.
 
-The refresh is idempotent by appearance hash. A throw is not recorded as
-applied, so the runtime retries the same hash on its next trigger.
+The refresh is idempotent by generation hash. A stale pointer is deferred with
+the requested hash and installs nothing; a throw is not recorded as applied, so
+the next trigger retries the same generation.
 
 ### Residual (explicit)
 
@@ -97,13 +101,13 @@ appearance provider reloads.
 
 ## Local development
 
-The program tuple is `ags-platform` `v0.9.0` / `contracts` `v0.7.0`, local-only
+The program tuple is `ags-platform` `v1.0.0` / `contracts` `v0.8.0`, local-only
 in this run. The local gates symlink both under `.dev/` (gitignored): the
 platform from `../ags-platform`, and contracts from `../contracts` via `make
 conformance`.
 
 ```sh
-ln -s ../../../ags-platform .dev/ags-platform/v0.9.0   # or use AGS_PLATFORM_DEV
+ln -s ../../../ags-platform .dev/ags-platform/v1.0.0   # or use AGS_PLATFORM_DEV
 make test          # pure unit + copied app tests (Node only)
 make conformance   # manifest + handler + template gate
 make backend       # Python backend pytest suite (uv)

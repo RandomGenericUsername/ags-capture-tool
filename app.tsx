@@ -48,8 +48,9 @@ const appearance = createAppearance({ configDir: "ags-capture" })
 // THE RUNTIME-OWNED LIVE REFRESH (AD-27). This is the real capture refresh,
 // not a Theme-only acknowledgement:
 //
-//   1. `createAppearanceRefreshHandler` re-applies the WHOLE appearance
-//      (palette + skin + mode), so the stylesheet sees the new generation;
+//   1. `createAppearanceRefreshHandler` resolves and installs exactly the
+//      requested generation (palette + skin + mode), so the stylesheet sees
+//      the new generation;
 //   2. the app-owned work fans out to EVERY live per-monitor window's
 //      appearance surface, where the generated capture icons are removed and
 //      rebuilt from the newly regenerated SVG files, then the layer surface
@@ -59,9 +60,10 @@ const appearance = createAppearance({ configDir: "ags-capture" })
 // screenshot/recording/settings surface, the mode switch, the open inline path
 // editor, the selected option groups and the single shared `createUiState()`
 // object all survive. The platform helper owns the one JSON-string response,
-// idempotence by appearance hash, and a thrown refresh remains retryable.
-const paletteRefresh = createAppearanceRefreshHandler(appearance, () => {
+// idempotence by generation hash, and a thrown refresh remains retryable.
+const appearanceRefresh = createAppearanceRefreshHandler(appearance, () => {
   refreshAppAppearance()
+  return { status: "applied" }
 })
 
 // The cluster controller is built inside `main()` (it needs the live topology
@@ -70,7 +72,7 @@ const paletteRefresh = createAppearanceRefreshHandler(appearance, () => {
 // that window and answers a cluster request retryably until the controller is
 // ready.
 let clusterHandler: ClusterHandler | null = null
-const requestHandler = createCaptureRequestHandler(paletteRefresh, (text) => {
+const requestHandler = createCaptureRequestHandler(appearanceRefresh, (text) => {
   if (clusterHandler === null) {
     return { ok: false, error: "internal", retryable: true }
   }
@@ -175,7 +177,7 @@ app.start({
     // openspec/changes/fix-capture-monitor-lifecycle/design.md.
     //
     // Each `ClassicWindow` registers its appearance surface from its own
-    // `<window>` `$` handler, so the palette-refresh fan-out above always sees
+    // `<window>` `$` handler, so the appearance-refresh fan-out above always sees
     // the current monitor set without app.tsx tracking windows a second time.
     const windowSet = createMonitorWindowSet({
       app,

@@ -7,9 +7,9 @@
  * tracks the live per-monitor window set automatically, including hotplug.
  *
  * The refresh continues through every window even when one throws, then
- * rethrows the first failure so `createPaletteRefreshHandler` answers with a
- * retryable protocol failure. A single bad surface must not leave the other
- * monitors on the old palette.
+ * rethrows the first failure so `createAppearanceRefreshHandler` answers with
+ * a retryable protocol failure. A single bad surface must not leave the other
+ * monitors on the old generation.
  */
 
 import {

@@ -10,10 +10,11 @@
 //
 //   1. app.tsx declares one createAppearance scoped to ags-capture;
 //   2. main() applies the appearance once; no theme/skin call survives;
-//   3. the palette-refresh handler is createAppearanceRefreshHandler(appearance,
-//      work) where work only runs refreshAppAppearance();
+//   3. the appearance-refresh handler is
+//      createAppearanceRefreshHandler(appearance, work) where work only runs
+//      refreshAppAppearance() and returns the v3 applied result;
 //   4. the capture request surface (screenshot/record/settings + cluster) is
-//      unchanged and no new request command is added;
+//      unchanged and the only refresh command is v3 `appearance-refresh`;
 //   5. the panel width is CSS-owned: no capture layout token or widthRequest
 //      plumbing survives in TSX;
 //   6. style.css still carries the bundled glass fallback and --rec-accent.
@@ -102,6 +103,7 @@ function functionBody(source, marker) {
 const app = stripComments(read("app.tsx"))
 const window = stripComments(read("ui", "classic", "ClassicWindow.tsx"))
 const settings = stripComments(read("ui", "classic", "SettingsPage.tsx"))
+const dispatch = stripComments(read("lib", "request-dispatch.ts"))
 
 // ── 1. One app-scoped Appearance ──────────────────────────────────────────
 
@@ -149,18 +151,23 @@ for (const forbidden of [
 
 assert.match(
   app,
-  /const paletteRefresh = createAppearanceRefreshHandler\(appearance,/,
-  "the palette-refresh wiring must use createAppearanceRefreshHandler(appearance, work)",
+  /const appearanceRefresh = createAppearanceRefreshHandler\(appearance,/,
+  "the appearance-refresh wiring must use createAppearanceRefreshHandler(appearance, work)",
 )
 assert.doesNotMatch(app, /skin-refresh|SKIN_REFRESH/)
 assert.doesNotMatch(app, /wallpaper\.state/)
 
-const refresh = functionBody(app, "const paletteRefresh = createAppearanceRefreshHandler")
+const refresh = functionBody(app, "const appearanceRefresh = createAppearanceRefreshHandler")
 assert.match(refresh, /refreshAppAppearance\(\)/, "the capture surface fan-out is kept")
+assert.match(
+  refresh,
+  /return \{ status: "applied" \}/,
+  "work returns the v3 applied result after the capture fan-out",
+)
 assert.doesNotMatch(
   refresh,
   /\b(?:theme|skin)\.apply\(\)/,
-  "the platform helper already re-applies the whole appearance",
+  "the platform helper already resolves the requested generation",
 )
 assert.doesNotMatch(
   refresh,
@@ -182,8 +189,8 @@ assert.equal(
 )
 assert.match(
   app,
-  /const requestHandler = createCaptureRequestHandler\(paletteRefresh,/,
-  "the one request handler stays wired to the palette refresh",
+  /const requestHandler = createCaptureRequestHandler\(appearanceRefresh,/,
+  "the one request handler stays wired to the appearance refresh",
 )
 assert.match(
   app,
@@ -192,8 +199,28 @@ assert.match(
 )
 assert.doesNotMatch(
   app,
-  /PALETTE_REFRESH_COMMAND|CAPTURE_CLUSTER_COMMAND/,
+  /APPEARANCE_REFRESH_COMMAND|PALETTE_REFRESH_COMMAND|CAPTURE_CLUSTER_COMMAND/,
   "request command dispatch stays in lib/request-dispatch, not app.tsx",
+)
+assert.match(
+  dispatch,
+  /APPEARANCE_REFRESH_COMMAND/,
+  "the dispatcher routes the v3 appearance-refresh command",
+)
+assert.match(
+  dispatch,
+  /from "ags-platform\/ports\/appearance-refresh"/,
+  "the dispatcher uses the v3 appearance-refresh handler contract",
+)
+assert.doesNotMatch(
+  dispatch,
+  /PALETTE_REFRESH_COMMAND|palette-refresh/,
+  "the retired v2 palette-refresh command must not survive",
+)
+assert.match(
+  dispatch,
+  /CAPTURE_CLUSTER_COMMAND/,
+  "the capture-cluster command is unchanged",
 )
 
 // ── 5. Panel width is CSS-owned, with no capture layout token ─────────────

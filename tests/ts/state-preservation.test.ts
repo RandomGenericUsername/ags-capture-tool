@@ -21,8 +21,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
-import { PALETTE_REFRESH_COMMAND } from "ags-platform/ports/palette-refresh"
-import { createAppearanceRefreshHandler } from "ags-platform/ports/appearance-refresh"
+import {
+  APPEARANCE_REFRESH_COMMAND,
+  createAppearanceRefreshHandler,
+} from "ags-platform/ports/appearance-refresh"
 import {
   applyAppearance,
   createAppearanceRegistry,
@@ -161,7 +163,7 @@ test("a removed monitor unregisters its surface and is not refreshed again", () 
   assert.deepEqual(measurements, ["eDP-1"])
 })
 
-test("the same appearance hash does not rebuild icons twice", () => {
+test("the same generation hash does not rebuild icons twice", () => {
   const active: ActiveView = {
     visible: true,
     mode: "screenshot",
@@ -173,16 +175,26 @@ test("the same appearance hash does not rebuild icons twice", () => {
   const window = fakeWindow("eDP-1", active, measurements)
   const registry = createAppearanceRegistry()
   registry.register(window.surface)
+  const hashA = "a".repeat(64)
+  const hashB = "b".repeat(64)
   const refresh = createAppearanceRefreshHandler(
-    { apply: () => {} },
-    () => refreshSurfaces(registry.surfaces()),
+    {
+      applyGeneration: (genHash: string) => ({
+        status: "applied" as const,
+        genHash,
+      }),
+    },
+    () => {
+      refreshSurfaces(registry.surfaces())
+      return { status: "applied" }
+    },
   )
   const respond = () => {}
 
-  refresh([PALETTE_REFRESH_COMMAND, "hash-a"], respond)
-  refresh([PALETTE_REFRESH_COMMAND, "hash-a"], respond)
+  refresh([APPEARANCE_REFRESH_COMMAND, hashA], respond)
+  refresh([APPEARANCE_REFRESH_COMMAND, hashA], respond)
   assert.equal(window.iconGeneration, 1, "an idempotent trigger must be a no-op")
-  refresh([PALETTE_REFRESH_COMMAND, "hash-b"], respond)
-  assert.equal(window.iconGeneration, 2, "a new appearance rebuilds the icons")
+  refresh([APPEARANCE_REFRESH_COMMAND, hashB], respond)
+  assert.equal(window.iconGeneration, 2, "a new generation rebuilds the icons")
   assert.equal(active.visible, true)
 })

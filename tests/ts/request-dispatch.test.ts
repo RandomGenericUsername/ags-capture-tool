@@ -1,10 +1,15 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import type { PaletteRefreshRequestHandler } from "ags-platform/ports/palette-refresh"
+import {
+  APPEARANCE_REFRESH_COMMAND,
+  type AppearanceRefreshRequestHandler,
+} from "ags-platform/ports/appearance-refresh"
 import {
   createCaptureRequestHandler,
 } from "../../lib/request-dispatch.ts"
 import type { ClusterHandler } from "../../lib/cluster-request.ts"
+
+const GEN_HASH = "a".repeat(64)
 
 function recorder() {
   const responses: string[] = []
@@ -14,28 +19,47 @@ function recorder() {
   }
 }
 
-test("palette-refresh routes to the existing helper unchanged", () => {
+test("appearance-refresh routes to the platform handler unchanged", () => {
   const seen: unknown[] = []
-  const palette: PaletteRefreshRequestHandler = (argv, respond) => {
+  const appearance: AppearanceRefreshRequestHandler = (argv, respond) => {
     seen.push([...argv])
-    respond('{"ok":true,"status":"applied"}')
+    respond(JSON.stringify({ applied: GEN_HASH }))
   }
   const cluster: ClusterHandler = () => {
     throw new Error("must not run")
   }
   const output = recorder()
 
-  createCaptureRequestHandler(palette, cluster)(
-    ["palette-refresh", "hash-1"],
+  createCaptureRequestHandler(appearance, cluster)(
+    [APPEARANCE_REFRESH_COMMAND, GEN_HASH],
     output.respond,
   )
 
-  assert.deepEqual(seen, [["palette-refresh", "hash-1"]])
-  assert.deepEqual(output.responses, ['{"ok":true,"status":"applied"}'])
+  assert.deepEqual(seen, [[APPEARANCE_REFRESH_COMMAND, GEN_HASH]])
+  assert.deepEqual(output.responses, [JSON.stringify({ applied: GEN_HASH })])
+})
+
+test("the retired palette-refresh command is not a capture command", () => {
+  const appearance: AppearanceRefreshRequestHandler = () => {
+    throw new Error("must not run")
+  }
+  const cluster: ClusterHandler = () => {
+    throw new Error("must not run")
+  }
+  const output = recorder()
+
+  createCaptureRequestHandler(appearance, cluster)(
+    ["palette-refresh", GEN_HASH],
+    output.respond,
+  )
+
+  assert.deepEqual(output.responses, [
+    '{"ok":false,"error":"unknown-command","retryable":false}',
+  ])
 })
 
 test("capture-cluster encodes the handler's response", () => {
-  const palette: PaletteRefreshRequestHandler = () => {
+  const appearance: AppearanceRefreshRequestHandler = () => {
     throw new Error("must not run")
   }
   const cluster: ClusterHandler = (text) => {
@@ -44,7 +68,7 @@ test("capture-cluster encodes the handler's response", () => {
   }
   const output = recorder()
 
-  createCaptureRequestHandler(palette, cluster)(
+  createCaptureRequestHandler(appearance, cluster)(
     ["capture-cluster", '{"v":1}'],
     output.respond,
   )
@@ -53,7 +77,7 @@ test("capture-cluster encodes the handler's response", () => {
 })
 
 test("an unknown command is one JSON error, not a text ack", () => {
-  const palette: PaletteRefreshRequestHandler = () => {
+  const appearance: AppearanceRefreshRequestHandler = () => {
     throw new Error("must not run")
   }
   const cluster: ClusterHandler = () => {
@@ -61,7 +85,7 @@ test("an unknown command is one JSON error, not a text ack", () => {
   }
   const output = recorder()
 
-  createCaptureRequestHandler(palette, cluster)(["nope"], output.respond)
+  createCaptureRequestHandler(appearance, cluster)(["nope"], output.respond)
 
   assert.deepEqual(output.responses, [
     '{"ok":false,"error":"unknown-command","retryable":false}',
@@ -69,7 +93,7 @@ test("an unknown command is one JSON error, not a text ack", () => {
 })
 
 test("a throwing cluster handler still gets exactly one response", () => {
-  const palette: PaletteRefreshRequestHandler = () => {
+  const appearance: AppearanceRefreshRequestHandler = () => {
     throw new Error("must not run")
   }
   const cluster: ClusterHandler = () => {
@@ -77,7 +101,7 @@ test("a throwing cluster handler still gets exactly one response", () => {
   }
   const output = recorder()
 
-  createCaptureRequestHandler(palette, cluster)(
+  createCaptureRequestHandler(appearance, cluster)(
     ["capture-cluster", "{}"],
     output.respond,
   )

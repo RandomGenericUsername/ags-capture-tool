@@ -2,7 +2,7 @@
 id: OPS-011
 title: "Bump the local ags-platform pin to v1.0.1"
 kind: ops-task
-status: in-progress
+status: done
 lane: direct
 links:
   openspec: none
@@ -47,4 +47,23 @@ pin test asserts `v1.0.1`, and `make gates` is green.
 - `.github/workflows/ci.yml` checks out `ref: v1.0.1` for `ags-platform` and
   `ref: v0.8.0` for `contracts`.
 - `tests/app-contract.test.mjs` pin test asserts `v1\\.0\\.1`.
-- Local `ags-platform` `v1.0.1` tag `10b4d11`; `contracts` `v0.8.0` unchanged.
+- Local `ags-platform` `v1.0.1` tag object `ba5ca4a2`, peeled commit `10b4d11`;
+  `contracts` `v0.8.0` tag object `d86c19c8`, peeled commit `8906f1ad`.
+- Gates command (foreground, worktree root):
+
+  ```sh
+  AGS_PLATFORM_DEV=/home/inumaki/Development/dotfiles/ags-platform \
+  CONTRACTS_ROOT=/home/inumaki/Development/dotfiles/contracts make gates
+  ```
+
+  `PASS`:
+  - `make test` unit `10/10`, validation `2/2`, TS suites `404/404`,
+    `tsc --noEmit -p tests/tsconfig.tests.json` 0 errors.
+  - `make conformance` `17/17` (including the v1.0.1 / v0.8.0 pin test).
+  - `make backend` `114 passed`.
+  - `make bundle` `build/capture.js` 2,118,400 bytes.
+  - `make typecheck` 0 errors in the ags-capture-tool tree; 28 tolerated
+    `/usr/share/ags/js` errors, 0 tolerated `ags-platform` errors.
+- Log: `/tmp/opencode/ops-011-gates.log`.
+- No app/backend/overlay source, handler/ack, `style.css` or lane-policy file is
+  in the change set.

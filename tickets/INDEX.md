@@ -60,7 +60,7 @@
 - [OPS-007-release-pins/ticket.md](./OPS-007-release-pins/ticket.md) — Release and pins | `done` | worktree .worktrees/EPIC-002/, branch ticket/EPIC-002-monitor-catalog-dropdowns
 - [OPS-009-evidence-reconciliation/ticket.md](./OPS-009-evidence-reconciliation/ticket.md) — Evidence and status reconciliation after EPIC-002 | `done` | worktree .worktrees/OPS-009/, branch ticket/OPS-009-evidence-reconciliation
 - [OPS-010-runtime-v061-note/ticket.md](./OPS-010-runtime-v061-note/ticket.md) — Refresh the EPIC-002 status note after runtime v0.6.1 | `done` | worktree .worktrees/OPS-010/, branch ticket/OPS-010-runtime-v061-note
-- [OPS-011-platform-v101-pin/ticket.md](./OPS-011-platform-v101-pin/ticket.md) — Bump the local ags-platform pin to v1.0.1 | `in-progress` | worktree .worktrees/OPS-011/, branch ticket/OPS-011-platform-v101-pin
+- [OPS-011-platform-v101-pin/ticket.md](./OPS-011-platform-v101-pin/ticket.md) — Bump the local ags-platform pin to v1.0.1 | `done` | worktree .worktrees/OPS-011/, branch ticket/OPS-011-platform-v101-pin | gates green: unit 10, validation 2, TS 404, conformance 17, backend 114, bundle 2,118,400 B, typecheck 0 in-tree
 
 ## Spikes
 

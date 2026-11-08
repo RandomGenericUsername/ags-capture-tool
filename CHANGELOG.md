@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.7.1 — 2026-11-07
+
+The dev pin moves to `ags-platform` `v1.0.1`, the appearance CSS validation
+patch; `contracts` stays `v0.8.0`. No app code changed.
+
+### Changed
+
+- `Makefile`, the CI tag checkout and the conformance pin test move
+  `AGS_PLATFORM_VERSION` from `v1.0.0` to `v1.0.1`; `CONTRACTS_VERSION` remains
+  `v0.8.0`.
+- `README.md` names the `v1.0.1` / `v0.8.0` tuple and the
+  `.dev/ags-platform/v1.0.1` symlink path.
+- Platform `v1.0.1` fixes `validateAppearanceCss`: it rejects only 3/4/6/8-digit
+  hex colour literals, so CSS ID selectors such as
+  `window#notifications-window` and `url(#fragment)` references are no longer
+  mistaken for colours during a live `appearance-refresh`.
+
+### Unchanged
+
+- `contracts` remains `v0.8.0`; the generation-bound `appearance-refresh`
+  protocol and its ack/deferred/failed responses are unchanged.
+- App, backend and overlay sources, handler wiring, `style.css` and lane policy
+  are untouched.
+
+### Tests
+
+- The conformance pin test asserts `ags-platform` `v1.0.1` / `contracts`
+  `v0.8.0`.
+
 ## v0.7.0 — 2026-11-07
 
 The capture app now consumes Generations v3: the appearance plane is read only

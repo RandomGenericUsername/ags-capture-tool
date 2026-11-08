@@ -269,9 +269,9 @@ test("the contracts v0.8.0 manifest schema agrees with the platform", () => {
   )
 })
 
-test("the Makefile pins the v1.0.0 platform / v0.8.0 contracts tuple", () => {
+test("the Makefile pins the v1.0.1 platform / v0.8.0 contracts tuple", () => {
   const makefile = readText("Makefile")
-  assert.match(makefile, /^AGS_PLATFORM_VERSION := v1\.0\.0$/m)
+  assert.match(makefile, /^AGS_PLATFORM_VERSION := v1\.0\.1$/m)
   assert.match(makefile, /^CONTRACTS_VERSION := v0\.8\.0$/m)
 })
 

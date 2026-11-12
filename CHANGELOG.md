@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.7.2 — 2026-11-12
+
+The dev pin moves to `ags-platform` `v1.1.0` / `contracts` `v0.12.0`, the
+required `surface.window` role and `opacity` token kind. No app code changed.
+
+### Changed
+
+- `Makefile`, the CI tag checkouts and the conformance pin test move
+  `AGS_PLATFORM_VERSION` from `v1.0.1` to `v1.1.0` and `CONTRACTS_VERSION` from
+  `v0.8.0` to `v0.12.0`.
+- `README.md` names the `v1.1.0` / `v0.12.0` tuple and the
+  `.dev/ags-platform/v1.1.0` symlink path.
+- Platform `v1.1.0` requires the six surface roles including `window`, and adds
+  the unitless `surface.window.opacity` token in `[0, 1]`; `contracts` `v0.12.0`
+  ships the same required window group in its appearance schemas and fixtures.
+
+### Unchanged
+
+- The exported platform API, the generation-bound `appearance-refresh` protocol
+  and its ack/deferred/failed responses are unchanged; the app only reads
+  tokens through `value(...)`, so this is a pin-parity release, not an API
+  migration.
+- App, backend and overlay sources, handler wiring, `style.css` and lane policy
+  are untouched.
+
+### Tests
+
+- The conformance pin test asserts `ags-platform` `v1.1.0` / `contracts`
+  `v0.12.0`.
+
 ## v0.7.1 — 2026-11-07
 
 The dev pin moves to `ags-platform` `v1.0.1`, the appearance CSS validation

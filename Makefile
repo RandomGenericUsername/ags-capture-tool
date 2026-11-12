@@ -1,13 +1,13 @@
 .PHONY: help platform-dev contracts-dev deps types test-deps test conformance backend ci bundle typecheck gates clean
 
-# The program tuple this app builds/tests against (AD-31/AD-34). v1.0.1 is the
+# The program tuple this app builds/tests against (AD-31/AD-34). v1.1.0 is the
 # Generations v3 tuple (`createAppearance` / generation-bound
-# `createAppearanceRefreshHandler`) with the appearance CSS hex validation
-# patch; contracts v0.8.0 carries the frozen v3 state plane. The tuple is
-# LOCAL-ONLY in this run: local gates symlink it from .dev/ (gitignored), CI
-# checks out the tags explicitly.
-AGS_PLATFORM_VERSION := v1.0.1
-CONTRACTS_VERSION := v0.8.0
+# `createAppearanceRefreshHandler`) with the required `surface.window` role and
+# the `opacity` token kind; contracts v0.12.0 ships the same required window
+# group. The tuple is LOCAL-ONLY in this run: local gates symlink it from .dev/
+# (gitignored), CI checks out the tags explicitly.
+AGS_PLATFORM_VERSION := v1.1.0
+CONTRACTS_VERSION := v0.12.0
 AGS_PLATFORM_REPO := https://github.com/RandomGenericUsername/ags-platform.git
 AGS_PLATFORM_DEV ?=
 PLATFORM_FETCH_DIR := $(CURDIR)/.dev/ags-platform/$(AGS_PLATFORM_VERSION)
@@ -26,9 +26,9 @@ help:
 	@echo "make ci           stock-runner gates: test + conformance + backend"
 	@echo "make gates        all local gates: ci + bundle + typecheck"
 	@echo ""
-	@echo "Local-only platform v1.0.1 / contracts v0.8.0 tuple: put checkouts/symlinks at"
-	@echo "  .dev/ags-platform/v1.0.1  (or AGS_PLATFORM_DEV=/path/to/ags-platform)"
-	@echo "and .dev/contracts/v0.8.0 (make conformance links ../contracts, or set CONTRACTS_ROOT)."
+	@echo "Local-only platform v1.1.0 / contracts v0.12.0 tuple: put checkouts/symlinks at"
+	@echo "  .dev/ags-platform/v1.1.0  (or AGS_PLATFORM_DEV=/path/to/ags-platform)"
+	@echo "and .dev/contracts/v0.12.0 (make conformance links ../contracts, or set CONTRACTS_ROOT)."
 
 # The platform shortcut. It MUST point outside node_modules: Node refuses to
 # type-strip `.ts` under a real node_modules directory, but realpaths a symlink

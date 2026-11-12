@@ -48,8 +48,8 @@ Node in the stock-runner gates.
 
 ## Appearance plane
 
-The app consumes the Generations v3 Appearance plane (`contracts` v0.8.0 /
-`ags-platform` v1.0.1). Palette, skin and mode are ONE immutable generation
+The app consumes the Generations v3 Appearance plane (`contracts` v0.12.0 /
+`ags-platform` v1.1.0). Palette, skin and mode are ONE immutable generation
 behind `$XDG_STATE_HOME/dotfiles/current`. One module-level
 `createAppearance({ configDir: "ags-capture" })` watches that one hop, verifies
 `current/manifest.json`, reads `current/appearance/ags-capture.css` plus
@@ -101,13 +101,13 @@ appearance provider reloads.
 
 ## Local development
 
-The program tuple is `ags-platform` `v1.0.1` / `contracts` `v0.8.0`, local-only
+The program tuple is `ags-platform` `v1.1.0` / `contracts` `v0.12.0`, local-only
 in this run. The local gates symlink both under `.dev/` (gitignored): the
 platform from `../ags-platform`, and contracts from `../contracts` via `make
 conformance`.
 
 ```sh
-ln -s ../../../ags-platform .dev/ags-platform/v1.0.1   # or use AGS_PLATFORM_DEV
+ln -s ../../../ags-platform .dev/ags-platform/v1.1.0   # or use AGS_PLATFORM_DEV
 make test          # pure unit + copied app tests (Node only)
 make conformance   # manifest + handler + template gate
 make backend       # Python backend pytest suite (uv)

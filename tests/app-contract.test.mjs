@@ -250,7 +250,7 @@ test("the frozen copyable template is present for the next app", () => {
   }
 })
 
-test("the contracts v0.8.0 manifest schema agrees with the platform", () => {
+test("the contracts v0.12.0 manifest schema agrees with the platform", () => {
   const contractsRoot = findContractsRoot()
   assert.notEqual(contractsRoot, null, "cannot find contracts (set CONTRACTS_ROOT)")
   const schema = JSON.parse(
@@ -269,10 +269,10 @@ test("the contracts v0.8.0 manifest schema agrees with the platform", () => {
   )
 })
 
-test("the Makefile pins the v1.0.1 platform / v0.8.0 contracts tuple", () => {
+test("the Makefile pins the v1.1.0 platform / v0.12.0 contracts tuple", () => {
   const makefile = readText("Makefile")
-  assert.match(makefile, /^AGS_PLATFORM_VERSION := v1\.0\.1$/m)
-  assert.match(makefile, /^CONTRACTS_VERSION := v0\.8\.0$/m)
+  assert.match(makefile, /^AGS_PLATFORM_VERSION := v1\.1\.0$/m)
+  assert.match(makefile, /^CONTRACTS_VERSION := v0\.12\.0$/m)
 })
 
 // ── 3. The live handler is real and non-destructive ────────────────────────
